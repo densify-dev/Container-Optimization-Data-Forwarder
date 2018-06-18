@@ -78,11 +78,11 @@ def writeConfig(systems,benchmark,cpu_speed,type):
 def writeAttributes(systems,prometheus_addr,type,name1):
 	f=open('./data/attributes.csv', 'w+')
 	if type == 'container':
-		f.write('host_name,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Container Info,Pod Info,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request\n')
+		f.write('host_name,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Container Info,Pod Info,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Original Parent\n')
 	for i in systems:
 		for j in systems[i]:
 			if i !='' and j != 'pod_info' and j != 'pod_labels':
-				f.write(i + '__' + j + ',Containers,' + prometheus_addr + ',' + systems[i][j]['namespace'] + ',' + systems[i][j][name1] + ',' + systems[i][j]['attr'] + ',' + systems[i][j]['con_info'] + ',' + systems[i]['pod_info'] + ',' + systems[i]['pod_labels'] + ',' + systems[i][j]['cpu_limit'] + ',' + systems[i][j]['cpu_request'] + ',' + systems[i][j]['mem_limit'] + ',' + systems[i][j]['mem_request'] + '\n')
+				f.write(i + '__' + j + ',Containers,' + prometheus_addr + ',' + systems[i][j]['namespace'] + ',' + systems[i][j][name1] + ',' + systems[i][j]['attr'] + ',' + systems[i][j]['con_info'] + ',' + systems[i]['pod_info'] + ',' + systems[i]['pod_labels'] + ',' + systems[i][j]['cpu_limit'] + ',' + systems[i][j]['cpu_request'] + ',' + systems[i][j]['mem_limit'] + ',' + systems[i][j]['mem_request'] + ',' + j + ',' + systems[i][j]['con_instance'] + '\n')
 	f.close()
 		
 
@@ -142,6 +142,7 @@ def main():
 					systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['namespace'] = 'Default'
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]][dc_settings[args.collection]['name1']] = i['metric'][dc_settings[args.collection]['name1']]
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['attr'] = ''
+				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['con_instance'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['con_info'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['cpu_limit'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['cpu_request'] = ''
@@ -208,6 +209,8 @@ def main():
 				attr = ''
 				for j in i['metric']:
 					attr += j + ' : ' + i['metric'][j] + '|'
+					if j == 'instance':
+						systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['con_instance'] = i['metric'][j]
 				attr = attr[:-1]
 				#print(attr)
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['attr'] = attr

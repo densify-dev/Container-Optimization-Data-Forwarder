@@ -27,7 +27,7 @@ args = parser.parse_args()
 
 def metricCollect(metric,dataTag):
 	resp = requests.get(url=metric, timeout=int(args.timeout))
-	#print(metric)
+	print(metric)
 	if resp.status_code != 200:
 		print(metric)
 		print(resp.status_code)
@@ -47,7 +47,7 @@ def writeWorkload(data2,systems,file,property,name1,name2):
 					if i['metric'][name1] in systems:
 						if i['metric'][name2] in systems[i['metric'][name1]]:
 							for j in i['values']:
-								f.write(i['metric'][name1] + '__' + i['metric'][name2] + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
+								f.write(i['metric'][name1] + '__' + i['metric'][name2].replace(':','..') + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
 	f.close()
 
 def writeWorkloadNetwork(data2,systems,file,property,instance,name1,name2):
@@ -64,7 +64,7 @@ def writeWorkloadNetwork(data2,systems,file,property,instance,name1,name2):
 							for j in i['values']:
 								values[i['metric'][name2]][j[0]]=[]
 								values[i['metric'][name2]][j[0]].append(j[1])
-								f.write(i['metric'][name1] + '__' + i['metric'][name2] + ',' + property + ',' + instance + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
+								f.write(i['metric'][name1] + '__' + i['metric'][name2].replace(':','..') + ',' + property + ',' + instance + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
 	f.close()
 	return values
 
@@ -74,22 +74,22 @@ def writeConfig(systems,benchmark,cpu_speed,type):
 		f.write('host_name,HW Total Memory,OS Name,HW Manufacturer,HW Model,HW Serial Number\n')
 	for i in systems:
 		for j in systems[i]:
-			if j !='' and j != 'pod_info' and j != 'pod_labels':
-				f.write(i + '__' + j + ',' + str(systems[i][j]['memory']) + ',Linux,CONTAINERS,' + systems[i][j]['namespace'] + ',' + systems[i][j]['namespace'] + '\n')
+			if j !='' and j != 'pod_info' and j != 'pod_labels' and j != 'created_by_kind' and j != 'created_by_name':
+				f.write(i + '__' + j.replace(':','..') + ',' + str(systems[i][j]['memory']) + ',Linux,CONTAINERS,' + systems[i][j]['namespace'] + ',' + systems[i][j]['namespace'] + '\n')
 	f.close()
 		
 def writeAttributes(systems,prometheus_addr,type):
 	f=open('./data/attributes.csv', 'w+')
 	if type == 'container':
-		f.write('host_name,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Container Info,Pod Info,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Original Parent,Power State\n')
+		f.write('host_name,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Container Info,Pod Info,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Original Parent,Power State,Created By Kind, Created By Name\n')
 	for i in systems:
 		for j in systems[i]:
-			if i !='' and j != 'pod_info' and j != 'pod_labels':
+			if i !='' and j != 'pod_info' and j != 'pod_labels' and j != 'created_by_kind' and j != 'created_by_name':
 				if systems[i][j]['state'] == 1:
 					cstate = 'Terminated'
 				else:
 					cstate = 'Running'
-				f.write(i + '__' + j + ',Containers,' + prometheus_addr + ',' + systems[i][j]['namespace'] + ',' + i + ',' + systems[i][j]['attr'] + ',' + systems[i][j]['con_info'] + ',' + systems[i]['pod_info'] + ',' + systems[i]['pod_labels'] + ',' + systems[i][j]['cpu_limit'] + ',' + systems[i][j]['cpu_request'] + ',' + systems[i][j]['mem_limit'] + ',' + systems[i][j]['mem_request'] + ',' + j + ',' + systems[i][j]['con_instance'] + ',' + cstate + '\n')
+				f.write(i + '__' + j.replace(':','..') + ',Containers,' + prometheus_addr + ',' + systems[i][j]['namespace'] + ',' + i + ',' + systems[i][j]['attr'] + ',' + systems[i][j]['con_info'] + ',' + systems[i]['pod_info'] + ',' + systems[i]['pod_labels'] + ',' + systems[i][j]['cpu_limit'] + ',' + systems[i][j]['cpu_request'] + ',' + systems[i][j]['mem_limit'] + ',' + systems[i][j]['mem_request'] + ',' + j + ',' + systems[i][j]['con_instance'] + ',' + cstate + ',' + systems[i]['created_by_kind'] + ',' + systems[i]['created_by_name'] + '\n')
 	f.close()
 		
 def getkubestatemetrics(systems,query,metric,prometheus_addr):
@@ -139,7 +139,7 @@ def main():
 	dc_settings = {}
 	dc_settings['kubernetes'] = {}
 	#These filters and group by are for the general cadvisor metrics. For the kube state metrics they are coded in line as it varies based on container and pod in each command. To see those ones can search for kube_pod and look at what each does as all those metrics start with kube_pod
-	dc_settings['kubernetes']['grpby'] = 'instance,pod_name,namespace,container_name'
+	dc_settings['kubernetes']['grpby'] = 'instance,pod_name,namespace,container_name,created_by_name,created_by_kind'
 	dc_settings['kubernetes']['filter'] = '{name!~"k8s_POD_.*"}'
 	#for kubernetes this will build the name of the container as pod name__container name
 	dc_settings['kubernetes']['name1'] = 'pod_name'
@@ -171,6 +171,8 @@ def main():
 				systems[i['metric'][dc_settings[args.collection]['name1']]]={}
 				systems[i['metric'][dc_settings[args.collection]['name1']]]['pod_info'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]]['pod_labels'] = ''
+				systems[i['metric'][dc_settings[args.collection]['name1']]]['created_by_kind'] = ''
+				systems[i['metric'][dc_settings[args.collection]['name1']]]['created_by_name'] = ''
 			if dc_settings[args.collection]['name2'] in i['metric']:
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]] = {}
 				if args.collection == 'kubernetes':
@@ -245,7 +247,7 @@ def main():
 			if dc_settings[args.collection]['name2'] in i['metric']:
 				attr = ''
 				for j in i['metric']:
-					attr += j + ' : ' + i['metric'][j] + '|'
+					attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
 					if j == 'instance':
 						systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['con_instance'] = i['metric'][j]
 				attr = attr[:-1]
@@ -271,7 +273,7 @@ def main():
 				if i['metric']['container'] in systems[i['metric']['pod']]:
 					attr = ''
 					for j in i['metric']:
-						attr += j + ' : ' + i['metric'][j] + '|'
+						attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
 					attr = attr[:-1]
 					systems[i['metric']['pod']][i['metric']['container']]['con_info'] = attr
 		
@@ -291,7 +293,11 @@ def main():
 			if i['metric']['pod'] in systems:
 				attr = ''
 				for j in i['metric']:
-					attr += j + ' : ' + i['metric'][j] + '|'
+					if j == 'created_by_kind':
+						systems[i['metric']['pod']]['created_by_kind'] = i['metric'][j]
+					elif j == 'created_by_name':
+						systems[i['metric']['pod']]['created_by_name'] = i['metric'][j]
+					attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
 				attr = attr[:-1]
 				systems[i['metric']['pod']]['pod_info'] = attr
 		
@@ -311,7 +317,7 @@ def main():
 			if i['metric']['pod'] in systems:
 				attr = ''
 				for j in i['metric']:
-					attr += j + ' : ' + i['metric'][j] + '|'
+					attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
 				attr = attr[:-1]
 				systems[i['metric']['pod']]['pod_labels'] = attr
 	
@@ -372,6 +378,8 @@ def main():
 		
 		count += 1
 		
+	#Replica Set data 
+	
 	
 if __name__=="__main__":
     main()

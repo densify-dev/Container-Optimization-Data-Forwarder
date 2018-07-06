@@ -27,7 +27,7 @@ args = parser.parse_args()
 
 def metricCollect(metric,dataTag):
 	resp = requests.get(url=metric, timeout=int(args.timeout))
-	print(metric)
+	#print(metric)
 	if resp.status_code != 200:
 		print(metric)
 		print(resp.status_code)
@@ -70,12 +70,12 @@ def writeWorkloadNetwork(data2,systems,file,property,instance,name1,name2):
 
 def writeConfig(systems,benchmark,cpu_speed,type):
 	f=open('./data/config.csv', 'w+')
-	if type == 'container':
+	if type == 'CONTAINERS':
 		f.write('host_name,HW Total Memory,OS Name,HW Manufacturer,HW Model,HW Serial Number\n')
 	for i in systems:
 		for j in systems[i]:
 			if j !='' and j != 'pod_info' and j != 'pod_labels' and j != 'created_by_kind' and j != 'created_by_name':
-				f.write(i + '__' + j.replace(':','..') + ',' + str(systems[i][j]['memory']) + ',Linux,CONTAINERS,' + systems[i][j]['namespace'] + ',' + systems[i][j]['namespace'] + '\n')
+				f.write(i + '__' + j.replace(':','..') + ',' + str(systems[i][j]['memory']) + ',Linux,' + type + ',' + systems[i][j]['namespace'] + ',' + systems[i][j]['namespace'] + '\n')
 	f.close()
 		
 def writeAttributes(systems,prometheus_addr,type):
@@ -227,7 +227,7 @@ def main():
 					
 	# kube state metrics end
 				
-	writeConfig(systems,benchmark,cpu_speed,'container')
+	writeConfig(systems,benchmark,cpu_speed,'CONTAINERS')
 	
 	# Additional Attributes?
 	data2 = []

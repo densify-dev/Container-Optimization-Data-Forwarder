@@ -27,7 +27,7 @@ args = parser.parse_args()
 
 def metricCollect(metric,dataTag):
 	resp = requests.get(url=metric, timeout=int(args.timeout))
-	#print(metric)
+	print(metric)
 	if resp.status_code != 200:
 		print(metric)
 		print(resp.status_code)
@@ -47,7 +47,10 @@ def writeWorkload(data2,systems,file,property,name1,name2):
 					if i['metric'][name1] in systems:
 						if i['metric'][name2] in systems[i['metric'][name1]]:
 							for j in i['values']:
-								f.write(i['metric'][name1] + '__' + i['metric'][name2].replace(':','..') + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
+								x = i['metric'][name1]
+								if i['metric'][name1] == '<none>':
+									x = systems[i['metric'][name1]][i['metric'][name2]]['pod_name']
+								f.write(x + '__' + i['metric'][name2].replace(':','..') + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
 	f.close()
 
 def writeWorkloadNetwork(data2,systems,file,property,instance,name1,name2):
@@ -62,9 +65,12 @@ def writeWorkloadNetwork(data2,systems,file,property,instance,name1,name2):
 						if i['metric'][name2] in systems[i['metric'][name1]]:
 							values[i['metric'][name2]]={}
 							for j in i['values']:
+								x = i['metric'][name1]
+								if i['metric'][name1] == '<none>':
+									x = systems[i['metric'][name1]][i['metric'][name2]]['pod_name']
 								values[i['metric'][name2]][j[0]]=[]
 								values[i['metric'][name2]][j[0]].append(j[1])
-								f.write(i['metric'][name1] + '__' + i['metric'][name2].replace(':','..') + ',' + property + ',' + instance + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
+								f.write(x + '__' + i['metric'][name2].replace(':','..') + ',' + property + ',' + instance + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
 	f.close()
 	return values
 
@@ -74,8 +80,11 @@ def writeConfig(systems,benchmark,cpu_speed,type):
 		f.write('host_name,HW Total Memory,OS Name,HW Manufacturer,HW Model,HW Serial Number\n')
 	for i in systems:
 		for j in systems[i]:
-			if j !='' and j != 'pod_info' and j != 'pod_labels' and j != 'created_by_kind' and j != 'created_by_name':
-				f.write(i + '__' + j.replace(':','..') + ',' + str(systems[i][j]['memory']) + ',Linux,' + type + ',' + systems[i][j]['namespace'] + ',' + systems[i][j]['namespace'] + '\n')
+			if j !='' and j != 'pod_info' and j != 'pod_labels' and j != 'created_by_kind' and j != 'created_by_name' and j != 'pod_name':
+				x = i
+				if i == '<none>':
+					x = systems[i][j]['pod_name']
+				f.write(x + '__' + j.replace(':','..') + ',' + str(systems[i][j]['memory']) + ',Linux,' + type + ',' + systems[i][j]['namespace'] + ',' + systems[i][j]['namespace'] + '\n')
 	f.close()
 		
 def writeAttributes(systems,prometheus_addr,type):
@@ -84,34 +93,93 @@ def writeAttributes(systems,prometheus_addr,type):
 		f.write('host_name,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Container Info,Pod Info,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Original Parent,Power State,Created By Kind, Created By Name\n')
 	for i in systems:
 		for j in systems[i]:
-			if i !='' and j != 'pod_info' and j != 'pod_labels' and j != 'created_by_kind' and j != 'created_by_name':
+			if i !='' and j != 'pod_info' and j != 'pod_labels' and j != 'created_by_kind' and j != 'created_by_name' and j != 'pod_name':
 				if systems[i][j]['state'] == 1:
 					cstate = 'Terminated'
 				else:
 					cstate = 'Running'
-				f.write(i + '__' + j.replace(':','..') + ',Containers,' + prometheus_addr + ',' + systems[i][j]['namespace'] + ',' + i + ',' + systems[i][j]['attr'] + ',' + systems[i][j]['con_info'] + ',' + systems[i]['pod_info'] + ',' + systems[i]['pod_labels'] + ',' + systems[i][j]['cpu_limit'] + ',' + systems[i][j]['cpu_request'] + ',' + systems[i][j]['mem_limit'] + ',' + systems[i][j]['mem_request'] + ',' + j + ',' + systems[i][j]['con_instance'] + ',' + cstate + ',' + systems[i]['created_by_kind'] + ',' + systems[i]['created_by_name'] + '\n')
+				x = i
+				if i == '<none>':
+					x = systems[i][j]['pod_name']
+				f.write(x + '__' + j.replace(':','..') + ',Containers,' + prometheus_addr + ',' + systems[i][j]['namespace'] + ',' + x + ',' + systems[i][j]['attr'] + ',' + systems[i][j]['con_info'] + ',' + systems[i]['pod_info'] + ',' + systems[i]['pod_labels'] + ',' + systems[i][j]['cpu_limit'] + ',' + systems[i][j]['cpu_request'] + ',' + systems[i][j]['mem_limit'] + ',' + systems[i][j]['mem_request'] + ',' + j + ',' + systems[i][j]['con_instance'] + ',' + cstate + ',' + systems[i]['created_by_kind'] + ',' + systems[i]['created_by_name'] + '\n')
 	f.close()
 		
 def getkubestatemetrics(systems,query,metric,prometheus_addr):
 	data2 = []
 	if args.mode == 'current':
-		query2 = 'http://' + prometheus_addr + '/api/v1/query?query=' + query
+		query2 = 'http://' + prometheus_addr + '/api/v1/query?query=max(' + query + ' * on (namespace,pod) group_left (created_by_name,created_by_kind) kube_pod_info) by (created_by_name,created_by_kind,namespace,container)'
 		data2 += metricCollect(query2,'result')
 	else:
 		count = int(args.days)
 		while count > -1:
 			current_day = (datetime.datetime.today() - datetime.timedelta(days=count)).strftime("%Y-%m-%d")
-			query2 = 'http://' + prometheus_addr + '/api/v1/query_range?query=' + query + '&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+			query2 = 'http://' + prometheus_addr + '/api/v1/query_range?query=max(' + query + ' * on (namespace,pod) group_left (created_by_name,created_by_kind) kube_pod_info) by (created_by_name,created_by_kind,namespace,container)&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
 			data2 += metricCollect(query2,'result')
 			count -= 1
 	
 	for i in data2:
-		if i['metric']['pod'] in systems:
-			if i['metric']['container'] in systems[i['metric']['pod']]:
+		if i['metric']['created_by_name'] in systems:
+			if i['metric']['container'] in systems[i['metric']['created_by_name']]:
 				if args.mode == 'current':
-					systems[i['metric']['pod']][i['metric']['container']][metric] = i['value'][1]
+					systems[i['metric']['created_by_name']][i['metric']['container']][metric] = i['value'][1]
 				else:
-					systems[i['metric']['pod']][i['metric']['container']][metric] = i['values'][len(i['values'])-1][1]
+					systems[i['metric']['created_by_name']][i['metric']['container']][metric] = i['values'][len(i['values'])-1][1]
+
+def getattributes(systems,data2,name1,name2,attribute):
+	tempsystems = {}
+	for i in data2:
+		if name1 in i['metric']:
+			if i['metric'][name1] in systems:
+				if i['metric'][name1] not in tempsystems:
+					tempsystems[i['metric'][name1]] = {}
+				if name2 in i['metric']:
+					if i['metric'][name2] in systems[i['metric'][name1]]:
+						if i['metric'][name2] not in tempsystems[i['metric'][name1]]:
+							tempsystems[i['metric'][name1]][i['metric'][name2]] = {}
+						for j in i['metric']:
+							if j not in tempsystems[i['metric'][name1]][i['metric'][name2]]:
+								tempsystems[i['metric'][name1]][i['metric'][name2]][j] = i['metric'][j].replace(',',';')
+							else:
+								if i['metric'][j].replace(',',';') not in tempsystems[i['metric'][name1]][i['metric'][name2]][j]:
+									tempsystems[i['metric'][name1]][i['metric'][name2]][j] += ';' + i['metric'][j].replace(',',';')
+
+	for i in tempsystems:
+		for j in tempsystems[i]:
+			attr = ''
+			for k in tempsystems[i][j]:
+				attr += k + ' : ' + tempsystems[i][j][k] + '|'
+				if k == 'instance':
+					systems[i][j]['con_instance'] = tempsystems[i][j][k]
+				elif k == 'pod':
+					systems[i][j]['pod_name'] = tempsystems[i][j][k]
+			attr = attr[:-1]
+			systems[i][j][attribute] = attr
+							
+def getattributespod(systems,data2,name1,attribute):
+	tempsystems = {}
+	for i in data2:
+		if name1 in i['metric']:
+			if i['metric'][name1] in systems:
+				if i['metric'][name1] not in tempsystems:
+					tempsystems[i['metric'][name1]] = {}
+				for j in i['metric']:
+					if j not in tempsystems[i['metric'][name1]]:
+						tempsystems[i['metric'][name1]][j] = i['metric'][j].replace(',',';')
+					else:
+						if i['metric'][j].replace(',',';') not in tempsystems[i['metric'][name1]][j]:
+							tempsystems[i['metric'][name1]][j] += ';' + i['metric'][j].replace(',',';')
+				
+	for i in tempsystems:
+		attr = ''
+		for j in tempsystems[i]:
+			attr += j + ' : ' + tempsystems[i][j] + '|'
+			if j == 'created_by_kind':
+				systems[i]['created_by_kind'] = tempsystems[i][j]
+			elif j == 'created_by_name':
+				systems[i]['created_by_name'] = tempsystems[i][j]
+		attr = attr[:-1]
+		systems[i][attribute] = attr
+							
 		
 def main():
 	if str(args.config_file) != 'NA':
@@ -142,7 +210,7 @@ def main():
 	dc_settings['kubernetes']['grpby'] = 'instance,pod_name,namespace,container_name,created_by_name,created_by_kind'
 	dc_settings['kubernetes']['filter'] = '{name!~"k8s_POD_.*"}'
 	#for kubernetes this will build the name of the container as pod name__container name
-	dc_settings['kubernetes']['name1'] = 'pod_name'
+	dc_settings['kubernetes']['name1'] = 'created_by_name'
 	dc_settings['kubernetes']['name2'] = 'container_name'
 	dc_settings['swarm'] = {}
 	dc_settings['swarm']['grpby'] = 'name,instance,id'
@@ -155,16 +223,16 @@ def main():
 	systems={}
 	data2 =[]
 	if args.mode == 'current':					
-		mem_spec = 'http://' + prometheus_addr + '/api/v1/query?query=sum(container_spec_memory_limit_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ')/1024/1024'
+		mem_spec = 'http://' + prometheus_addr + '/api/v1/query?query=max(sum(container_spec_memory_limit_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ')/1024/1024 * on (namespace,pod_name) group_left (created_by_name,created_by_kind) label_replace(kube_pod_info, "pod_name", "$1", "pod", "(.*)")) by (created_by_name,created_by_kind,namespace,container_name)'
 		data2 += metricCollect(mem_spec,'result')
 	else:
 		count = int(args.days)
 		while count > -1:
 			current_day = (datetime.datetime.today() - datetime.timedelta(days=count)).strftime("%Y-%m-%d")
-			mem_spec = 'http://' + prometheus_addr + '/api/v1/query_range?query=sum(container_spec_memory_limit_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ')/1024/1024&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+			mem_spec = 'http://' + prometheus_addr + '/api/v1/query_range?query=max(sum(container_spec_memory_limit_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ')/1024/1024 * on (namespace,pod_name) group_left (created_by_name,created_by_kind) label_replace(kube_pod_info, "pod_name", "$1", "pod", "(.*)")) by (created_by_name,created_by_kind,namespace,container_name)&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
 			data2 += metricCollect(mem_spec,'result')
 			count -= 1
-	
+
 	for i in data2:
 		if dc_settings[args.collection]['name1'] in i['metric']:
 			if i['metric'][dc_settings[args.collection]['name1']] not in systems:
@@ -190,7 +258,9 @@ def main():
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['cpu_request'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['mem_limit'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['mem_request'] = ''
+				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['pod_name'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['state'] = 1
+				
 
 	#kube state metrics start
 	if args.collection == 'kubernetes':
@@ -207,14 +277,15 @@ def main():
 		getkubestatemetrics(systems,query,'mem_request',prometheus_addr)
 				
 		# This should only be a query as we want to get the current containers list that are showing terminated or not.
-		state = 'http://' + prometheus_addr + '/api/v1/query?query=sum(kube_pod_container_status_terminated) by (pod,namespace,container)'
+		state = 'http://' + prometheus_addr + '/api/v1/query?query=max(sum(kube_pod_container_status_terminated) by (pod,namespace,container) * on (namespace,pod) group_left (created_by_name,created_by_kind) kube_pod_info) by (created_by_name,created_by_kind,namespace,container)'
 		data2 = metricCollect(state,'result')
 		
 		for i in data2:
-			if i['metric']['pod'] in systems:
-				if i['metric']['container'] in systems[i['metric']['pod']]:
-					systems[i['metric']['pod']][i['metric']['container']]['state'] = i['value'][1]
+			if i['metric']['created_by_name'] in systems:
+				if i['metric']['container'] in systems[i['metric']['created_by_name']]:
+					systems[i['metric']['created_by_name']][i['metric']['container']]['state'] = i['value'][1]
 	else:
+		#Need to fix or remove
 		# for swarm will just look at current value for memory to see what containers exist right now.
 		# This should only be a query as we want to get the current containers list that are showing terminated or not.
 		state = 'http://' + prometheus_addr + '/api/v1/query?query=sum(container_spec_memory_limit_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ')/1024/1024'
@@ -227,55 +298,59 @@ def main():
 					
 	# kube state metrics end
 				
-	writeConfig(systems,benchmark,cpu_speed,'CONTAINERS')
-	
 	# Additional Attributes?
 	data2 = []
 	if args.mode == 'current':					
-		attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=(sum(container_spec_cpu_shares' + dc_settings[args.collection]['filter'] + ') by (pod_name,namespace,container_name)) * on (namespace,pod_name,container_name) group_right container_spec_cpu_shares'
+		attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=(sum(container_spec_cpu_shares' + dc_settings[args.collection]['filter'] + ') by (pod_name,namespace,container_name)) * on (namespace,pod_name,container_name) group_right container_spec_cpu_shares * on (namespace,pod_name) group_left (created_by_name,created_by_kind) label_replace(kube_pod_info, "pod_name", "$1", "pod", "(.*)")'
 		data2 += metricCollect(attr_spec,'result')
 	else:
 		count = int(args.days)
 		while count > -1:
 			current_day = (datetime.datetime.today() - datetime.timedelta(days=count)).strftime("%Y-%m-%d")
-			attr_spec = 'http://' + prometheus_addr + '/api/v1/query_range?query=(sum(container_spec_cpu_shares' + dc_settings[args.collection]['filter'] + ') by (pod_name,namespace,container_name)) * on (namespace,pod_name,container_name) group_right container_spec_cpu_shares&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+			attr_spec = 'http://' + prometheus_addr + '/api/v1/query_range?query=(sum(container_spec_cpu_shares' + dc_settings[args.collection]['filter'] + ') by (pod_name,namespace,container_name)) * on (namespace,pod_name,container_name) group_right container_spec_cpu_shares * on (namespace,pod_name) group_left (created_by_name,created_by_kind) label_replace(kube_pod_info, "pod_name", "$1", "pod", "(.*)")&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
 			data2 += metricCollect(attr_spec,'result')
 			count -= 1
 				
-	for i in data2:
-		if dc_settings[args.collection]['name1'] in i['metric']:
-			if dc_settings[args.collection]['name2'] in i['metric']:
-				attr = ''
-				for j in i['metric']:
-					attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
-					if j == 'instance':
-						systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['con_instance'] = i['metric'][j]
-				attr = attr[:-1]
-				#print(attr)
-				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['attr'] = attr
+	getattributes(systems,data2,dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'],'attr')
+#	for i in data2:
+#		if dc_settings[args.collection]['name1'] in i['metric']:
+#			if dc_settings[args.collection]['name2'] in i['metric']:
+#				attr = ''
+#				for j in i['metric']:
+#					attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
+#					if j == 'instance':
+#						#Need to fix
+#						systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['con_instance'] = i['metric'][j]
+#				attr = attr[:-1]
+#				#print(attr)
+#				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['attr'] = attr
 		
 	#kube state metrics start
 	if args.collection == 'kubernetes':
 		data2 = []
 		if args.mode == 'current':					
-			attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=sum(kube_pod_container_info) by (pod,namespace,container) * on (namespace,pod,container) group_right kube_pod_container_info'
+			attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=sum(kube_pod_container_info) by (pod,namespace,container) * on (namespace,pod,container) group_right kube_pod_container_info * on (namespace,pod) group_left (created_by_name,created_by_kind) kube_pod_info'
 			data2 += metricCollect(attr_spec,'result')
 		else:
 			count = int(args.days)
 			while count > -1:
 				current_day = (datetime.datetime.today() - datetime.timedelta(days=count)).strftime("%Y-%m-%d")
-				attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=sum(kube_pod_container_info) by (pod,namespace,container) * on (namespace,pod,container) group_right kube_pod_container_info&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+				attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=sum(kube_pod_container_info) by (pod,namespace,container) * on (namespace,pod,container) group_right kube_pod_container_info * on (namespace,pod) group_left (created_by_name,created_by_kind) kube_pod_info&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
 				data2 += metricCollect(attr_spec,'result')
 				count -= 1
 				
-		for i in data2:
-			if i['metric']['pod'] in systems:
-				if i['metric']['container'] in systems[i['metric']['pod']]:
-					attr = ''
-					for j in i['metric']:
-						attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
-					attr = attr[:-1]
-					systems[i['metric']['pod']][i['metric']['container']]['con_info'] = attr
+		getattributes(systems,data2,'created_by_name','container','con_info')
+#		for i in data2:
+#			if i['metric']['created_by_name'] in systems:
+#				if i['metric']['container'] in systems[i['metric']['created_by_name']]:
+#					attr = ''
+#					for j in i['metric']:
+#						if j == 'pod':
+#							#Need to fix
+#							systems[i['metric']['created_by_name']][i['metric']['container']]['pod_name'] = i['metric'][j]
+#						attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
+#					attr = attr[:-1]
+#					systems[i['metric']['created_by_name']][i['metric']['container']]['con_info'] = attr
 		
 		data2 = []
 		if args.mode == 'current':					
@@ -288,41 +363,45 @@ def main():
 				attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_info&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
 				data2 += metricCollect(attr_spec,'result')
 				count -= 1
-				
-		for i in data2:
-			if i['metric']['pod'] in systems:
-				attr = ''
-				for j in i['metric']:
-					if j == 'created_by_kind':
-						systems[i['metric']['pod']]['created_by_kind'] = i['metric'][j]
-					elif j == 'created_by_name':
-						systems[i['metric']['pod']]['created_by_name'] = i['metric'][j]
-					attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
-				attr = attr[:-1]
-				systems[i['metric']['pod']]['pod_info'] = attr
+		
+		getattributespod(systems,data2,'created_by_name','pod_info')
+#		for i in data2:
+#			if i['metric']['created_by_name'] in systems:
+#				attr = ''
+#				for j in i['metric']:
+#					if j == 'created_by_kind':
+#						systems[i['metric']['created_by_name']]['created_by_kind'] = i['metric'][j]
+#					elif j == 'created_by_name':
+#						systems[i['metric']['created_by_name']]['created_by_name'] = i['metric'][j]
+#					attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
+#				attr = attr[:-1]
+#				systems[i['metric']['created_by_name']]['pod_info'] = attr
 		
 		data2 = []
 		if args.mode == 'current':					
-			attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_labels'
+			attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_labels * on (namespace,pod) group_left (created_by_name,created_by_kind) kube_pod_info'
 			data2 += metricCollect(attr_spec,'result')
 		else:
 			count = int(args.days)
 			while count > -1:
 				current_day = (datetime.datetime.today() - datetime.timedelta(days=count)).strftime("%Y-%m-%d")
-				attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_labels&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+				attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_labels * on (namespace,pod) group_left (created_by_name,created_by_kind) kube_pod_info&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
 				data2 += metricCollect(attr_spec,'result')
 				count -= 1
 						
-		for i in data2:
-			if i['metric']['pod'] in systems:
-				attr = ''
-				for j in i['metric']:
-					attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
-				attr = attr[:-1]
-				systems[i['metric']['pod']]['pod_labels'] = attr
+		getattributespod(systems,data2,'created_by_name','pod_labels')
+#		for i in data2:
+#			if i['metric']['created_by_name'] in systems:
+#				attr = ''
+#				for j in i['metric']:
+#					#Need to fix
+#					attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
+#				attr = attr[:-1]
+#				systems[i['metric']['created_by_name']]['pod_labels'] = attr
 	
 	# kube state metrics end
 	
+	writeConfig(systems,benchmark,cpu_speed,'CONTAINERS')
 	writeAttributes(systems,prometheus_addr,'container')
 		
 	#workload metrics	
@@ -330,27 +409,27 @@ def main():
 	while count <= int(args.days):
 		current_day = (datetime.datetime.today() - datetime.timedelta(days=count)).strftime("%Y-%m-%d")
 	
-		cpu_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=round(sum(rate(container_cpu_usage_seconds_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ')*1000,1)&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		cpu_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=max(round(sum(rate(container_cpu_usage_seconds_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ')*1000,1) * on (namespace,pod_name) group_left (created_by_name,created_by_kind) label_replace(kube_pod_info, "pod_name", "$1", "pod", "(.*)")) by (created_by_name,created_by_kind,namespace,container_name)&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
 		data2 = metricCollect(cpu_metrics,'result')
 		writeWorkload(data2,systems,'cpu_mCores_workload' + current_day,'CPU Utilization in mCores',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 
-		mem_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=sum(container_memory_usage_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ')&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		mem_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=max(sum(container_memory_usage_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') * on (namespace,pod_name) group_left (created_by_name,created_by_kind) label_replace(kube_pod_info, "pod_name", "$1", "pod", "(.*)")) by (created_by_name,created_by_kind,namespace,container_name)&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
 		data2 = metricCollect(mem_metrics,'result')
 		writeWorkload(data2,systems,'mem_workload' + current_day,'Raw Mem Utilization',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 						
-		rss_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=sum(container_memory_rss' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ')&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		rss_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=max(sum(container_memory_rss' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') * on (namespace,pod_name) group_left (created_by_name,created_by_kind) label_replace(kube_pod_info, "pod_name", "$1", "pod", "(.*)")) by (created_by_name,created_by_kind,namespace,container_name)&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
 		data2 = metricCollect(rss_metrics,'result')
 		writeWorkload(data2,systems,'rss_workload' + current_day,'Actual Memory Utilization',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 		
-		disk_bytes_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=sum(container_fs_usage_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ')&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		disk_bytes_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=max(sum(container_fs_usage_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') * on (namespace,pod_name) group_left (created_by_name,created_by_kind) label_replace(kube_pod_info, "pod_name", "$1", "pod", "(.*)")) by (created_by_name,created_by_kind,namespace,container_name)&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
 		data2 = metricCollect(disk_bytes_metrics,'result')
 		writeWorkload(data2,systems,'disk_workload' + current_day,'Raw Disk Utilization',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 							
-		net_s_bytes_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=sum(rate(container_network_transmit_bytes_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ')&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		net_s_bytes_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=max(sum(rate(container_network_transmit_bytes_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') * on (namespace,pod_name) group_left (created_by_name,created_by_kind) label_replace(kube_pod_info, "pod_name", "$1", "pod", "(.*)")) by (created_by_name,created_by_kind,namespace,container_name)&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
 		data2 = metricCollect(net_s_bytes_metrics,'result')
 		valuesSend = writeWorkloadNetwork(data2,systems,'net_bytes_s_workload' + current_day,'Network Interface Bytes Sent per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 		
-		net_r_bytes_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=sum(rate(container_network_receive_bytes_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ')&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		net_r_bytes_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=max(sum(rate(container_network_receive_bytes_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') * on (namespace,pod_name) group_left (created_by_name,created_by_kind) label_replace(kube_pod_info, "pod_name", "$1", "pod", "(.*)")) by (created_by_name,created_by_kind,namespace,container_name)&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
 		data2 = metricCollect(net_r_bytes_metrics,'result')
 		valuesReceived = writeWorkloadNetwork(data2,systems,'net_bytes_r_workload' + current_day,'Network Interface Bytes Received per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 		
@@ -361,11 +440,11 @@ def main():
 				f12.write(i + ',Network Interface Bytes Total per sec,,' + datetime.datetime.fromtimestamp(j).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + str(float(valuesReceived[i][j][0]) + float(valuesSend[i][j][0])) + '\n')
 		f12.close()
 		
-		net_s_pkts_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=sum(rate(container_network_transmit_packets_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ')&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		net_s_pkts_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=max(sum(rate(container_network_transmit_packets_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') * on (namespace,pod_name) group_left (created_by_name,created_by_kind) label_replace(kube_pod_info, "pod_name", "$1", "pod", "(.*)")) by (created_by_name,created_by_kind,namespace,container_name)&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
 		data2 = metricCollect(net_s_pkts_metrics,'result')
 		valuesSend = writeWorkloadNetwork(data2,systems,'net_pkts_s_workload' + current_day,'Network Interface Packets Sent per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 												
-		net_r_pkts_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=sum(rate(container_network_receive_packets_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ')&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		net_r_pkts_metrics = 'http://' + prometheus_addr + '/api/v1/query_range?query=max(sum(rate(container_network_receive_packets_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') * on (namespace,pod_name) group_left (created_by_name,created_by_kind) label_replace(kube_pod_info, "pod_name", "$1", "pod", "(.*)")) by (created_by_name,created_by_kind,namespace,container_name)&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
 		data2 = metricCollect(net_r_pkts_metrics,'result')
 		valuesReceived = writeWorkloadNetwork(data2,systems,'net_pkts_r_workload' + current_day,'Network Interface Packets Received per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 		

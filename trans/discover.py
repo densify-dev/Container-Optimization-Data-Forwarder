@@ -80,7 +80,7 @@ def writeConfig(systems,benchmark,cpu_speed,type):
 		f.write('host_name,HW Total Memory,OS Name,HW Manufacturer,HW Model,HW Serial Number\n')
 	for i in systems:
 		for j in systems[i]:
-			if j !='' and j != 'pod_info' and j != 'pod_labels' and j != 'created_by_kind' and j != 'created_by_name' and j != 'pod_name':
+			if j !='' and j != 'pod_info' and j != 'pod_labels' and j != 'created_by_kind' and j != 'created_by_name' and j != 'pod_name' and j != 'current_size':
 				x = i
 				if i == '<none>':
 					x = systems[i][j]['pod_name']
@@ -90,10 +90,10 @@ def writeConfig(systems,benchmark,cpu_speed,type):
 def writeAttributes(systems,prometheus_addr,type):
 	f=open('./data/attributes.csv', 'w+')
 	if type == 'container':
-		f.write('host_name,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Container Info,Pod Info,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Original Parent,Power State,Created By Kind, Created By Name\n')
+		f.write('host_name,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Container Info,Pod Info,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Original Parent,Power State,Created By Kind, Created By Name,Current Size\n')
 	for i in systems:
 		for j in systems[i]:
-			if i !='' and j != 'pod_info' and j != 'pod_labels' and j != 'created_by_kind' and j != 'created_by_name' and j != 'pod_name':
+			if i !='' and j != 'pod_info' and j != 'pod_labels' and j != 'created_by_kind' and j != 'created_by_name' and j != 'pod_name' and j != 'current_size':
 				if systems[i][j]['state'] == 1:
 					cstate = 'Terminated'
 				else:
@@ -101,7 +101,7 @@ def writeAttributes(systems,prometheus_addr,type):
 				x = i
 				if i == '<none>':
 					x = systems[i][j]['pod_name']
-				f.write(x + '__' + j.replace(':','..') + ',Containers,' + prometheus_addr + ',' + systems[i][j]['namespace'] + ',' + x + ',' + systems[i][j]['attr'] + ',' + systems[i][j]['con_info'] + ',' + systems[i]['pod_info'] + ',' + systems[i]['pod_labels'] + ',' + systems[i][j]['cpu_limit'] + ',' + systems[i][j]['cpu_request'] + ',' + systems[i][j]['mem_limit'] + ',' + systems[i][j]['mem_request'] + ',' + j + ',' + systems[i][j]['con_instance'] + ',' + cstate + ',' + systems[i]['created_by_kind'] + ',' + systems[i]['created_by_name'] + '\n')
+				f.write(x + '__' + j.replace(':','..') + ',Containers,' + prometheus_addr + ',' + systems[i][j]['namespace'] + ',' + x + ',' + systems[i][j]['attr'] + ',' + systems[i][j]['con_info'] + ',' + systems[i]['pod_info'] + ',' + systems[i]['pod_labels'] + ',' + systems[i][j]['cpu_limit'] + ',' + systems[i][j]['cpu_request'] + ',' + systems[i][j]['mem_limit'] + ',' + systems[i][j]['mem_request'] + ',' + j + ',' + systems[i][j]['con_instance'][:-1] + ',' + cstate + ',' + systems[i]['created_by_kind'] + ',' + systems[i]['created_by_name'] + ',' + systems[i]['current_size'] + '\n')
 	f.close()
 		
 def getkubestatemetrics(systems,query,metric,prometheus_addr):
@@ -149,7 +149,8 @@ def getattributes(systems,data2,name1,name2,attribute):
 			for k in tempsystems[i][j]:
 				attr += k + ' : ' + tempsystems[i][j][k] + '|'
 				if k == 'instance':
-					systems[i][j]['con_instance'] = tempsystems[i][j][k]
+					if attribute == 'attr':
+						systems[i][j]['con_instance'] += tempsystems[i][j][k] + ';'
 				elif k == 'pod':
 					systems[i][j]['pod_name'] = tempsystems[i][j][k]
 			attr = attr[:-1]
@@ -241,6 +242,7 @@ def main():
 				systems[i['metric'][dc_settings[args.collection]['name1']]]['pod_labels'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]]['created_by_kind'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]]['created_by_name'] = ''
+				systems[i['metric'][dc_settings[args.collection]['name1']]]['current_size'] = ''
 			if dc_settings[args.collection]['name2'] in i['metric']:
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]] = {}
 				if args.collection == 'kubernetes':
@@ -312,18 +314,6 @@ def main():
 			count -= 1
 				
 	getattributes(systems,data2,dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'],'attr')
-#	for i in data2:
-#		if dc_settings[args.collection]['name1'] in i['metric']:
-#			if dc_settings[args.collection]['name2'] in i['metric']:
-#				attr = ''
-#				for j in i['metric']:
-#					attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
-#					if j == 'instance':
-#						#Need to fix
-#						systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['con_instance'] = i['metric'][j]
-#				attr = attr[:-1]
-#				#print(attr)
-#				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['attr'] = attr
 		
 	#kube state metrics start
 	if args.collection == 'kubernetes':
@@ -340,17 +330,6 @@ def main():
 				count -= 1
 				
 		getattributes(systems,data2,'created_by_name','container','con_info')
-#		for i in data2:
-#			if i['metric']['created_by_name'] in systems:
-#				if i['metric']['container'] in systems[i['metric']['created_by_name']]:
-#					attr = ''
-#					for j in i['metric']:
-#						if j == 'pod':
-#							#Need to fix
-#							systems[i['metric']['created_by_name']][i['metric']['container']]['pod_name'] = i['metric'][j]
-#						attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
-#					attr = attr[:-1]
-#					systems[i['metric']['created_by_name']][i['metric']['container']]['con_info'] = attr
 		
 		data2 = []
 		if args.mode == 'current':					
@@ -365,17 +344,6 @@ def main():
 				count -= 1
 		
 		getattributespod(systems,data2,'created_by_name','pod_info')
-#		for i in data2:
-#			if i['metric']['created_by_name'] in systems:
-#				attr = ''
-#				for j in i['metric']:
-#					if j == 'created_by_kind':
-#						systems[i['metric']['created_by_name']]['created_by_kind'] = i['metric'][j]
-#					elif j == 'created_by_name':
-#						systems[i['metric']['created_by_name']]['created_by_name'] = i['metric'][j]
-#					attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
-#				attr = attr[:-1]
-#				systems[i['metric']['created_by_name']]['pod_info'] = attr
 		
 		data2 = []
 		if args.mode == 'current':					
@@ -390,14 +358,64 @@ def main():
 				count -= 1
 						
 		getattributespod(systems,data2,'created_by_name','pod_labels')
-#		for i in data2:
-#			if i['metric']['created_by_name'] in systems:
-#				attr = ''
-#				for j in i['metric']:
-#					#Need to fix
-#					attr += j + ' : ' + i['metric'][j].replace(',',';') + '|'
-#				attr = attr[:-1]
-#				systems[i['metric']['created_by_name']]['pod_labels'] = attr
+		
+		data2 = []
+		if args.mode == 'current':					
+			attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=kube_replicaset_spec_replicas'
+			data2 += metricCollect(attr_spec,'result')
+		else:
+			count = int(args.days)
+			while count > -1:
+				current_day = (datetime.datetime.today() - datetime.timedelta(days=count)).strftime("%Y-%m-%d")
+				attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=kube_replicaset_spec_replicas&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+				data2 += metricCollect(attr_spec,'result')
+				count -= 1
+						
+		for i in data2:
+			if i['metric']['replicaset'] in systems:
+				if args.mode == 'current':
+					systems[i['metric']['replicaset']]['current_size'] = i['value'][1]
+				else:
+					systems[i['metric']['replicaset']]['current_size'] = i['values'][len(i['values'])-1][1]
+		
+		data2 = []
+		if args.mode == 'current':					
+			attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=kube_replicationcontroller_spec_replicas'
+			data2 += metricCollect(attr_spec,'result')
+		else:
+			count = int(args.days)
+			while count > -1:
+				current_day = (datetime.datetime.today() - datetime.timedelta(days=count)).strftime("%Y-%m-%d")
+				attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=kube_replicationcontroller_spec_replicas&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+				data2 += metricCollect(attr_spec,'result')
+				count -= 1
+						
+		for i in data2:
+			if i['metric']['replicationcontroller'] in systems:
+				if args.mode == 'current':
+					systems[i['metric']['replicationcontroller']]['current_size'] = i['value'][1]
+				else:
+					systems[i['metric']['replicationcontroller']]['current_size'] = i['values'][len(i['values'])-1][1]
+		
+		data2 = []
+		if args.mode == 'current':					
+			attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=kube_daemonset_status_number_available'
+			data2 += metricCollect(attr_spec,'result')
+		else:
+			count = int(args.days)
+			while count > -1:
+				current_day = (datetime.datetime.today() - datetime.timedelta(days=count)).strftime("%Y-%m-%d")
+				attr_spec = 'http://' + prometheus_addr + '/api/v1/query?query=kube_daemonset_status_number_available&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+				data2 += metricCollect(attr_spec,'result')
+				count -= 1
+						
+		for i in data2:
+			if i['metric']['daemonset'] in systems:
+				if args.mode == 'current':
+					systems[i['metric']['daemonset']]['current_size'] = i['value'][1]
+				else:
+					systems[i['metric']['daemonset']]['current_size'] = i['values'][len(i['values'])-1][1]
+
 	
 	# kube state metrics end
 	
@@ -456,9 +474,6 @@ def main():
 		f13.close()
 		
 		count += 1
-		
-	#Replica Set data 
-	
 	
 if __name__=="__main__":
     main()

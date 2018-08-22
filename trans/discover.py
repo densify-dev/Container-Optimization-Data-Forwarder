@@ -50,7 +50,7 @@ def writeWorkload(data2,systems,file,property,name1,name2):
 								x = i['metric'][name1]
 								if i['metric'][name1] == '<none>':
 									x = systems[i['metric'][name1]][i['metric'][name2]]['pod_name']
-								f.write(x + '__' + i['metric'][name2].replace(':','..') + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
+								f.write(x.replace(';','..') + '__' + i['metric'][name2].replace(':','..') + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
 	f.close()
 
 def writeWorkloadNetwork(data2,systems,file,property,instance,name1,name2):
@@ -70,7 +70,7 @@ def writeWorkloadNetwork(data2,systems,file,property,instance,name1,name2):
 									x = systems[i['metric'][name1]][i['metric'][name2]]['pod_name']
 								values[i['metric'][name2]][j[0]]=[]
 								values[i['metric'][name2]][j[0]].append(j[1])
-								f.write(x + '__' + i['metric'][name2].replace(':','..') + ',' + property + ',' + instance + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
+								f.write(x.replace(';','..') + '__' + i['metric'][name2].replace(':','..') + ',' + property + ',' + instance + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
 	f.close()
 	return values
 
@@ -84,13 +84,13 @@ def writeConfig(systems,benchmark,cpu_speed,type):
 				x = i
 				if i == '<none>':
 					x = systems[i][j]['pod_name']
-				f.write(x + '__' + j.replace(':','..') + ',' + str(systems[i][j]['memory']) + ',Linux,' + type + ',' + systems[i][j]['namespace'] + ',' + systems[i][j]['namespace'] + '\n')
+				f.write(x.replace(';','..') + '__' + j.replace(':','..') + ',' + str(systems[i][j]['memory']) + ',Linux,' + type + ',' + systems[i][j]['namespace'] + ',' + systems[i][j]['namespace'] + '\n')
 	f.close()
 		
 def writeAttributes(systems,prometheus_addr,type):
 	f=open('./data/attributes.csv', 'w+')
 	if type == 'container':
-		f.write('host_name,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Container Info,Pod Info,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Original Parent,Power State,Created By Kind, Created By Name,Current Size\n')
+		f.write('host_name,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Container Info,Pod Info,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Current Nodes,Power State,Created By Kind,Created By Name,Current Size\n')
 	for i in systems:
 		for j in systems[i]:
 			if i !='' and j != 'pod_info' and j != 'pod_labels' and j != 'created_by_kind' and j != 'created_by_name' and j != 'pod_name' and j != 'current_size':
@@ -101,7 +101,7 @@ def writeAttributes(systems,prometheus_addr,type):
 				x = i
 				if i == '<none>':
 					x = systems[i][j]['pod_name']
-				f.write(x + '__' + j.replace(':','..') + ',Containers,' + prometheus_addr + ',' + systems[i][j]['namespace'] + ',' + x + ',' + systems[i][j]['attr'] + ',' + systems[i][j]['con_info'] + ',' + systems[i]['pod_info'] + ',' + systems[i]['pod_labels'] + ',' + systems[i][j]['cpu_limit'] + ',' + systems[i][j]['cpu_request'] + ',' + systems[i][j]['mem_limit'] + ',' + systems[i][j]['mem_request'] + ',' + j + ',' + systems[i][j]['con_instance'][:-1] + ',' + cstate + ',' + systems[i]['created_by_kind'] + ',' + systems[i]['created_by_name'] + ',' + systems[i]['current_size'] + '\n')
+				f.write(x.replace(';','..') + '__' + j.replace(':','..') + ',Containers,' + prometheus_addr + ',' + systems[i][j]['namespace'] + ',' + x + ',' + systems[i][j]['attr'] + ',' + systems[i][j]['con_info'] + ',' + systems[i]['pod_info'] + ',' + systems[i]['pod_labels'] + ',' + systems[i][j]['cpu_limit'] + ',' + systems[i][j]['cpu_request'] + ',' + systems[i][j]['mem_limit'] + ',' + systems[i][j]['mem_request'] + ',' + j + ',' + systems[i][j]['con_instance'][:-1] + ',' + cstate + ',' + systems[i]['created_by_kind'] + ',' + systems[i]['created_by_name'] + ',' + systems[i]['current_size'] + '\n')
 	f.close()
 		
 def getkubestatemetrics(systems,query,metric,prometheus_addr):
@@ -142,15 +142,21 @@ def getattributes(systems,data2,name1,name2,attribute):
 							else:
 								if i['metric'][j].replace(',',';') not in tempsystems[i['metric'][name1]][i['metric'][name2]][j]:
 									tempsystems[i['metric'][name1]][i['metric'][name2]][j] += ';' + i['metric'][j].replace(',',';')
-
+									
 	for i in tempsystems:
 		for j in tempsystems[i]:
 			attr = ''
 			for k in tempsystems[i][j]:
-				attr += k + ' : ' + tempsystems[i][j][k] + '|'
+				if len(k) < 250:
+					temp = tempsystems[i][j][k]
+					if len(temp)-3-len(k) < 256:
+						attr += k + ' : ' + temp + '|'
+					else:
+						templength = 256 - 3 - len(k)
+						attr += k + ' : ' + temp[:templength] + '|'
 				if k == 'instance':
 					if attribute == 'attr':
-						systems[i][j]['con_instance'] += tempsystems[i][j][k] + ';'
+						systems[i][j]['con_instance'] += tempsystems[i][j][k].replace(';','|') + '|'
 				elif k == 'pod':
 					systems[i][j]['pod_name'] = tempsystems[i][j][k]
 			attr = attr[:-1]

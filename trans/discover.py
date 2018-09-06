@@ -27,7 +27,7 @@ args = parser.parse_args()
 
 def metricCollect(metric,dataTag):
 	resp = requests.get(url=metric, timeout=int(args.timeout))
-	#print(metric)
+	print(metric)
 	if resp.status_code != 200:
 		print(metric)
 		print(resp.status_code)

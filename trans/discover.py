@@ -13,8 +13,8 @@ parser.add_argument('--address', dest='prom_addr', default='',
                     help='Name of Prometheus server')
 parser.add_argument('--port', dest='prom_port', default='',
                     help='Port of Prometheus server')
-parser.add_argument('--days', dest='days', default='0',
-                    help='Amount of days to receive data')
+parser.add_argument('--history', dest='history', default='1',
+                    help='Amount of time to go back for data collection works with the interval and intervalSize settings')
 parser.add_argument('--file', dest='config_file', default='NA',
                     help='Config file to load settings from')
 parser.add_argument('--timeout', dest='timeout', default='3600',
@@ -29,6 +29,10 @@ parser.add_argument('--sslCertVerify', dest='verify', default='True',
                     help='Verify SSL certificates or not can be True|False|Directory containing certificates')
 parser.add_argument('--aggregator', dest='aggregator', default='max',
                     help='Which aggregator for the data collection of controllers to use max|avg|min')
+parser.add_argument('--interval', dest='interval', default='days',
+                    help='interval to use for data collection. Can be days, hours or minutes')
+parser.add_argument('--intervalSize', dest='interval_size', default='1',
+                    help='Interval size to be used for querying. eg. default of 1 with default interval of days queries 1 day at a time')
 parser.add_argument('--debug', dest='debug', default='false',
                     help='enable debug logging')
 args = parser.parse_args()
@@ -54,17 +58,27 @@ def metricCollect(metric,dataTag,query_type):
 	data2 = data['data'][dataTag]
 	return data2
 
-def multiDayCollect(query,dataTag):
+def multiDayCollect(query,dataTag,current_time):
 	data2 = []
 	if args.mode == 'current':					
 		data2 += metricCollect(query,dataTag,'query')
 	else:
-		count = int(args.days)
+		count = int(args.history)
 		while count > -1:
-			current_day = (datetime.datetime.today() - datetime.timedelta(days=count)).strftime("%Y-%m-%d")
-			metric = query + '&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+			count2 = count - int(args.interval_size)
+			if args.interval == 'days':
+				start = (current_time - datetime.timedelta(days=count)).strftime("%Y-%m-%dT00:00:00.000Z")
+				end = (current_time - datetime.timedelta(days=count2)).strftime("%Y-%m-%dT23:00:00.000Z")
+			elif args.interval == 'hours':
+				start = (current_time - datetime.timedelta(hours=count)).strftime("%Y-%m-%dT%H:00:00.000Z")
+				end = (current_time - datetime.timedelta(hours=count2)).strftime("%Y-%m-%dT%H:00:00.000Z")
+			elif args.interval == 'minutes':
+				start = (current_time - datetime.timedelta(minutes=count)).strftime("%Y-%m-%dT%H:%M:00.000Z")
+				end = (current_time - datetime.timedelta(minutes=count2)).strftime("%Y-%m-%dT%H:%M:00.000Z")
+	
+			metric = query + '&start=' + start + '&end=' + end + '&step=5m'
 			data2 += metricCollect(metric,dataTag,'query_range')
-			count -= 1
+			count -= int(args.interval_size)
 	return data2
 	
 def writeWorkload(data2,systems,file,property,name1,name2):
@@ -134,9 +148,9 @@ def writeAttributes(systems,type):
 				f.write(x.replace(';','.') + '__' + j.replace(':','.') + ',Containers,' + str(args.prom_addr) + ',' + systems[i][j]['namespace'] + ',' + x + ',' + systems[i][j]['attr'] + ',' + systems[i][j]['con_info'] + ',' + systems[i]['pod_info'] + ',' + systems[i]['pod_labels'] + ',' + systems[i][j]['cpu_limit'] + ',' + systems[i][j]['cpu_request'] + ',' + systems[i][j]['mem_limit'] + ',' + systems[i][j]['mem_request'] + ',' + j + ',' + systems[i][j]['con_instance'][:-1] + ',' + cstate + ',' + systems[i]['created_by_kind'] + ',' + systems[i]['created_by_name'] + ',' + systems[i]['current_size'] + '\n')
 	f.close()
 		
-def getkubestatemetrics(systems,query,metric):
+def getkubestatemetrics(systems,query,metric,current_time):
 	query2 = str(args.aggregator) + '(' + query + ' * on (namespace,pod) group_left (created_by_name,created_by_kind) kube_pod_info) by (created_by_name,created_by_kind,namespace,container)'
-	data2 = multiDayCollect(query2,'result')
+	data2 = multiDayCollect(query2,'result',current_time)
 
 	for i in data2:
 		if i['metric']['created_by_name'] in systems:
@@ -210,13 +224,14 @@ def getattributespod(systems,data2,name1,attribute):
 							
 		
 def main():
+	current_time = datetime.datetime.today()
 	if str(args.config_file) != 'NA':
 		f=open(str(args.config_file), 'r')
 		for line in f:
 			info = line.split()
 			if len(info) !=0:
-				if info[0] == 'days' and args.days == '0':
-					args.days = info[1]
+				if info[0] == 'history' and args.history == '1':
+					args.history = info[1]
 				elif info[0] == 'prometheus_address' and str(args.prom_addr) == '':
 					args.prom_addr = info[1]
 				elif info[0] == 'prometheus_port' and str(args.prom_port) == '':
@@ -233,6 +248,10 @@ def main():
 					args.verify = info[1]
 				elif info[0] == 'aggregator' and args.aggregator == 'max':
 					args.aggregator = info[1]
+				elif info[0] == 'interval' and args.interval == 'days':
+					args.interval = info[1]
+				elif info[0] == 'interval_size' and args.interval_size == 'false':
+					args.interval_size = info[1]
 				elif info[0] == 'debug' and args.debug == 'false':
 					args.debug = info[1]
 		f.close()
@@ -262,7 +281,7 @@ def main():
 	#containers
 	systems={}
 	query = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_spec_memory_limit_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ')/1024/1024 ' + dc_settings[args.collection]['ksm2'] + ''
-	data2 = multiDayCollect(query,'result')
+	data2 = multiDayCollect(query,'result',current_time)
 	
 	for i in data2:
 		if dc_settings[args.collection]['name1'] in i['metric']:
@@ -297,16 +316,16 @@ def main():
 	#kube state metrics start
 	if args.collection == 'kubernetes':
 		query = 'sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000'
-		getkubestatemetrics(systems,query,'cpu_limit')
+		getkubestatemetrics(systems,query,'cpu_limit',current_time)
 		
 		query = 'sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000'
-		getkubestatemetrics(systems,query,'cpu_request')
+		getkubestatemetrics(systems,query,'cpu_request',current_time)
 		
 		query = 'sum(kube_pod_container_resource_limits_memory_bytes) by (pod,namespace,container)/1024/1024'
-		getkubestatemetrics(systems,query,'mem_limit')
+		getkubestatemetrics(systems,query,'mem_limit',current_time)
 		
 		query = 'sum(kube_pod_container_resource_requests_memory_bytes) by (pod,namespace,container)/1024/1024'
-		getkubestatemetrics(systems,query,'mem_request')
+		getkubestatemetrics(systems,query,'mem_request',current_time)
 				
 		# This should only be a query as we want to get the current containers list that are showing terminated or not.
 		state = str(args.aggregator) + '(sum(kube_pod_container_status_terminated) by (pod,namespace,container) * on (namespace,pod) group_left (created_by_name,created_by_kind) kube_pod_info) by (created_by_name,created_by_kind,namespace,container)'
@@ -332,25 +351,25 @@ def main():
 				
 	# Additional Attributes?
 	query = '(sum(container_spec_cpu_shares' + dc_settings[args.collection]['filter'] + ') by (pod_name,namespace,container_name)) * on (namespace,pod_name,container_name) group_right container_spec_cpu_shares * on (namespace,pod_name) group_left (created_by_name,created_by_kind) label_replace(kube_pod_info, "pod_name", "$1", "pod", "(.*)")'
-	data2 = multiDayCollect(query,'result')
+	data2 = multiDayCollect(query,'result',current_time)
 	getattributes(systems,data2,dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'],'attr')
 		
 	#kube state metrics start
 	if args.collection == 'kubernetes':
 		query = 'sum(kube_pod_container_info) by (pod,namespace,container) * on (namespace,pod,container) group_right kube_pod_container_info * on (namespace,pod) group_left (created_by_name,created_by_kind) kube_pod_info'
-		data2 = multiDayCollect(query,'result')
+		data2 = multiDayCollect(query,'result',current_time)
 		getattributes(systems,data2,'created_by_name','container','con_info')
 		
 		query = 'sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_info'
-		data2 = multiDayCollect(query,'result')
+		data2 = multiDayCollect(query,'result',current_time)
 		getattributespod(systems,data2,'created_by_name','pod_info')
 	
 		query = 'sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_labels * on (namespace,pod) group_left (created_by_name,created_by_kind) kube_pod_info'
-		data2 = multiDayCollect(query,'result')
+		data2 = multiDayCollect(query,'result',current_time)
 		getattributespod(systems,data2,'created_by_name','pod_labels')
 		
 		query = 'kube_replicaset_spec_replicas'
-		data2 = multiDayCollect(query,'result')
+		data2 = multiDayCollect(query,'result',current_time)
 		for i in data2:
 			if i['metric']['replicaset'] in systems:
 				if args.mode == 'current':
@@ -359,7 +378,7 @@ def main():
 					systems[i['metric']['replicaset']]['current_size'] = i['values'][len(i['values'])-1][1]
 		
 		query = 'kube_replicationcontroller_spec_replicas'
-		data2 = multiDayCollect(query,'result')
+		data2 = multiDayCollect(query,'result',current_time)
 		for i in data2:
 			if i['metric']['replicationcontroller'] in systems:
 				if args.mode == 'current':
@@ -368,7 +387,7 @@ def main():
 					systems[i['metric']['replicationcontroller']]['current_size'] = i['values'][len(i['values'])-1][1]
 		
 		query = 'kube_daemonset_status_number_available'
-		data2 = multiDayCollect(query,'result')
+		data2 = multiDayCollect(query,'result',current_time)
 		for i in data2:
 			if i['metric']['daemonset'] in systems:
 				if args.mode == 'current':
@@ -384,56 +403,65 @@ def main():
 		
 	#workload metrics	
 	count = 0
-	while count <= int(args.days):
-		current_day = (datetime.datetime.today() - datetime.timedelta(days=count)).strftime("%Y-%m-%d")
-	
-		cpu_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'round(sum(rate(container_cpu_usage_seconds_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ')*1000,1) ' + dc_settings[args.collection]['ksm2'] + '&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+	while count <= int(args.history):
+		count2 = count + int(args.interval_size)
+		if args.interval == 'days':
+			start = (current_time - datetime.timedelta(days=count2)).strftime("%Y-%m-%dT00:00:00.000Z")
+			end = (current_time - datetime.timedelta(days=count)).strftime("%Y-%m-%dT23:00:00.000Z")
+		elif args.interval == 'hours':
+			start = (current_time - datetime.timedelta(hours=count2)).strftime("%Y-%m-%dT%H:00:00.000Z")
+			end = (current_time - datetime.timedelta(hours=count)).strftime("%Y-%m-%dT%H:00:00.000Z")
+		elif args.interval == 'minutes':
+			start = (current_time - datetime.timedelta(minutes=count2)).strftime("%Y-%m-%dT%H:%M:00.000Z")
+			end = (current_time - datetime.timedelta(minutes=count)).strftime("%Y-%m-%dT%H:%M:00.000Z")
+		
+		cpu_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'round(sum(rate(container_cpu_usage_seconds_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ')*1000,1) ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
 		data2 = metricCollect(cpu_metrics,'result','query_range')
-		writeWorkload(data2,systems,'cpu_mCores_workload' + current_day,'CPU Utilization in mCores',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
+		writeWorkload(data2,systems,'cpu_mCores_workload' + str(start[:-5]).replace(":","."),'CPU Utilization in mCores',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 
-		mem_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_memory_usage_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		mem_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_memory_usage_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
 		data2 = metricCollect(mem_metrics,'result','query_range')
-		writeWorkload(data2,systems,'mem_workload' + current_day,'Raw Mem Utilization',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
+		writeWorkload(data2,systems,'mem_workload' + str(start[:-5]).replace(":","."),'Raw Mem Utilization',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 						
-		rss_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_memory_rss' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		rss_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_memory_rss' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
 		data2 = metricCollect(rss_metrics,'result','query_range')
-		writeWorkload(data2,systems,'rss_workload' + current_day,'Actual Memory Utilization',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
+		writeWorkload(data2,systems,'rss_workload' + str(start[:-5]).replace(":","."),'Actual Memory Utilization',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 		
-		disk_bytes_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_fs_usage_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		disk_bytes_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_fs_usage_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
 		data2 = metricCollect(disk_bytes_metrics,'result','query_range')
-		writeWorkload(data2,systems,'disk_workload' + current_day,'Raw Disk Utilization',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
+		writeWorkload(data2,systems,'disk_workload' + str(start[:-5]).replace(":","."),'Raw Disk Utilization',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 							
-		net_s_bytes_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(rate(container_network_transmit_bytes_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		net_s_bytes_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(rate(container_network_transmit_bytes_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
 		data2 = metricCollect(net_s_bytes_metrics,'result','query_range')
-		valuesSend = writeWorkloadNetwork(data2,systems,'net_bytes_s_workload' + current_day,'Network Interface Bytes Sent per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
+		valuesSend = writeWorkloadNetwork(data2,systems,'net_bytes_s_workload' + str(start[:-5]).replace(":","."),'Network Interface Bytes Sent per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 		
-		net_r_bytes_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(rate(container_network_receive_bytes_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		net_r_bytes_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(rate(container_network_receive_bytes_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
 		data2 = metricCollect(net_r_bytes_metrics,'result','query_range')
-		valuesReceived = writeWorkloadNetwork(data2,systems,'net_bytes_r_workload' + current_day,'Network Interface Bytes Received per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
+		valuesReceived = writeWorkloadNetwork(data2,systems,'net_bytes_r_workload' + str(start[:-5]).replace(":","."),'Network Interface Bytes Received per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 		
-		f12=open('./data/net_bytes_workload' + current_day + '.csv', 'w+')
+		f12=open('./data/net_bytes_workload' + str(start[:-5]).replace(":",".") + '.csv', 'w+')
 		f12.write('HOSTNAME,PROPERTY,INSTANCE,DT,VAL\n')
 		for i in valuesSend:
 			for j in valuesSend[i]:
 				f12.write(i + ',Network Interface Bytes Total per sec,,' + datetime.datetime.fromtimestamp(j).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + str(float(valuesReceived[i][j][0]) + float(valuesSend[i][j][0])) + '\n')
 		f12.close()
 		
-		net_s_pkts_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(rate(container_network_transmit_packets_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		net_s_pkts_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(rate(container_network_transmit_packets_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
 		data2 = metricCollect(net_s_pkts_metrics,'result','query_range')
-		valuesSend = writeWorkloadNetwork(data2,systems,'net_pkts_s_workload' + current_day,'Network Interface Packets Sent per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
+		valuesSend = writeWorkloadNetwork(data2,systems,'net_pkts_s_workload' + str(start[:-5]).replace(":","."),'Network Interface Packets Sent per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 												
-		net_r_pkts_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(rate(container_network_receive_packets_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + current_day + 'T00:00:00.000Z&end=' + current_day + 'T23:59:59.000Z&step=5m'
+		net_r_pkts_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(rate(container_network_receive_packets_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
 		data2 = metricCollect(net_r_pkts_metrics,'result','query_range')
-		valuesReceived = writeWorkloadNetwork(data2,systems,'net_pkts_r_workload' + current_day,'Network Interface Packets Received per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
+		valuesReceived = writeWorkloadNetwork(data2,systems,'net_pkts_r_workload' + str(start[:-5]).replace(":","."),'Network Interface Packets Received per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
 		
-		f13=open('./data/net_pkts_workload' + current_day +'.csv', 'w+')
+		f13=open('./data/net_pkts_workload' + str(start[:-5]).replace(":",".") +'.csv', 'w+')
 		f13.write('HOSTNAME,PROPERTY,INSTANCE,DT,VAL\n')
 		for i in valuesSend:
 			for j in valuesSend[i]:
 				f13.write(i + ',Network Interface Packets per sec,,' + datetime.datetime.fromtimestamp(j).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + str(float(valuesReceived[i][j][0]) + float(valuesSend[i][j][0])) + '\n')
 		f13.close()
 		
-		count += 1
+		count += int(args.interval_size)
 	
 if __name__=="__main__":
     main()

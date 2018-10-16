@@ -5,6 +5,7 @@ import argparse
 import string
 import subprocess
 import sys
+import json
 
 # Parsing inputted arguments from batch
 parser = argparse.ArgumentParser()
@@ -215,10 +216,10 @@ def getattributespod(systems,data2,name1,attribute):
 		attr = ''
 		for j in tempsystems[i]:
 			attr += j + ' : ' + tempsystems[i][j] + '|'
-			if j == 'created_by_kind':
-				systems[i]['created_by_kind'] = tempsystems[i][j]
-			elif j == 'created_by_name':
-				systems[i]['created_by_name'] = tempsystems[i][j]
+			#if j == 'created_by_kind':
+			#	systems[i]['created_by_kind'] = tempsystems[i][j]
+			#elif j == 'created_by_name':
+			#	systems[i]['created_by_name'] = tempsystems[i][j]
 		attr = attr[:-1]
 		systems[i][attribute] = attr
 							
@@ -282,15 +283,26 @@ def main():
 	systems={}
 	query = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_spec_memory_limit_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ')/1024/1024 ' + dc_settings[args.collection]['ksm2'] + ''
 	data2 = multiDayCollect(query,'result',current_time)
+	if str(args.debug) == 'true':
+		debug_log.write(query)
+		debug_log.write('\n')
 	
 	for i in data2:
 		if dc_settings[args.collection]['name1'] in i['metric']:
 			if i['metric'][dc_settings[args.collection]['name1']] not in systems:
+				if str(args.debug) == 'true':
+					debug_log.write('Initialize systems\n')
+					debug_log.write(json.dumps(i['metric']))
+					debug_log.write('\n')
 				systems[i['metric'][dc_settings[args.collection]['name1']]]={}
 				systems[i['metric'][dc_settings[args.collection]['name1']]]['pod_info'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]]['pod_labels'] = ''
-				systems[i['metric'][dc_settings[args.collection]['name1']]]['created_by_kind'] = ''
-				systems[i['metric'][dc_settings[args.collection]['name1']]]['created_by_name'] = ''
+				if args.collection == 'kubernetes':
+					systems[i['metric'][dc_settings[args.collection]['name1']]]['created_by_kind'] = i['metric']['created_by_kind']
+					systems[i['metric'][dc_settings[args.collection]['name1']]]['created_by_name'] = i['metric']['created_by_name']
+				else:
+					systems[i['metric'][dc_settings[args.collection]['name1']]]['created_by_kind'] = ''
+					systems[i['metric'][dc_settings[args.collection]['name1']]]['created_by_name'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]]['current_size'] = ''
 			if dc_settings[args.collection]['name2'] in i['metric']:
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]] = {}
@@ -311,8 +323,12 @@ def main():
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['mem_request'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['pod_name'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['state'] = 1
-				
-
+	
+	if str(args.debug) == 'true':			
+		debug_log.write('Dump systems \n')
+		debug_log.write(json.dumps(systems))
+		debug_log.write('\n')
+	
 	#kube state metrics start
 	if args.collection == 'kubernetes':
 		query = 'sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000'
@@ -353,20 +369,28 @@ def main():
 	query = '(sum(container_spec_cpu_shares' + dc_settings[args.collection]['filter'] + ') by (pod_name,namespace,container_name)) * on (namespace,pod_name,container_name) group_right container_spec_cpu_shares * on (namespace,pod_name) group_left (created_by_name,created_by_kind) label_replace(kube_pod_info, "pod_name", "$1", "pod", "(.*)")'
 	data2 = multiDayCollect(query,'result',current_time)
 	getattributes(systems,data2,dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'],'attr')
-		
+	if str(args.debug) == 'true':
+		debug_log.write('Dump systems Additional Attributes \n')
+		debug_log.write(json.dumps(systems))
+		debug_log.write('\n')	
+	
 	#kube state metrics start
 	if args.collection == 'kubernetes':
 		query = 'sum(kube_pod_container_info) by (pod,namespace,container) * on (namespace,pod,container) group_right kube_pod_container_info * on (namespace,pod) group_left (created_by_name,created_by_kind) kube_pod_info'
 		data2 = multiDayCollect(query,'result',current_time)
 		getattributes(systems,data2,'created_by_name','container','con_info')
-		
-		query = 'sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_info'
-		data2 = multiDayCollect(query,'result',current_time)
-		getattributespod(systems,data2,'created_by_name','pod_info')
+		if str(args.debug) == 'true':
+			debug_log.write('Dump systems kube state \n')
+			debug_log.write(json.dumps(systems))
+			debug_log.write('\n')	
 	
-		query = 'sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_labels * on (namespace,pod) group_left (created_by_name,created_by_kind) kube_pod_info'
-		data2 = multiDayCollect(query,'result',current_time)
-		getattributespod(systems,data2,'created_by_name','pod_labels')
+		#query = 'sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_info'
+		#data2 = multiDayCollect(query,'result',current_time)
+		#getattributespod(systems,data2,'created_by_name','pod_info')
+	    #
+		#query = 'sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_labels * on (namespace,pod) group_left (created_by_name,created_by_kind) kube_pod_info'
+		#data2 = multiDayCollect(query,'result',current_time)
+		#getattributespod(systems,data2,'created_by_name','pod_labels')
 		
 		query = 'kube_replicaset_spec_replicas'
 		data2 = multiDayCollect(query,'result',current_time)

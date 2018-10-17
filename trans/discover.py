@@ -257,6 +257,8 @@ def main():
 					args.debug = info[1]
 		f.close()
 	
+	debug_log.write('Version 0.1.5\n')
+	
 	dc_settings = {}
 	dc_settings['kubernetes'] = {}
 	#These filters and group by are for the general cadvisor metrics. For the kube state metrics they are coded in line as it varies based on container and pod in each command. To see those ones can search for kube_pod and look at what each does as all those metrics start with kube_pod
@@ -290,10 +292,10 @@ def main():
 	for i in data2:
 		if dc_settings[args.collection]['name1'] in i['metric']:
 			if i['metric'][dc_settings[args.collection]['name1']] not in systems:
-				if str(args.debug) == 'true':
-					debug_log.write('Initialize systems\n')
-					debug_log.write(json.dumps(i['metric']))
-					debug_log.write('\n')
+				#if str(args.debug) == 'true':
+				debug_log.write('Initialize systems\n')
+				debug_log.write(json.dumps(i['metric']))
+				debug_log.write('\n')
 				systems[i['metric'][dc_settings[args.collection]['name1']]]={}
 				systems[i['metric'][dc_settings[args.collection]['name1']]]['pod_info'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]]['pod_labels'] = ''
@@ -324,10 +326,10 @@ def main():
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['pod_name'] = ''
 				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['state'] = 1
 	
-	if str(args.debug) == 'true':			
-		debug_log.write('Dump systems \n')
-		debug_log.write(json.dumps(systems))
-		debug_log.write('\n')
+	#if str(args.debug) == 'true':			
+	debug_log.write('Dump systems \n')
+	debug_log.write(json.dumps(systems))
+	debug_log.write('\n')
 	
 	#kube state metrics start
 	if args.collection == 'kubernetes':

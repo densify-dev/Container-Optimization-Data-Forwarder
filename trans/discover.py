@@ -185,7 +185,7 @@ def getattributes(systems,data2,name1,name2,attribute):
 			for k in tempsystems[i][j]:
 				if len(k) < 250:
 					temp = tempsystems[i][j][k]
-					if len(temp)-3-len(k) < 256:
+					if len(temp)+3+len(k) < 256:
 						attr += k + ' : ' + temp + '|'
 					else:
 						templength = 256 - 3 - len(k)
@@ -215,7 +215,13 @@ def getattributespod(systems,data2,name1,attribute):
 	for i in tempsystems:
 		attr = ''
 		for j in tempsystems[i]:
-			attr += j + ' : ' + tempsystems[i][j] + '|'
+			if len(j) < 250:
+				temp = tempsystems[i][j]
+				if len(temp)+3+len(j) < 256:
+					attr += j + ' : ' + temp + '|'
+				else:
+					templength = 256 - 3 - len(j)
+					attr += j + ' : ' + temp[:templength] + '|'
 			#if j == 'owner_kind':
 			#	systems[i]['owner_kind'] = tempsystems[i][j]
 			#elif j == 'owner_name':
@@ -257,7 +263,7 @@ def main():
 					args.debug = info[1]
 		f.close()
 	
-	debug_log.write('Version 0.1.6\n')
+	debug_log.write('Version 0.1.7\n')
 	
 	dc_settings = {}
 	dc_settings['kubernetes'] = {}

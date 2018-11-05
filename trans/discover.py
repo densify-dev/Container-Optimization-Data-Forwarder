@@ -76,7 +76,7 @@ def multiDayCollect(query,dataTag,current_time):
 			elif args.interval == 'minutes':
 				start = (current_time - datetime.timedelta(minutes=count)).strftime("%Y-%m-%dT%H:%M:00.000Z")
 				end = (current_time - datetime.timedelta(minutes=count2)).strftime("%Y-%m-%dT%H:%M:00.000Z")
-	
+						
 			metric = query + '&start=' + start + '&end=' + end + '&step=5m'
 			data2 += metricCollect(metric,dataTag,'query_range')
 			count -= int(args.interval_size)
@@ -231,7 +231,8 @@ def getattributespod(systems,data2,name1,attribute):
 							
 		
 def main():
-	current_time = datetime.datetime.today()
+	current_time = datetime.datetime.utcnow()
+	
 	if str(args.config_file) != 'NA':
 		f=open(str(args.config_file), 'r')
 		for line in f:
@@ -257,7 +258,7 @@ def main():
 					args.aggregator = info[1]
 				elif info[0] == 'interval' and args.interval == 'days':
 					args.interval = info[1]
-				elif info[0] == 'interval_size' and args.interval_size == 'false':
+				elif info[0] == 'interval_size' and args.interval_size == '1':
 					args.interval_size = info[1]
 				elif info[0] == 'debug' and args.debug == 'false':
 					args.debug = info[1]

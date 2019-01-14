@@ -21,7 +21,7 @@ parser.add_argument('--file', dest='config_file', default='NA',
 parser.add_argument('--timeout', dest='timeout', default='3600',
                     help='Timeout for querying Prometheus')
 parser.add_argument('--collectMethod', dest='collection', default='kubernetes',
-                    help='Data collection: swarm or kubernetes')
+                    help='Data collection: kubernetes')
 parser.add_argument('--mode', dest='mode', default='current',
                     help='What containers to collect ones running now or all the ones that ran in last days: current or all')
 parser.add_argument('--protocol', dest='protocol', default='http',
@@ -96,49 +96,42 @@ def multiDayCollect(query,dataTag,current_time):
 	return data2
 
 # writes out the workload specified. takes in the list of data from one of the above functions, the systems dictionary which contains all the systems we want to report on. The output file name, property for the workload writing out and how we break down the system identifiers by controller\pod and container_name	
-def writeWorkload(data2,systems,file,property,name1,name2):
+def writeWorkload(data2,systems,file,property,name1,name2,namespace):
 	#Opens the file and writes out the header
 	f=open('./data/' + file + '.csv', 'w+')
-	f.write('host_name,Datetime,' + property + '\n')
+	f.write('cluster,namespace,pod,container,Datetime,' + property + '\n')
 	#Loops through the data array checking to see if the system has both name identifiers in it or not. Then we check to see that the system exists in the list we are collecting data for. 
 	for i in data2:
 		if name2 in i['metric']:
 			if name1 in i['metric']:
-				if i['metric'][name2] !='':
-					if i['metric'][name1] in systems:
-						if i['metric'][name2] in systems[i['metric'][name1]]:
-							#Go through the different values which are the times and value of the metric. 
-							for j in i['values']:
-								# Setting up a variable to use as the default one we use for controllers is blank if it is a standalone pod so need to backfill this in those cases. 
-								x = i['metric'][name1]
-								if i['metric'][name1] == '<none>':
-									x = systems[i['metric'][name1]][i['metric'][name2]]['pod_name']
-								#write out each individual metric. 
-								f.write(x.replace(';','.') + '__' + i['metric'][name2].replace(':','.') + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
+				if namespace in i['metric']:
+					if i['metric'][name2] !='':
+						if i['metric'][namespace] in systems:
+							if i['metric'][name1] in systems[i['metric'][namespace]]:
+								if i['metric'][name2] in systems[i['metric'][namespace]][i['metric'][name1]]:
+									#Go through the different values which are the times and value of the metric. 
+									for j in i['values']:
+										# Setting up a variable to use as the default one we use for controllers is blank if it is a standalone pod so need to backfill this in those cases. 
+										x = i['metric'][name1]
+										if i['metric'][name1] == '<none>':
+											x = systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]['pod_name']
+										#write out each individual metric. 
+										f.write(str(args.prom_addr) + ',' + i['metric'][namespace] + ',' + x.replace(';','.') + ',' + i['metric'][name2].replace(':','.') + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
+			elif 'pod_name' in i['metric']:
+				if namespace in i['metric']:
+					if i['metric'][name2] !='':
+						if i['metric'][namespace] in systems:
+							if i['metric']['pod_name'] in systems[i['metric'][namespace]]:
+								if i['metric'][name2] in systems[i['metric'][namespace]][i['metric']['pod_name']]:
+									#Go through the different values which are the times and value of the metric. 
+									for j in i['values']:
+										# Setting up a variable to use as the default one we use for controllers is blank if it is a standalone pod so need to backfill this in those cases. 
+										x = i['metric']['pod_name']
+										if i['metric']['pod_name'] == '<none>':
+											x = systems[i['metric'][namespace]][i['metric']['pod_name']][i['metric'][name2]]['pod_name']
+										#write out each individual metric. 
+										f.write(str(args.prom_addr) + ',' + i['metric'][namespace] + ',' + x.replace(';','.') + ',' + i['metric'][name2].replace(':','.') + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
 	f.close()
-
-# This one is similar to the one above with the one exception in it returns a dictionary of the values as well since for network we collect send and receive but we also load total so we need to take the send and receive and combine them to get the total. 
-def writeWorkloadNetwork(data2,systems,file,property,instance,name1,name2):
-	f=open('./data/' + file + '.csv', 'w+')
-	f.write('HOSTNAME,PROPERTY,INSTANCE,DT,VAL\n')
-	values = {}
-	for i in data2:
-		if name2 in i['metric']:
-			if name1 in i['metric']:
-				if i['metric'][name2] !='':
-					if i['metric'][name1] in systems:
-						if i['metric'][name2] in systems[i['metric'][name1]]:
-							values[i['metric'][name2]]={}
-							for j in i['values']:
-								x = i['metric'][name1]
-								if i['metric'][name1] == '<none>':
-									x = systems[i['metric'][name1]][i['metric'][name2]]['pod_name']
-								# updates values that will be returned with the new data points. 
-								values[i['metric'][name2]][j[0]]=[]
-								values[i['metric'][name2]][j[0]].append(j[1])
-								f.write(x.replace(';','.') + '__' + i['metric'][name2].replace(':','.') + ',' + property + ',' + instance + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
-	f.close()
-	return values
 
 # Writes out the config file with all the systems and there settings
 def writeConfig(systems,type):
@@ -146,131 +139,191 @@ def writeConfig(systems,type):
 	f=open('./data/config.csv', 'w+')
 	#This if statement was going to be used for when doing nodes data collection though this was delayed which is why there is no else as we would call it twice but only want 1 header. 
 	if type == 'CONTAINERS':
-		f.write('host_name,HW Total Memory,OS Name,HW Manufacturer,HW Model,HW Serial Number\n')
+		f.write('cluster,namespace,pod,container,HW Total Memory,OS Name,HW Manufacturer,HW Model,HW Serial Number\n')
 	# Look through all the pods and containers and writes out the config info.
-	for i in systems:
-		for j in systems[i]:
-			# Ignores items in the pods level for items that are attributes on the pod and not containers with details under them. 
-			if j !='' and j != 'pod_info' and j != 'pod_labels' and j != 'owner_kind' and j != 'owner_name' and j != 'pod_name' and j != 'current_size':
-				x = i
-				if i == '<none>':
-					x = systems[i][j]['pod_name']
-				f.write(x.replace(';','.') + '__' + j.replace(':','.') + ',' + str(systems[i][j]['memory']) + ',Linux,' + type + ',' + systems[i][j]['namespace'] + ',' + systems[i][j]['namespace'] + '\n')
+	for n in systems:
+		for i in systems[n]:
+			if i != 'namespace_labels' and i != 'cpu_limit' and i != 'cpu_request' and i != 'mem_limit' and i != 'mem_request':
+				for j in systems[n][i]:
+					# Ignores items in the pods level for items that are attributes on the pod and not containers with details under them. 
+					if j !='' and j != 'pod_info' and j != 'pod_labels' and j != 'owner_kind' and j != 'owner_name' and j != 'pod_name' and j != 'current_size' and j != 'creation_time':
+						x = i
+						if i == '<none>':
+							x = systems[n][i][j]['pod_name']
+						f.write(str(args.prom_addr) + ',' + n + ',' + x.replace(';','.') + ',' + j.replace(':','.') + ',' + str(systems[n][i][j]['memory']) + ',Linux,' + type + ',' + n + ',' + n + '\n')
 	f.close()
 		
 # Writes out the attributes file
 def writeAttributes(systems,type):
 	f=open('./data/attributes.csv', 'w+')
 	if type == 'container':
-		f.write('host_name,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Container Info,Pod Info,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Current Nodes,Power State,Created By Kind,Created By Name,Current Size\n')
-	for i in systems:
-		for j in systems[i]:
-			# Ignores pod specific attributes as we only want to update items that are containers. 
-			if i !='' and j != 'pod_info' and j != 'pod_labels' and j != 'owner_kind' and j != 'owner_name' and j != 'pod_name' and j != 'current_size':
-				#determining the state and converting to string instead of number. 
-				if systems[i][j]['state'] == 1:
-					cstate = 'Terminated'
-				else:
-					cstate = 'Running'
-				x = i
-				if i == '<none>':
-					x = systems[i][j]['pod_name']
-				f.write(x.replace(';','.') + '__' + j.replace(':','.') + ',Containers,' + str(args.prom_addr) + ',' + systems[i][j]['namespace'] + ',' + x + ',' + systems[i][j]['attr'] + ',' + systems[i][j]['con_info'] + ',' + systems[i]['pod_info'] + ',' + systems[i]['pod_labels'] + ',' + systems[i][j]['cpu_limit'] + ',' + systems[i][j]['cpu_request'] + ',' + systems[i][j]['mem_limit'] + ',' + systems[i][j]['mem_request'] + ',' + j + ',' + systems[i][j]['con_instance'][:-1] + ',' + cstate + ',' + systems[i]['owner_kind'] + ',' + systems[i]['owner_name'] + ',' + systems[i]['current_size'] + '\n')
+		f.write('cluster,namespace,pod,container,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Container Info,Pod Info,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Current Nodes,Power State,Created By Kind,Created By Name,Current Size,Create Time,Container Restarts,Namespace Labels,Namespace CPU Request,Namespace CPU Limit,Namespace Memory Request,Namespace Memory Limit\n')
+	for n in systems:
+		for i in systems[n]:
+			if i != 'namespace_labels' and i != 'cpu_limit' and i != 'cpu_request' and i != 'mem_limit' and i != 'mem_request':
+				for j in systems[n][i]:
+					# Ignores pod specific attributes as we only want to update items that are containers. 
+					if i !='' and j != 'pod_info' and j != 'pod_labels' and j != 'owner_kind' and j != 'owner_name' and j != 'pod_name' and j != 'current_size' and j != 'creation_time':
+						#determining the state and converting to string instead of number. 
+						if systems[n][i][j]['state'] == 1:
+							cstate = 'Terminated'
+						else:
+							cstate = 'Running'
+						x = i
+						if i == '<none>':
+							x = systems[n][i][j]['pod_name']
+						f.write(str(args.prom_addr) + ',' + n + ',' + x.replace(';','.') + ',' + j.replace(':','.') + ',Containers,' + str(args.prom_addr) + ',' + n + ',' + x + ',' + systems[n][i][j]['attr'] + ',' + systems[n][i][j]['con_info'] + ',' + systems[n][i]['pod_info'] + ',' + systems[n][i]['pod_labels'] + ',' + systems[n][i][j]['cpu_limit'] + ',' + systems[n][i][j]['cpu_request'] + ',' + systems[n][i][j]['mem_limit'] + ',' + systems[n][i][j]['mem_request'] + ',' + j + ',' + systems[n][i][j]['con_instance'][:-1] + ',' + cstate + ',' + systems[n][i]['owner_kind'] + ',' + systems[n][i]['owner_name'] + ',' + systems[n][i]['current_size'] + ',' + datetime.datetime.fromtimestamp(float(systems[n][i]['creation_time'])).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + systems[n][i][j]['restarts'] + ',' + systems[n]['namespace_labels'] + ',' + systems[n]['cpu_request'] + ',' + systems[n]['cpu_limit'] + ',' + systems[n]['mem_request'] + ',' + systems[n]['mem_limit'] + '\n')
 	f.close()
 
 # Used to build metric string for metrics we get from kube state metrics as they have a similar query builds out the part that is repeated for them. 	
 def getkubestatemetrics(systems,query,metric,current_time):
-	query2 = str(args.aggregator) + '(' + query + ' * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner) by (owner_name,owner_kind,namespace,container)'
+	query2 = str(args.aggregator) + '(' + query + ' * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)'
 	data2 = multiDayCollect(query2,'result',current_time)
 
 	for i in data2:
-		if i['metric']['owner_name'] in systems:
-			if i['metric']['container'] in systems[i['metric']['owner_name']]:
-				if args.mode == 'current':
-					systems[i['metric']['owner_name']][i['metric']['container']][metric] = i['value'][1]
-				else:
-					systems[i['metric']['owner_name']][i['metric']['container']][metric] = i['values'][len(i['values'])-1][1]
+		if i['metric']['namespace'] in systems:
+			if i['metric']['owner_name'] in systems[i['metric']['namespace']]:
+				if i['metric']['container'] in systems[i['metric']['namespace']][i['metric']['owner_name']]:
+					if args.mode == 'current':
+						systems[i['metric']['namespace']][i['metric']['owner_name']][i['metric']['container']][metric] = i['value'][1]
+					else:
+						systems[i['metric']['namespace']][i['metric']['owner_name']][i['metric']['container']][metric] = i['values'][len(i['values'])-1][1]
 
+	query2 = str(args.aggregator) + '(' + query + ' * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}) by (pod,namespace,container)'
+	data2 = multiDayCollect(query2,'result',current_time)
+
+	for i in data2:
+		if i['metric']['namespace'] in systems:
+			if i['metric']['pod'] in systems[i['metric']['namespace']]:
+				if i['metric']['container'] in systems[i['metric']['namespace']][i['metric']['pod']]:
+					if args.mode == 'current':
+						systems[i['metric']['namespace']][i['metric']['pod']][i['metric']['container']][metric] = i['value'][1]
+					else:
+						systems[i['metric']['namespace']][i['metric']['pod']][i['metric']['container']][metric] = i['values'][len(i['values'])-1][1]
+						
+def getkubestatemetricspod(systems,query,namespace,service,metric,current_time):
+	data2 = multiDayCollect(query,'result',current_time)
+	for i in data2:
+		if i['metric'][namespace] in systems:
+			if i['metric'][service] in systems[i['metric'][namespace]]:
+				if args.mode == 'current':
+					systems[i['metric'][namespace]][i['metric'][service]][metric] = i['value'][1]
+				else:
+					systems[i['metric'][namespace]][i['metric'][service]][metric] = i['values'][len(i['values'])-1][1]
+						
 # For certain metrics we take the full results and build out multi-value tags to load all the details into different attributes
-def getattributes(systems,data2,name1,name2,attribute):
+def getattributes(systems,data2,name1,name2,namespace,attribute):
 	tempsystems = {}
 	# loops through the data and makes sure haves the required names we require for controller and container as well as the pod being in the list we are collecting data for. 
 	for i in data2:
 		if name1 in i['metric']:
-			if i['metric'][name1] in systems:
-				#If system isn't in the temp array adds it.
-				if i['metric'][name1] not in tempsystems:
-					tempsystems[i['metric'][name1]] = {}
-				if name2 in i['metric']:
-					if i['metric'][name2] in systems[i['metric'][name1]]:
-						if i['metric'][name2] not in tempsystems[i['metric'][name1]]:
-							tempsystems[i['metric'][name1]][i['metric'][name2]] = {}
-						for j in i['metric']:
-							#if the attribute isn't in the temp list it adds it
-							if j not in tempsystems[i['metric'][name1]][i['metric'][name2]]:
-								tempsystems[i['metric'][name1]][i['metric'][name2]][j] = i['metric'][j].replace(',',';')
-							# if the attriubte is in the temp array then it appends the new value to it. 
-							else:
-								if i['metric'][j].replace(',',';') not in tempsystems[i['metric'][name1]][i['metric'][name2]][j]:
-									tempsystems[i['metric'][name1]][i['metric'][name2]][j] += ';' + i['metric'][j].replace(',',';')
+			if namespace in i['metric']:
+				if i['metric'][namespace] in systems:
+					if i['metric'][name1] in systems[i['metric'][namespace]]:
+						#If system isn't in the temp array adds it.
+						if i['metric'][namespace] not in tempsystems:
+							tempsystems[i['metric'][namespace]] = {}
+						if i['metric'][name1] not in tempsystems[i['metric'][namespace]]:
+							tempsystems[i['metric'][namespace]][i['metric'][name1]] = {}
+						if name2 in i['metric']:
+							if i['metric'][name2] in systems[i['metric'][namespace]][i['metric'][name1]]:
+								if i['metric'][name2] not in tempsystems[i['metric'][namespace]][i['metric'][name1]]:
+									tempsystems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]] = {}
+								for j in i['metric']:
+									#if the attribute isn't in the temp list it adds it
+									if j not in tempsystems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]:
+										tempsystems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]][j] = i['metric'][j].replace(',',';')
+									# if the attriubte is in the temp array then it appends the new value to it. 
+									else:
+										if i['metric'][j].replace(',',';') not in tempsystems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]][j]:
+											tempsystems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]][j] += ';' + i['metric'][j].replace(',',';')
 	
 	# Loops through the temp array and combines all the different attributes found to form 1 giant multivalue attribute. 
-	for i in tempsystems:
-		for j in tempsystems[i]:
-			attr = ''
-			for k in tempsystems[i][j]:
-				# if the key is over 250 then don't add as we can only add 256 and won't make sense. 
-				if len(k) < 250:
-					temp = tempsystems[i][j][k]
-					#if the total for the key and valoue is under 256 then add it else we need to trim it so that it will fit as there is a 256 character limit on attributes. 
-					if len(temp)+3+len(k) < 256:
-						attr += k + ' : ' + temp + '|'
-					else:
-						templength = 256 - 3 - len(k)
-						attr += k + ' : ' + temp[:templength] + '|'
-				#If the attribute name is instance and we are loading to attribute "attr" then update con_instance with this value as well. 
-				if k == 'instance':
-					if attribute == 'attr':
-						systems[i][j]['con_instance'] += tempsystems[i][j][k].replace(';','|') + '|'
-				# If the name is pod then it sets the pod_name value as well for this system. 
-				elif k == 'pod':
-					systems[i][j]['pod_name'] = tempsystems[i][j][k]
-			attr = attr[:-1]
-			#updates the system array with the multivalue attribute based on name given.
-			systems[i][j][attribute] = attr
+	for n in tempsystems:
+		for i in tempsystems[n]:
+			for j in tempsystems[n][i]:
+				attr = ''
+				for k in tempsystems[n][i][j]:
+					# if the key is over 250 then don't add as we can only add 256 and won't make sense. 
+					if len(k) < 250:
+						temp = tempsystems[n][i][j][k]
+						#if the total for the key and valoue is under 256 then add it else we need to trim it so that it will fit as there is a 256 character limit on attributes. 
+						if len(temp)+3+len(k) < 256:
+							attr += k + ' : ' + temp + '|'
+						else:
+							templength = 256 - 3 - len(k)
+							attr += k + ' : ' + temp[:templength] + '|'
+					#If the attribute name is instance and we are loading to attribute "attr" then update con_instance with this value as well. 
+					if k == 'instance':
+						if attribute == 'attr':
+							systems[n][i][j]['con_instance'] += tempsystems[n][i][j][k].replace(';','|') + '|'
+					# If the name is pod then it sets the pod_name value as well for this system. 
+					elif k == 'pod':
+						systems[n][i][j]['pod_name'] = tempsystems[n][i][j][k]
+				attr = attr[:-1]
+				#updates the system array with the multivalue attribute based on name given.
+				systems[n][i][j][attribute] = attr
 							
 # Similar function to the one above for containers just this builds the multi-value stirngs for the pod level attributes. 
-def getattributespod(systems,data2,name1,attribute):
+def getattributespod(systems,data2,name1,namespace,attribute):
 	tempsystems = {}
 	for i in data2:
-		if name1 in i['metric']:
-			if i['metric'][name1] in systems:
-				if i['metric'][name1] not in tempsystems:
-					tempsystems[i['metric'][name1]] = {}
-				for j in i['metric']:
-					if j not in tempsystems[i['metric'][name1]]:
-						tempsystems[i['metric'][name1]][j] = i['metric'][j].replace(',',';')
-					else:
-						if i['metric'][j].replace(',',';') not in tempsystems[i['metric'][name1]][j]:
-							tempsystems[i['metric'][name1]][j] += ';' + i['metric'][j].replace(',',';')
+		if namespace in i['metric']:
+			if name1 in i['metric']:
+				if i['metric'][namespace] in systems:
+					if i['metric'][name1] in systems[i['metric'][namespace]]:
+						if i['metric'][namespace] not in tempsystems:
+							tempsystems[i['metric'][namespace]] = {}
+						if i['metric'][name1] not in tempsystems[i['metric'][namespace]]:
+							tempsystems[i['metric'][namespace]][i['metric'][name1]] = {}
+						for j in i['metric']:
+							if j not in tempsystems[i['metric'][namespace]][i['metric'][name1]]:
+								tempsystems[i['metric'][namespace]][i['metric'][name1]][j] = i['metric'][j].replace(',',';')
+							else:
+								if i['metric'][j].replace(',',';') not in tempsystems[i['metric'][namespace]][i['metric'][name1]][j]:
+									tempsystems[i['metric'][namespace]][i['metric'][name1]][j] += ';' + i['metric'][j].replace(',',';')
 				
-	for i in tempsystems:
+	for n in tempsystems:
+		for i in tempsystems[n]:
+			attr = ''
+			for j in tempsystems[n][i]:
+				if len(j) < 250:
+					temp = tempsystems[n][i][j]
+					if len(temp)+3+len(j) < 256:
+						attr += j + ' : ' + temp + '|'
+					else:
+						templength = 256 - 3 - len(j)
+						attr += j + ' : ' + temp[:templength] + '|'
+			attr = attr[:-1]
+			systems[n][i][attribute] = attr
+							
+# Similar function to the one above for containers just this builds the multi-value stirngs for the pod level attributes. 
+def getattributesnamespace(systems,data2,namespace,attribute):
+	tempsystems = {}
+	for i in data2:
+		if namespace in i['metric']:
+			if i['metric'][namespace] in systems:
+				if i['metric'][namespace] not in tempsystems:
+					tempsystems[i['metric'][namespace]] = {}
+				for j in i['metric']:
+					if j not in tempsystems[i['metric'][namespace]]:
+						tempsystems[i['metric'][namespace]][j] = i['metric'][j].replace(',',';')
+					else:
+						if i['metric'][j].replace(',',';') not in tempsystems[i['metric'][namespace]][j]:
+							tempsystems[i['metric'][namespace]][j] += ';' + i['metric'][j].replace(',',';')
+				
+	for n in tempsystems:
 		attr = ''
-		for j in tempsystems[i]:
+		for j in tempsystems[n]:
 			if len(j) < 250:
-				temp = tempsystems[i][j]
+				temp = tempsystems[n][j]
 				if len(temp)+3+len(j) < 256:
 					attr += j + ' : ' + temp + '|'
 				else:
 					templength = 256 - 3 - len(j)
 					attr += j + ' : ' + temp[:templength] + '|'
-			#if j == 'owner_kind':
-			#	systems[i]['owner_kind'] = tempsystems[i][j]
-			#elif j == 'owner_name':
-			#	systems[i]['owner_name'] = tempsystems[i][j]
 		attr = attr[:-1]
-		systems[i][attribute] = attr
-							
+		systems[n][attribute] = attr
 		
 def main():
 	# gets the current time so that all the different queries we run will be based off the same timestamp vs each one having a slightly different time as the script is run and keeps querying for current time. 
@@ -309,7 +362,7 @@ def main():
 		f.close()
 	
 	# Write out version number to script this way we know each time what version of the file was run. 
-	debug_log.write('Version 0.1.8\n')
+	debug_log.write('Version 0.2.0\n')
 	
 	# This dictionary holds different parameters that adjust how the query works based on if use kubernetes or swarm. Note Kubernetes is only one should use as swarm may not be current.
 	dc_settings = {}
@@ -318,21 +371,18 @@ def main():
 	dc_settings['kubernetes']['grpby'] = 'instance,pod_name,namespace,container_name,owner_name,owner_kind'
 	dc_settings['kubernetes']['filter'] = '{name!~"k8s_POD_.*"}'
 	dc_settings['kubernetes']['ksm1'] = '('
-	dc_settings['kubernetes']['ksm2'] = '* on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)'
+	dc_settings['kubernetes']['ksm2'] = '* on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)'
+	dc_settings['kubernetes']['ksm2pod'] = '* on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)'
 	#for kubernetes this will build the name of the container as pod name__container name
 	dc_settings['kubernetes']['name1'] = 'owner_name'
 	dc_settings['kubernetes']['name2'] = 'container_name'
-	dc_settings['swarm'] = {}
-	dc_settings['swarm']['grpby'] = 'name,instance,id'
-	dc_settings['swarm']['filter'] = ''
-	dc_settings['swarm']['ksm1'] = ''
-	dc_settings['swarm']['ksm2'] = ''
-	#for swarm this will build the name of the container as container name__instance name
-	dc_settings['swarm']['name1'] = 'name'
-	dc_settings['swarm']['name2'] = 'instance'
+	dc_settings['kubernetes']['pod_name'] = 'pod_name'
 
-	if args.collection == 'swarm':
-		args.aggregator = ''
+	
+	name1 = dc_settings[args.collection]['name1']
+	name2 = dc_settings[args.collection]['name2']
+	pod_name = dc_settings[args.collection]['pod_name']
+	namespace = 'namespace'
 	
 	#containers
 	# creates the dictionary that will hold all the containers we plan to collect data from for this run we do this so as we make different calls we have a consistent set of contaienrs from start to end vs collecting data for ones that may be missing config if just created. 
@@ -347,42 +397,98 @@ def main():
 	
 	# Loops through the results and builds out the list of systems for ones that have the name1 and name2
 	for i in data2:
-		if dc_settings[args.collection]['name1'] in i['metric']:
-			if i['metric'][dc_settings[args.collection]['name1']] not in systems:
-				# dumps out the results from the query to prometheus. 
-				if str(args.debug) == 'true':
-					debug_log.write('Initialize systems\n')
-					debug_log.write(json.dumps(i['metric']))
-					debug_log.write('\n')
-				systems[i['metric'][dc_settings[args.collection]['name1']]]={}
-				systems[i['metric'][dc_settings[args.collection]['name1']]]['pod_info'] = ''
-				systems[i['metric'][dc_settings[args.collection]['name1']]]['pod_labels'] = ''
-				if args.collection == 'kubernetes':
-					systems[i['metric'][dc_settings[args.collection]['name1']]]['owner_kind'] = i['metric']['owner_kind']
-					systems[i['metric'][dc_settings[args.collection]['name1']]]['owner_name'] = i['metric']['owner_name']
-				else:
-					systems[i['metric'][dc_settings[args.collection]['name1']]]['owner_kind'] = ''
-					systems[i['metric'][dc_settings[args.collection]['name1']]]['owner_name'] = ''
-				systems[i['metric'][dc_settings[args.collection]['name1']]]['current_size'] = ''
-			if dc_settings[args.collection]['name2'] in i['metric']:
-				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]] = {}
-				if args.collection == 'kubernetes':
-					systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['namespace'] = i['metric']['namespace']
-				else:
-					systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['namespace'] = 'Default'
-				if args.mode == 'current':
-					systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['memory'] = i['value'][1]
-				else:
-					systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['memory'] = i['values'][len(i['values'])-1][1]
-				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['attr'] = ''
-				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['con_instance'] = ''
-				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['con_info'] = ''
-				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['cpu_limit'] = ''
-				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['cpu_request'] = ''
-				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['mem_limit'] = ''
-				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['mem_request'] = ''
-				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['pod_name'] = ''
-				systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['state'] = 1
+		if namespace in i['metric']:
+			if name1 in i['metric']:
+				if i['metric'][namespace] not in systems:
+					systems[i['metric'][namespace]]={}
+					systems[i['metric'][namespace]]['namespace_labels'] = ''
+					systems[i['metric'][namespace]]['cpu_limit'] = ''
+					systems[i['metric'][namespace]]['cpu_request'] = ''
+					systems[i['metric'][namespace]]['mem_limit'] = ''
+					systems[i['metric'][namespace]]['mem_request'] = ''
+				if i['metric'][name1] not in systems[i['metric'][namespace]]:
+					# dumps out the results from the query to prometheus. 
+					if str(args.debug) == 'true':
+						debug_log.write('Initialize systems\n')
+						debug_log.write(json.dumps(i['metric']))
+						debug_log.write('\n')
+					systems[i['metric'][namespace]][i['metric'][name1]]={}
+					systems[i['metric'][namespace]][i['metric'][name1]]['pod_info'] = ''
+					systems[i['metric'][namespace]][i['metric'][name1]]['pod_labels'] = ''
+					if args.collection == 'kubernetes':
+						systems[i['metric'][namespace]][i['metric'][name1]]['owner_kind'] = i['metric']['owner_kind']
+						systems[i['metric'][namespace]][i['metric'][name1]]['owner_name'] = i['metric']['owner_name']
+					else:
+						systems[i['metric'][namespace]][i['metric'][name1]]['owner_kind'] = ''
+						systems[i['metric'][namespace]][i['metric'][name1]]['owner_name'] = ''
+					systems[i['metric'][namespace]][i['metric'][name1]]['current_size'] = ''
+					systems[i['metric'][namespace]][i['metric'][name1]]['creation_time'] = ''
+				if name2 in i['metric']:
+					systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]] = {}
+					if args.mode == 'current':
+						systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]['memory'] = i['value'][1]
+					else:
+						systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]['memory'] = i['values'][len(i['values'])-1][1]
+					systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]['attr'] = ''
+					systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]['con_instance'] = ''
+					systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]['con_info'] = ''
+					systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]['cpu_limit'] = ''
+					systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]['cpu_request'] = ''
+					systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]['mem_limit'] = ''
+					systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]['mem_request'] = ''
+					systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]['restarts'] = ''
+					systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]['pod_name'] = ''
+					systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]['state'] = 1
+	
+	#Query to get the amount of memory container has also used to build default info about the containers into Systems.
+	query = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_spec_memory_limit_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ')/1024/1024 ' + dc_settings[args.collection]['ksm2pod'] + ''
+	data2 = multiDayCollect(query,'result',current_time)
+	# Logs the query if debug enabled.
+	if str(args.debug) == 'true':
+		debug_log.write(query)
+		debug_log.write('\n')
+	
+	# Loops through the results and builds out the list of systems for ones that have the pod_name and name2
+	for i in data2:
+		if namespace in i['metric']:
+			if pod_name in i['metric']:
+				if i['metric'][namespace] not in systems:
+					systems[i['metric'][namespace]]={}
+					systems[i['metric'][namespace]]['namespace_labels'] = ''
+					systems[i['metric'][namespace]]['cpu_limit'] = ''
+					systems[i['metric'][namespace]]['cpu_request'] = ''
+					systems[i['metric'][namespace]]['mem_limit'] = ''
+					systems[i['metric'][namespace]]['mem_request'] = ''
+				if i['metric'][pod_name] not in systems[i['metric'][namespace]]:
+					# dumps out the results from the query to prometheus. 
+					if str(args.debug) == 'true':
+						debug_log.write('Initialize systems\n')
+						debug_log.write(json.dumps(i['metric']))
+						debug_log.write('\n')
+					systems[i['metric'][namespace]][i['metric'][pod_name]]={}
+					systems[i['metric'][namespace]][i['metric'][pod_name]]['pod_info'] = ''
+					systems[i['metric'][namespace]][i['metric'][pod_name]]['pod_labels'] = ''
+					systems[i['metric'][namespace]][i['metric'][pod_name]]['owner_kind'] = '<none>'
+					systems[i['metric'][namespace]][i['metric'][pod_name]]['owner_name'] = ''
+					systems[i['metric'][namespace]][i['metric'][pod_name]]['current_size'] = ''
+					systems[i['metric'][namespace]][i['metric'][pod_name]]['creation_time'] = ''
+				if name2 in i['metric']:
+					systems[i['metric'][namespace]][i['metric'][pod_name]][i['metric'][name2]] = {}
+					if args.mode == 'current':
+						systems[i['metric'][namespace]][i['metric'][pod_name]][i['metric'][name2]]['memory'] = i['value'][1]
+					else:
+						systems[i['metric'][namespace]][i['metric'][pod_name]][i['metric'][name2]]['memory'] = i['values'][len(i['values'])-1][1]
+					systems[i['metric'][namespace]][i['metric'][pod_name]][i['metric'][name2]]['attr'] = ''
+					systems[i['metric'][namespace]][i['metric'][pod_name]][i['metric'][name2]]['con_instance'] = ''
+					systems[i['metric'][namespace]][i['metric'][pod_name]][i['metric'][name2]]['con_info'] = ''
+					systems[i['metric'][namespace]][i['metric'][pod_name]][i['metric'][name2]]['cpu_limit'] = ''
+					systems[i['metric'][namespace]][i['metric'][pod_name]][i['metric'][name2]]['cpu_request'] = ''
+					systems[i['metric'][namespace]][i['metric'][pod_name]][i['metric'][name2]]['mem_limit'] = ''
+					systems[i['metric'][namespace]][i['metric'][pod_name]][i['metric'][name2]]['mem_request'] = ''
+					systems[i['metric'][namespace]][i['metric'][pod_name]][i['metric'][name2]]['restarts'] = ''
+					systems[i['metric'][namespace]][i['metric'][pod_name]][i['metric'][name2]]['pod_name'] = ''
+					systems[i['metric'][namespace]][i['metric'][pod_name]][i['metric'][name2]]['state'] = 1
+	
 	
 	# dumps what is in systems after the first call will be json data structure
 	if str(args.debug) == 'true':			
@@ -407,34 +513,44 @@ def main():
 		#Collects Memory Requests
 		query = 'sum(kube_pod_container_resource_requests_memory_bytes) by (pod,namespace,container)/1024/1024'
 		getkubestatemetrics(systems,query,'mem_request',current_time)
+			
+		#Collects Memory Requests
+		query = 'sum(kube_pod_container_status_restarts_total) by (pod,namespace,container)'
+		getkubestatemetrics(systems,query,'restarts',current_time)
 				
 		# Query for current state of the container if terminated or not.
 		# This should only be a query as we want to get the current containers list that are showing terminated or not.
-		state = str(args.aggregator) + '(sum(kube_pod_container_status_terminated) by (pod,namespace,container) * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner) by (owner_name,owner_kind,namespace,container)'
+		state = str(args.aggregator) + '(sum(kube_pod_container_status_terminated) by (pod,namespace,container) * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)'
 		data2 = metricCollect(state,'result','query')
 		
 		for i in data2:
-			if i['metric']['owner_name'] in systems:
-				if i['metric']['container'] in systems[i['metric']['owner_name']]:
-					systems[i['metric']['owner_name']][i['metric']['container']]['state'] = i['value'][1]
-	else:
-		#Need to fix or remove
-		# for swarm will just look at current value for memory to see what containers exist right now.
+			if i['metric']['namespace'] in systems:
+				if i['metric']['owner_name'] in systems[i['metric'][namespace]]:
+					if i['metric']['container'] in systems[i['metric'][namespace]][i['metric']['owner_name']]:
+						systems[i['metric'][namespace]][i['metric']['owner_name']][i['metric']['container']]['state'] = i['value'][1]
+			
 		# This should only be a query as we want to get the current containers list that are showing terminated or not.
-		state = 'sum(container_spec_memory_limit_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ')/1024/1024'
+		state = str(args.aggregator) + '(sum(kube_pod_container_status_terminated) by (pod,namespace,container) * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}) by (pod,namespace,container)'
 		data2 = metricCollect(state,'result','query')
 		
 		for i in data2:
-			if dc_settings[args.collection]['name1'] in i['metric']:
-				if dc_settings[args.collection]['name2'] in i['metric']:
-					systems[i['metric'][dc_settings[args.collection]['name1']]][i['metric'][dc_settings[args.collection]['name2']]]['state'] = 0
-					
+			if i['metric']['namespace'] in systems:
+				if i['metric']['pod'] in systems[i['metric'][namespace]]:
+					if i['metric']['container'] in systems[i['metric'][namespace]][i['metric']['pod']]:
+						systems[i['metric'][namespace]][i['metric']['pod']][i['metric']['container']]['state'] = i['value'][1]
+			
 	# kube state metrics end
 				
 	# Queries for the CPU Shares and writes out container_labels multi-value attribute. 
-	query = '(sum(container_spec_cpu_shares' + dc_settings[args.collection]['filter'] + ') by (pod_name,namespace,container_name)) * on (namespace,pod_name,container_name) group_right container_spec_cpu_shares * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner, "pod_name", "$1", "pod", "(.*)")'
+	query = '(sum(container_spec_cpu_shares' + dc_settings[args.collection]['filter'] + ') by (pod_name,namespace,container_name)) * on (namespace,pod_name,container_name) group_right container_spec_cpu_shares * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")'
 	data2 = multiDayCollect(query,'result',current_time)
-	getattributes(systems,data2,dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'],'attr')
+	getattributes(systems,data2,name1,name2,namespace,'attr')
+	
+	query = '(sum(container_spec_cpu_shares' + dc_settings[args.collection]['filter'] + ') by (pod_name,namespace,container_name)) * on (namespace,pod_name,container_name) group_right container_spec_cpu_shares * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")'
+	data2 = multiDayCollect(query,'result',current_time)
+	getattributes(systems,data2,pod_name,name2,namespace,'attr')
+	
+	
 	if str(args.debug) == 'true':
 		debug_log.write('Dump systems Additional Attributes \n')
 		debug_log.write(json.dumps(systems))
@@ -443,55 +559,78 @@ def main():
 	#kube state metrics start
 	if args.collection == 'kubernetes':
 		# Query for the Container Info multi-value attribute
-		query = 'sum(kube_pod_container_info) by (pod,namespace,container) * on (namespace,pod,container) group_right kube_pod_container_info * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner'
+		query = 'sum(kube_pod_container_info) by (pod,namespace,container) * on (namespace,pod,container) group_right kube_pod_container_info * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}'
 		data2 = multiDayCollect(query,'result',current_time)
-		getattributes(systems,data2,'owner_name','container','con_info')
+		getattributes(systems,data2,'owner_name','container',namespace,'con_info')
+		
+		query = 'sum(kube_pod_container_info) by (pod,namespace,container) * on (namespace,pod,container) group_right kube_pod_container_info * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}'
+		data2 = multiDayCollect(query,'result',current_time)
+		getattributes(systems,data2,'pod','container',namespace,'con_info')
+		
 		if str(args.debug) == 'true':
 			debug_log.write('Dump systems kube state \n')
 			debug_log.write(json.dumps(systems))
 			debug_log.write('\n')	
 	
 		# Gets the Pod info multi-value attribute
-		query = 'sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_owner'
+		query = 'sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_owner{owner_kind!="<none>"}'
 		data2 = multiDayCollect(query,'result',current_time)
-		getattributespod(systems,data2,'owner_name','pod_info')
+		getattributespod(systems,data2,'owner_name',namespace,'pod_info')
+	    
+		query = 'sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_owner{owner_kind="<none>"}'
+		data2 = multiDayCollect(query,'result',current_time)
+		getattributespod(systems,data2,'pod',namespace,'pod_info')
 	    
 		# Gets the pod Labels multi-value attribute
-		query = 'sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_labels * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner'
+		query = 'sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_labels * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}'
 		data2 = multiDayCollect(query,'result',current_time)
-		getattributespod(systems,data2,'owner_name','pod_labels')
+		getattributespod(systems,data2,'owner_name',namespace,'pod_labels')
 		
-		# Gets the number of replicas in the replica set. 
-		query = 'kube_replicaset_spec_replicas'
+		query = 'sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_labels * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}'
+		data2 = multiDayCollect(query,'result',current_time)
+		getattributespod(systems,data2,'pod',namespace,'pod_labels')
+		
+		# Gets the namespace Labels multi-value attribute
+		query = 'kube_namespace_labels'
+		data2 = multiDayCollect(query,'result',current_time)
+		getattributesnamespace(systems,data2,namespace,'namespace_labels')
+		
+		# get the limits and requests of the namespace
+		query = 'kube_limitrange'
 		data2 = multiDayCollect(query,'result',current_time)
 		for i in data2:
-			if i['metric']['replicaset'] in systems:
-				if args.mode == 'current':
-					systems[i['metric']['replicaset']]['current_size'] = i['value'][1]
-				else:
-					systems[i['metric']['replicaset']]['current_size'] = i['values'][len(i['values'])-1][1]
+			if i['metric'][namespace] in systems:
+				if i['metric']['constraint'] == 'default':
+					if i['metric']['resource'] == 'cpu':
+						systems[i['metric'][namespace]]['cpu_limit'] = i['value'][1]
+					elif i['metric']['resource'] == 'memory':
+						systems[i['metric'][namespace]]['mem_limit'] = str(int(i['value'][1])/1024/1024)
+				elif i['metric']['constraint'] == 'defaultRequest':
+					if i['metric']['resource'] == 'cpu':
+						systems[i['metric'][namespace]]['cpu_request'] = i['value'][1]
+					elif i['metric']['resource'] == 'memory':
+						systems[i['metric'][namespace]]['mem_request'] = str(int(i['value'][1])/1024/1024)
+			
+		# Gets the number of replicas in the replica set. 
+		query = 'kube_replicaset_spec_replicas'
+		getkubestatemetricspod(systems,query,namespace,'replicaset','current_size',current_time)
 		
 		# Gets the number of replicas in the replication controller. 
 		query = 'kube_replicationcontroller_spec_replicas'
-		data2 = multiDayCollect(query,'result',current_time)
-		for i in data2:
-			if i['metric']['replicationcontroller'] in systems:
-				if args.mode == 'current':
-					systems[i['metric']['replicationcontroller']]['current_size'] = i['value'][1]
-				else:
-					systems[i['metric']['replicationcontroller']]['current_size'] = i['values'][len(i['values'])-1][1]
+		getkubestatemetricspod(systems,query,namespace,'replicationcontroller','current_size',current_time)
 		
 		# Gets the number of replicas in the daemon set. 
 		query = 'kube_daemonset_status_number_available'
-		data2 = multiDayCollect(query,'result',current_time)
-		for i in data2:
-			if i['metric']['daemonset'] in systems:
-				if args.mode == 'current':
-					systems[i['metric']['daemonset']]['current_size'] = i['value'][1]
-				else:
-					systems[i['metric']['daemonset']]['current_size'] = i['values'][len(i['values'])-1][1]
-
-	
+		getkubestatemetricspod(systems,query,namespace,'daemonset','current_size',current_time)
+		
+		# Gets the creation date. 
+		query = str(args.aggregator) + '(kube_pod_created * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)'
+		getkubestatemetricspod(systems,query,namespace,'owner_name','creation_time',current_time)
+		
+		query = str(args.aggregator) + '(kube_pod_created * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}) by (pod,namespace,container)'
+		getkubestatemetricspod(systems,query,namespace,'pod','creation_time',current_time)
+		
+		
 	# kube state metrics end
 	
 	# writes out the config and attributes files based on data from all the queries ran above. 
@@ -501,7 +640,7 @@ def main():
 	#workload metrics	
 	count = 0
 	#Loops through and collects the workload data starting with the newest data and working back to the oldest data this way if we have an issue we still get some data vs none as Prometheus if has issues is usually with collecting data from the older data.
-	while count <= int(args.history):
+	while count < int(args.history):
 		count2 = count + int(args.interval_size)
 		if args.interval == 'days':
 			start = (current_time - datetime.timedelta(days=count2)).strftime("%Y-%m-%dT00:00:00.000Z")
@@ -516,59 +655,30 @@ def main():
 		#Collect CPU millicores utilization
 		cpu_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'round(sum(rate(container_cpu_usage_seconds_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ')*1000,1) ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
 		data2 = metricCollect(cpu_metrics,'result','query_range')
-		writeWorkload(data2,systems,'cpu_mCores_workload' + str(start[:-5]).replace(":","."),'CPU Utilization in mCores',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
+		cpu_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'round(sum(rate(container_cpu_usage_seconds_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ')*1000,1) ' + dc_settings[args.collection]['ksm2pod'] + '&start=' + start + '&end=' + end + '&step=5m'
+		data2 += metricCollect(cpu_metrics,'result','query_range')
+		writeWorkload(data2,systems,'cpu_mCores_workload' + str(start[:-5]).replace(":","."),'CPU Utilization in mCores',name1,name2,namespace)
 
 		# Collect Memory utilization 
 		mem_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_memory_usage_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
 		data2 = metricCollect(mem_metrics,'result','query_range')
-		writeWorkload(data2,systems,'mem_workload' + str(start[:-5]).replace(":","."),'Raw Mem Utilization',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
+		mem_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_memory_usage_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2pod'] + '&start=' + start + '&end=' + end + '&step=5m'
+		data2 += metricCollect(mem_metrics,'result','query_range')
+		writeWorkload(data2,systems,'mem_workload' + str(start[:-5]).replace(":","."),'Raw Mem Utilization',name1,name2,namespace)
 						
 		# Collect RSS that we load into active memory
 		rss_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_memory_rss' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
 		data2 = metricCollect(rss_metrics,'result','query_range')
-		writeWorkload(data2,systems,'rss_workload' + str(start[:-5]).replace(":","."),'Actual Memory Utilization',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
+		rss_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_memory_rss' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2pod'] + '&start=' + start + '&end=' + end + '&step=5m'
+		data2 += metricCollect(rss_metrics,'result','query_range')
+		writeWorkload(data2,systems,'rss_workload' + str(start[:-5]).replace(":","."),'Actual Memory Utilization',name1,name2,namespace)
 		
 		#Collect disk IO bytes 
 		disk_bytes_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_fs_usage_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
 		data2 = metricCollect(disk_bytes_metrics,'result','query_range')
-		writeWorkload(data2,systems,'disk_workload' + str(start[:-5]).replace(":","."),'Raw Disk Utilization',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
-			
-		# The network metrics are blank by default as the way the network is done is through a sidecar and we are filtering those containers out. Also it would be for the whole pod not per container so if you have multiple pods in a container you don't have details of how much each one uses for network. 	
-		#Collect network sent bytes
-		net_s_bytes_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(rate(container_network_transmit_bytes_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
-		data2 = metricCollect(net_s_bytes_metrics,'result','query_range')
-		valuesSend = writeWorkloadNetwork(data2,systems,'net_bytes_s_workload' + str(start[:-5]).replace(":","."),'Network Interface Bytes Sent per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
-		
-		#Collect network receive bytes 
-		net_r_bytes_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(rate(container_network_receive_bytes_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
-		data2 = metricCollect(net_r_bytes_metrics,'result','query_range')
-		valuesReceived = writeWorkloadNetwork(data2,systems,'net_bytes_r_workload' + str(start[:-5]).replace(":","."),'Network Interface Bytes Received per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
-		
-		# Take the values from the netowk receive and sent data and combine them to get the total bytes for network. 
-		f12=open('./data/net_bytes_workload' + str(start[:-5]).replace(":",".") + '.csv', 'w+')
-		f12.write('HOSTNAME,PROPERTY,INSTANCE,DT,VAL\n')
-		for i in valuesSend:
-			for j in valuesSend[i]:
-				f12.write(i + ',Network Interface Bytes Total per sec,,' + datetime.datetime.fromtimestamp(j).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + str(float(valuesReceived[i][j][0]) + float(valuesSend[i][j][0])) + '\n')
-		f12.close()
-		
-		# Collect Network Packets sent
-		net_s_pkts_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(rate(container_network_transmit_packets_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
-		data2 = metricCollect(net_s_pkts_metrics,'result','query_range')
-		valuesSend = writeWorkloadNetwork(data2,systems,'net_pkts_s_workload' + str(start[:-5]).replace(":","."),'Network Interface Packets Sent per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
-										
-		# Collect network Packets Receive
-		net_r_pkts_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(rate(container_network_receive_packets_total' + dc_settings[args.collection]['filter'] + '[5m])) by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2'] + '&start=' + start + '&end=' + end + '&step=5m'
-		data2 = metricCollect(net_r_pkts_metrics,'result','query_range')
-		valuesReceived = writeWorkloadNetwork(data2,systems,'net_pkts_r_workload' + str(start[:-5]).replace(":","."),'Network Interface Packets Received per sec','',dc_settings[args.collection]['name1'],dc_settings[args.collection]['name2'])
-		
-		# Combine the send and receive packet rates to get total packets.
-		f13=open('./data/net_pkts_workload' + str(start[:-5]).replace(":",".") +'.csv', 'w+')
-		f13.write('HOSTNAME,PROPERTY,INSTANCE,DT,VAL\n')
-		for i in valuesSend:
-			for j in valuesSend[i]:
-				f13.write(i + ',Network Interface Packets per sec,,' + datetime.datetime.fromtimestamp(j).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + str(float(valuesReceived[i][j][0]) + float(valuesSend[i][j][0])) + '\n')
-		f13.close()
+		disk_bytes_metrics = str(args.aggregator) + dc_settings[args.collection]['ksm1'] + 'sum(container_fs_usage_bytes' + dc_settings[args.collection]['filter'] + ') by (' + dc_settings[args.collection]['grpby'] + ') ' + dc_settings[args.collection]['ksm2pod'] + '&start=' + start + '&end=' + end + '&step=5m'
+		data2 += metricCollect(disk_bytes_metrics,'result','query_range')
+		writeWorkload(data2,systems,'disk_workload' + str(start[:-5]).replace(":","."),'Raw Disk Utilization',name1,name2,namespace)
 		
 		count += int(args.interval_size)
 	

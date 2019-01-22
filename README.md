@@ -6,7 +6,7 @@ Densify Container Data Forwarder is the container that collects data from Kubern
 
 - [Requirements](#requirements)
 - [Usage](#usage)
-- [Docker Images](#docker)
+- [Docker Images](#docker-images)
 - [Examples](#examples)
 - [Inputs](#inputs)
 - [Outputs](#outputs)

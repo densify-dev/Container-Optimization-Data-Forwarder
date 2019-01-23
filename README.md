@@ -1,8 +1,8 @@
-# Densify Container Data Forwarder
+# Container Optimization Data Forwarder
 
 <img src="https://www.densify.com/wp-content/uploads/densify.png" width="300">
 
-Densify Container Data Forwarder is the container that collects data from Kubernetes via Prometheus and forwards that data to Densify to analysis of how the containers are running to provide recommenditions about how to size the containers. 
+The Densify Container Optimization Data Forwarder is the container that collects data from Kubernetes via Prometheus and forwards that data to Densify. Densify then analyzes how the containers are running and provides sizing recommendations. 
 
 - [Requirements](#requirements)
 - [Usage](#usage)
@@ -14,10 +14,10 @@ Densify Container Data Forwarder is the container that collects data from Kubern
 
 ## Requirements
 
-- Densify account, which is provided with a Densify subscription or free trial (www.densify.com/trial)
+- Densify account, which is provided with a Densify subscription or through a free trial (www.densify.com/trial)
 - Kubernetes or OpenShift
 - Prometheus (https://prometheus.io/)
-- Kube-stste-metrics (https://github.com/kubernetes/kube-state-metrics)
+- Kube-state-metrics (https://github.com/kubernetes/kube-state-metrics)
 
 ## Usage
 
@@ -25,7 +25,7 @@ Densify Container Data Forwarder is the container that collects data from Kubern
 
 Docker image is available on [Docker Hub](https://hub.docker.com/r/kgillan/densify-kubernetes-data-forwarder)
 
-To launch the container you will need to provide a configured config.cfg in the /config directory that provides details to connect to Prometheus and Densify servers. 
+To launch the container you need to update the config.cfg file located in the /config directory. This file provides details to connect to Prometheus and Densify servers. 
 
 ## Examples 
 

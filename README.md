@@ -17,9 +17,9 @@ The Densify Container Optimization Data Forwarder is the container that collects
 
 ## Docker images
 
-Docker image is available on [Docker Hub](https://hub.docker.com/r/densify/container-optimization-data-forwarder)
+The Docker image is available on [Docker Hub](https://hub.docker.com/r/densify/container-optimization-data-forwarder).
 
-To launch the container you need to update the [config.cfg](https://github.com/densify-dev/Container-Optimization-Data-Forwarder/blob/master/trans/config/config.cfg) file located in the /config directory. This file provides details to connect to Prometheus and Densify servers. 
+To launch the container you need to update the [config.cfg](https://github.com/densify-dev/Container-Optimization-Data-Forwarder/blob/master/trans/config/config.cfg) file located in the /config directory. This file provides details to connect to both Prometheus and Densify servers. 
 
 ## License
 

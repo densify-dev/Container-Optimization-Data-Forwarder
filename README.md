@@ -27,7 +27,7 @@ To launch the container do the following:
 docker run -v "/config/config.cfg":"/config/config.cfg" \
   densify/container-optimization-data-forwarder
 ```
-3. Densify then loads the collected data.
+Densify then loads the collected data.
 
 ## License
 

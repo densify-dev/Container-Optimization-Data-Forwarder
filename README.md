@@ -1,4 +1,4 @@
-# Container Optimization Data Forwarder
+# Densify Container Optimization Data Forwarder
 
 <img src="https://www.densify.com/wp-content/uploads/densify.png" width="300">
 

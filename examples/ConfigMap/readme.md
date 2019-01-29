@@ -1,0 +1,1 @@
+In this example you will find a configmap.yml and pod.yml which will show how can create a pod passing it the Config Map to provide the settings needed in the config.cfg.

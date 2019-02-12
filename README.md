@@ -6,6 +6,7 @@ The Densify Container Optimization Data Forwarder is the container that collects
 
 - [Requirements](#requirements)
 - [Docker Images](#docker-images)
+- [Examples](#examples)
 - [License](#license)
 
 ## Requirements

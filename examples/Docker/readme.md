@@ -8,3 +8,5 @@ docker run -v "/config/config.cfg":"/config/config.cfg" \
 ```
 This would expect the config.cfg to be in the /config directory on the local server and that would be the same directory we are mounting it into in the container. 
 4. Densify then loads the collected data.
+
+The pod will run and send data over once it has done this it will end so you will need to schedule it to run based on interval you using for the data collection in the config.

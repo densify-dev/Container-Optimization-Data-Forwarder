@@ -10,7 +10,7 @@ The Densify Container Optimization Data Forwarder is the container that collects
 
 ## Requirements
 
-- Densify account, which is provided with a Densify subscription or through a free trial (www.densify.com/trial)
+- Densify account, which is provided with a Densify subscription or through a free trial (https://www.densify.com/service/signup)
 - Kubernetes or OpenShift
 - Prometheus (https://prometheus.io/)
 - Kube-state-metrics (https://github.com/kubernetes/kube-state-metrics)

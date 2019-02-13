@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: densify
+spec:
+  containers:
+  - image: densify/Container-Optimization-Data-Forwarder
+    imagePullPolicy: Always
+    name: data-forwarder
+    volumeMounts:
+    - mountPath: /config
+      name: config
+  volumes:
+  - name: config
+    configMap:
+      name: densifyconf
+      items:
+        - key: config.cfg
+          path: config.cfg
+  restartPolicy: Never

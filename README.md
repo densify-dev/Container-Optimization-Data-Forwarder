@@ -7,6 +7,7 @@ The Densify Container Optimization Data Forwarder is the container that collects
 - [Requirements](#requirements)
 - [Docker Images](#docker-images)
 - [Examples](#examples)
+- [Documentation](#Documentation)
 - [License](#license)
 
 ## Requirements
@@ -23,6 +24,9 @@ The Docker image is available on [Docker Hub](https://hub.docker.com/r/densify/c
 ## Examples 
 * [Docker with Volume Mount](examples/Docker)
 * [Kubernetes with Config Map](examples/ConfigMap)
+
+## Documentation
+* [Documentation](docs)
 
 ## License
 

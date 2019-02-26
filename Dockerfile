@@ -5,4 +5,4 @@ RUN apt-get install -y python-setuptools
 RUN easy_install pip
 RUN pip install requests
 COPY ./densify .
-CMD ["java", "-jar", "IngestionClient.jar", "-c", "-n", "k8s_transfer_v2", "-l", "k8s_transfer_v2", "-o", "upload", "-r", "-S", "config"]
+CMD ["java", "-jar", "IngestionClient.jar", "-c", "-n", "k8s_transfer_v2", "-l", "k8s_transfer_v2", "-o", "upload", "-r", "-C", "config"]

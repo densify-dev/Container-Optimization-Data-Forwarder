@@ -36,6 +36,8 @@ parser.add_argument('--intervalSize', dest='interval_size', default='1',
                     help='Interval size to be used for querying. eg. default of 1 with default interval of days queries 1 day at a time')
 parser.add_argument('--debug', dest='debug', default='false',
                     help='enable debug logging')
+parser.add_argument('--clusterName', dest='cluster_name', default='',
+                    help='name of the cluster to show in Densify')
 args = parser.parse_args()
 
 debug_log=open('./data/log.txt', 'w+')
@@ -116,7 +118,11 @@ def writeWorkload(data2,systems,file,property,name1,name2,namespace):
 										if i['metric'][name1] == '<none>':
 											x = systems[i['metric'][namespace]][i['metric'][name1]][i['metric'][name2]]['pod_name']
 										#write out each individual metric. 
-										f.write(str(args.prom_addr) + ',' + i['metric'][namespace] + ',' + x.replace(';','.') + ',' + i['metric'][name2].replace(':','.') + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
+										if args.cluster_name == '':
+											cluster = str(args.prom_addr)
+										else:
+											cluster = str(args.cluster_name)
+										f.write(cluster + ',' + i['metric'][namespace] + ',' + x.replace(';','.') + ',' + i['metric'][name2].replace(':','.') + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
 			elif 'pod_name' in i['metric']:
 				if namespace in i['metric']:
 					if i['metric'][name2] !='':
@@ -130,7 +136,11 @@ def writeWorkload(data2,systems,file,property,name1,name2,namespace):
 										if i['metric']['pod_name'] == '<none>':
 											x = systems[i['metric'][namespace]][i['metric']['pod_name']][i['metric'][name2]]['pod_name']
 										#write out each individual metric. 
-										f.write(str(args.prom_addr) + ',' + i['metric'][namespace] + ',' + x.replace(';','.') + ',' + i['metric'][name2].replace(':','.') + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
+										if args.cluster_name == '':
+											cluster = str(args.prom_addr)
+										else:
+											cluster = str(args.cluster_name)
+										f.write(cluster + ',' + i['metric'][namespace] + ',' + x.replace(';','.') + ',' + i['metric'][name2].replace(':','.') + ',' + datetime.datetime.fromtimestamp(j[0]).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + j[1] + '\n')
 	f.close()
 
 # Writes out the config file with all the systems and there settings
@@ -150,7 +160,11 @@ def writeConfig(systems,type):
 						x = i
 						if i == '<none>':
 							x = systems[n][i][j]['pod_name']
-						f.write(str(args.prom_addr) + ',' + n + ',' + x.replace(';','.') + ',' + j.replace(':','.') + ',' + str(systems[n][i][j]['memory']) + ',Linux,' + type + ',' + n + ',' + n + '\n')
+						if args.cluster_name == '':
+							cluster = str(args.prom_addr)
+						else:
+							cluster = str(args.cluster_name)
+						f.write(cluster + ',' + n + ',' + x.replace(';','.') + ',' + j.replace(':','.') + ',' + str(systems[n][i][j]['memory']) + ',Linux,' + type + ',' + n + ',' + n + '\n')
 	f.close()
 		
 # Writes out the attributes file
@@ -172,7 +186,11 @@ def writeAttributes(systems,type):
 						x = i
 						if i == '<none>':
 							x = systems[n][i][j]['pod_name']
-						f.write(str(args.prom_addr) + ',' + n + ',' + x.replace(';','.') + ',' + j.replace(':','.') + ',Containers,' + str(args.prom_addr) + ',' + n + ',' + x + ',' + systems[n][i][j]['attr'] + ',' + systems[n][i][j]['con_info'] + ',' + systems[n][i]['pod_info'] + ',' + systems[n][i]['pod_labels'] + ',' + systems[n][i][j]['cpu_limit'] + ',' + systems[n][i][j]['cpu_request'] + ',' + systems[n][i][j]['mem_limit'] + ',' + systems[n][i][j]['mem_request'] + ',' + j + ',' + systems[n][i][j]['con_instance'][:-1] + ',' + cstate + ',' + systems[n][i]['owner_kind'] + ',' + systems[n][i]['owner_name'] + ',' + systems[n][i]['current_size'] + ',' + datetime.datetime.fromtimestamp(float(systems[n][i]['creation_time'])).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + systems[n][i][j]['restarts'] + ',' + systems[n]['namespace_labels'] + ',' + systems[n]['cpu_request'] + ',' + systems[n]['cpu_limit'] + ',' + systems[n]['mem_request'] + ',' + systems[n]['mem_limit'] + '\n')
+						if args.cluster_name == '':
+							cluster = str(args.prom_addr)
+						else:
+							cluster = str(args.cluster_name)
+						f.write(cluster + ',' + n + ',' + x.replace(';','.') + ',' + j.replace(':','.') + ',Containers,' + cluster + ',' + n + ',' + x + ',' + systems[n][i][j]['attr'] + ',' + systems[n][i][j]['con_info'] + ',' + systems[n][i]['pod_info'] + ',' + systems[n][i]['pod_labels'] + ',' + systems[n][i][j]['cpu_limit'] + ',' + systems[n][i][j]['cpu_request'] + ',' + systems[n][i][j]['mem_limit'] + ',' + systems[n][i][j]['mem_request'] + ',' + j + ',' + systems[n][i][j]['con_instance'][:-1] + ',' + cstate + ',' + systems[n][i]['owner_kind'] + ',' + systems[n][i]['owner_name'] + ',' + systems[n][i]['current_size'] + ',' + datetime.datetime.fromtimestamp(float(systems[n][i]['creation_time'])).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ',' + systems[n][i][j]['restarts'] + ',' + systems[n]['namespace_labels'] + ',' + systems[n]['cpu_request'] + ',' + systems[n]['cpu_limit'] + ',' + systems[n]['mem_request'] + ',' + systems[n]['mem_limit'] + '\n')
 	f.close()
 
 # Used to build metric string for metrics we get from kube state metrics as they have a similar query builds out the part that is repeated for them. 	
@@ -359,6 +377,8 @@ def main():
 					args.interval_size = info[1]
 				elif info[0] == 'debug' and args.debug == 'false':
 					args.debug = info[1]
+				elif info[0] == 'cluster_name' and args.cluster_name == '':
+					args.cluster_name = info[1]
 		f.close()
 	
 	# Write out version number to script this way we know each time what version of the file was run. 
@@ -622,6 +642,14 @@ def main():
 		# Gets the number of replicas in the daemon set. 
 		query = 'kube_daemonset_status_number_available'
 		getkubestatemetricspod(systems,query,namespace,'daemonset','current_size',current_time)
+		
+		# Gets the number of replicas in the stateful set. 
+		query = 'kube_statefulset_replicas'
+		getkubestatemetricspod(systems,query,namespace,'statefulset','current_size',current_time)
+		
+		# Gets the number of replicas in the stateful set. 
+		query = 'kube_job_spec_parallelism'
+		getkubestatemetricspod(systems,query,namespace,'job','current_size',current_time)
 		
 		# Gets the creation date. 
 		query = str(args.aggregator) + '(kube_pod_created * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)'

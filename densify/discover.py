@@ -649,7 +649,7 @@ def main():
 		
 		# Gets the number of replicas in the stateful set. 
 		query = 'kube_job_spec_parallelism'
-		getkubestatemetricspod(systems,query,namespace,'job','current_size',current_time)
+		getkubestatemetricspod(systems,query,namespace,'job_name','current_size',current_time)
 		
 		# Gets the creation date. 
 		query = str(args.aggregator) + '(kube_pod_created * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)'

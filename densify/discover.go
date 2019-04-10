@@ -524,28 +524,6 @@ func writeWorkload(file io.Writer, result model.Value, namespace, pod, container
 	}
 }
 
-/*
-	var value int
-	if len(result.(model.Matrix)[i].Values) == 0 {
-		value = 0
-	} else {
-		value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
-	}
-	if metric == "cpuLimit" {
-		systems[string(namespaceValue)].pods[string(podValue)].containers[string(containerValue)].cpuLimit = value
-	} else if metric == "cpuRequest" {
-		systems[string(namespaceValue)].pods[string(podValue)].containers[string(containerValue)].cpuRequest = value
-	} else if metric == "memLimit" {
-		systems[string(namespaceValue)].pods[string(podValue)].containers[string(containerValue)].memLimit = value
-	} else if metric == "memRequest" {
-		systems[string(namespaceValue)].pods[string(podValue)].containers[string(containerValue)].memRequest = value
-	} else if metric == "restarts" {
-		systems[string(namespaceValue)].pods[string(podValue)].containers[string(containerValue)].restarts = value
-	} else if metric == "powerState" {
-		systems[string(namespaceValue)].pods[string(podValue)].containers[string(containerValue)].powerState = value
-	}
-*/
-
 func main() {
 
 	debugLog, err := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
@@ -558,7 +536,21 @@ func main() {
 	log.Println("Version 1.0.0")
 
 	initParameters()
-	currentTime = time.Now().UTC()
+
+	var t time.Time
+	t = time.Now().UTC()
+	if interval == "days" {
+		currentTime = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+		fmt.Println(currentTime)
+	} else if interval == "hours" {
+		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location())
+		fmt.Println(currentTime)
+	} else {
+		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), 0, 0, t.Location())
+		fmt.Println(currentTime)
+	}
+	//currentTime = time.Now().UTC()
+
 	var historyInterval time.Duration
 	historyInterval = 0
 	step = 300000000000

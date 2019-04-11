@@ -99,7 +99,7 @@ func metricCollect(query string, historyInterval time.Duration) (value model.Val
 
 	client, err := api.NewClient(api.Config{Address: promProtocol + "://" + promAddr + ":" + promPort})
 	if err != nil {
-		log.Println(err)
+		log.Fatalln(err)
 	}
 
 	var start, end time.Time
@@ -114,11 +114,9 @@ func metricCollect(query string, historyInterval time.Duration) (value model.Val
 		start = currentTime.Add(time.Minute * -1 * time.Duration(intervalSize)).Add(time.Minute * -1 * time.Duration(intervalSize) * historyInterval)
 		end = currentTime.Add(time.Minute * -1 * time.Duration(intervalSize) * historyInterval)
 	}
-
 	q := v1.NewAPI(client)
 	value, err = q.QueryRange(ctx, query, v1.Range{Start: start, End: end, Step: step})
 	//value, err = q.Query(ctx, "kube_pod_container_info", time.Now())
-
 	if err != nil {
 		log.Println(err)
 	}
@@ -541,13 +539,10 @@ func main() {
 	t = time.Now().UTC()
 	if interval == "days" {
 		currentTime = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
-		fmt.Println(currentTime)
 	} else if interval == "hours" {
 		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location())
-		fmt.Println(currentTime)
 	} else {
 		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), 0, 0, t.Location())
-		fmt.Println(currentTime)
 	}
 	//currentTime = time.Now().UTC()
 
@@ -561,29 +556,31 @@ func main() {
 	query = `max(sum(container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)/1024/1024 * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
 	result = metricCollect(query, historyInterval)
 
-	for i := 0; i < result.(model.Matrix).Len(); i++ {
-		if namespaceValue, ok := result.(model.Matrix)[i].Metric["namespace"]; ok {
-			if _, ok := systems[string(namespaceValue)]; ok == false {
-				systems[string(namespaceValue)] = &Namespace{namespaceLabel: "", cpuRequest: -1, cpuLimit: -1, memRequest: -1, memLimit: -1, pods: map[string]*Pod{}}
-			}
-			if ownerValue, ok := result.(model.Matrix)[i].Metric["owner_name"]; ok {
-				if _, ok := systems[string(namespaceValue)].pods[string(ownerValue)]; ok == false {
-					if ownerKind, ok := result.(model.Matrix)[i].Metric["owner_kind"]; ok {
-						systems[string(namespaceValue)].pods[string(ownerValue)] = &Pod{podInfo: "", podLabel: "", ownerKind: string(ownerKind), ownerName: string(ownerValue), creationTime: -1, currentSize: -1, containers: map[string]*Container{}}
-					} else {
-						systems[string(namespaceValue)].pods[string(ownerValue)] = &Pod{podInfo: "", podLabel: "", ownerKind: "", ownerName: string(ownerValue), creationTime: -1, currentSize: -1, containers: map[string]*Container{}}
-					}
+	if result != nil {
+		for i := 0; i < result.(model.Matrix).Len(); i++ {
+			if namespaceValue, ok := result.(model.Matrix)[i].Metric["namespace"]; ok {
+				if _, ok := systems[string(namespaceValue)]; ok == false {
+					systems[string(namespaceValue)] = &Namespace{namespaceLabel: "", cpuRequest: -1, cpuLimit: -1, memRequest: -1, memLimit: -1, pods: map[string]*Pod{}}
 				}
-				if containerValue, ok := result.(model.Matrix)[i].Metric["container_name"]; ok {
-					if _, ok := systems[string(namespaceValue)].pods[string(ownerValue)].containers[string(containerValue)]; ok == false {
-						var memSize int
-						//Check the length of the values array if it is empty then set memory to 0 otherwise use the last\current value in the array as the size of the memory.
-						if len(result.(model.Matrix)[i].Values) == 0 {
-							memSize = 0
+				if ownerValue, ok := result.(model.Matrix)[i].Metric["owner_name"]; ok {
+					if _, ok := systems[string(namespaceValue)].pods[string(ownerValue)]; ok == false {
+						if ownerKind, ok := result.(model.Matrix)[i].Metric["owner_kind"]; ok {
+							systems[string(namespaceValue)].pods[string(ownerValue)] = &Pod{podInfo: "", podLabel: "", ownerKind: string(ownerKind), ownerName: string(ownerValue), creationTime: -1, currentSize: -1, containers: map[string]*Container{}}
 						} else {
-							memSize = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+							systems[string(namespaceValue)].pods[string(ownerValue)] = &Pod{podInfo: "", podLabel: "", ownerKind: "", ownerName: string(ownerValue), creationTime: -1, currentSize: -1, containers: map[string]*Container{}}
 						}
-						systems[string(namespaceValue)].pods[string(ownerValue)].containers[string(containerValue)] = &Container{memory: memSize, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, restarts: -1, powerState: 1, conLabel: "", conInfo: "", currentNodes: "", podName: ""}
+					}
+					if containerValue, ok := result.(model.Matrix)[i].Metric["container_name"]; ok {
+						if _, ok := systems[string(namespaceValue)].pods[string(ownerValue)].containers[string(containerValue)]; ok == false {
+							var memSize int
+							//Check the length of the values array if it is empty then set memory to 0 otherwise use the last\current value in the array as the size of the memory.
+							if len(result.(model.Matrix)[i].Values) == 0 {
+								memSize = 0
+							} else {
+								memSize = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+							}
+							systems[string(namespaceValue)].pods[string(ownerValue)].containers[string(containerValue)] = &Container{memory: memSize, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, restarts: -1, powerState: 1, conLabel: "", conInfo: "", currentNodes: "", podName: ""}
+						}
 					}
 				}
 			}
@@ -598,29 +595,35 @@ func main() {
 	query = `max(sum(container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)/1024/1024 * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
 	result = metricCollect(query, historyInterval)
 
-	for i := 0; i < result.(model.Matrix).Len(); i++ {
-		if namespaceValue, ok := result.(model.Matrix)[i].Metric["namespace"]; ok {
-			if _, ok := systems[string(namespaceValue)]; ok == false {
-				systems[string(namespaceValue)] = &Namespace{namespaceLabel: "", cpuRequest: -1, cpuLimit: -1, memRequest: -1, memLimit: -1, pods: map[string]*Pod{}}
-			}
-			if podValue, ok := result.(model.Matrix)[i].Metric["pod_name"]; ok {
-				if _, ok := systems[string(namespaceValue)].pods[string(podValue)]; ok == false {
-					systems[string(namespaceValue)].pods[string(podValue)] = &Pod{podInfo: "", podLabel: "", ownerKind: "<none>", ownerName: string(podValue), creationTime: -1, currentSize: -1, containers: map[string]*Container{}}
+	if result != nil {
+		for i := 0; i < result.(model.Matrix).Len(); i++ {
+			if namespaceValue, ok := result.(model.Matrix)[i].Metric["namespace"]; ok {
+				if _, ok := systems[string(namespaceValue)]; ok == false {
+					systems[string(namespaceValue)] = &Namespace{namespaceLabel: "", cpuRequest: -1, cpuLimit: -1, memRequest: -1, memLimit: -1, pods: map[string]*Pod{}}
 				}
-				if containerValue, ok := result.(model.Matrix)[i].Metric["container_name"]; ok {
-					if _, ok := systems[string(namespaceValue)].pods[string(podValue)].containers[string(containerValue)]; ok == false {
-						var memSize int
-						//Check the length of the values array if it is empty then set memory to 0 otherwise use the last\current value in the array as the size of the memory.
-						if len(result.(model.Matrix)[i].Values) == 0 {
-							memSize = 0
-						} else {
-							memSize = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+				if podValue, ok := result.(model.Matrix)[i].Metric["pod_name"]; ok {
+					if _, ok := systems[string(namespaceValue)].pods[string(podValue)]; ok == false {
+						systems[string(namespaceValue)].pods[string(podValue)] = &Pod{podInfo: "", podLabel: "", ownerKind: "<none>", ownerName: string(podValue), creationTime: -1, currentSize: -1, containers: map[string]*Container{}}
+					}
+					if containerValue, ok := result.(model.Matrix)[i].Metric["container_name"]; ok {
+						if _, ok := systems[string(namespaceValue)].pods[string(podValue)].containers[string(containerValue)]; ok == false {
+							var memSize int
+							//Check the length of the values array if it is empty then set memory to 0 otherwise use the last\current value in the array as the size of the memory.
+							if len(result.(model.Matrix)[i].Values) == 0 {
+								memSize = 0
+							} else {
+								memSize = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+							}
+							systems[string(namespaceValue)].pods[string(podValue)].containers[string(containerValue)] = &Container{memory: memSize, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, restarts: -1, powerState: 1, conLabel: "", conInfo: "", currentNodes: "", podName: ""}
 						}
-						systems[string(namespaceValue)].pods[string(podValue)].containers[string(containerValue)] = &Container{memory: memSize, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, restarts: -1, powerState: 1, conLabel: "", conInfo: "", currentNodes: "", podName: ""}
 					}
 				}
 			}
 		}
+	}
+	if len(systems) == 0 {
+		fmt.Println("No data returned from Prometheus. Validate all the prerequisites are setup")
+		log.Fatalln("No data returned from Prometheus. Validate all the prerequisites are setup")
 	}
 
 	if debug {
@@ -632,7 +635,6 @@ func main() {
 	//kubeStateOwner = ` * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}) by (pod,namespace,container)`
 
 	//Container metrics
-
 	query = `max(sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000 * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)`
 	result = metricCollect(query, historyInterval)
 	getContainerMetric(result, "namespace", "owner_name", "container", "cpuLimit")
@@ -754,7 +756,6 @@ func main() {
 	writeConfig()
 	writeAttributes()
 
-	historyInterval = 0
 	cpuWrite, err := os.Create("./data/cpu_mCores_workload.csv")
 	if err != nil {
 		log.Println(err)
@@ -777,72 +778,33 @@ func main() {
 	fmt.Fprintln(diskWrite, "cluster,namespace,pod,container,Datetime,Raw Disk Utilization")
 
 	//Insert looping logic here.....
-	query = `max(round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
-	result = metricCollect(query, historyInterval)
-	writeWorkload(cpuWrite, result, "namespace", "owner_name", "container_name")
-	query = `max(round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
-	result = metricCollect(query, historyInterval)
-	writeWorkload(cpuWrite, result, "namespace", "pod_name", "container_name")
+	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
+		query = `max(round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
+		result = metricCollect(query, historyInterval)
+		writeWorkload(cpuWrite, result, "namespace", "owner_name", "container_name")
+		query = `max(round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
+		result = metricCollect(query, historyInterval)
+		writeWorkload(cpuWrite, result, "namespace", "pod_name", "container_name")
 
-	query = `max(sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
-	result = metricCollect(query, historyInterval)
-	writeWorkload(memWrite, result, "namespace", "owner_name", "container_name")
-	query = `max(sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
-	result = metricCollect(query, historyInterval)
-	writeWorkload(memWrite, result, "namespace", "pod_name", "container_name")
+		query = `max(sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
+		result = metricCollect(query, historyInterval)
+		writeWorkload(memWrite, result, "namespace", "owner_name", "container_name")
+		query = `max(sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
+		result = metricCollect(query, historyInterval)
+		writeWorkload(memWrite, result, "namespace", "pod_name", "container_name")
 
-	query = `max(sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
-	result = metricCollect(query, historyInterval)
-	writeWorkload(rssWrite, result, "namespace", "owner_name", "container_name")
-	query = `max(sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
-	result = metricCollect(query, historyInterval)
-	writeWorkload(rssWrite, result, "namespace", "pod_name", "container_name")
+		query = `max(sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
+		result = metricCollect(query, historyInterval)
+		writeWorkload(rssWrite, result, "namespace", "owner_name", "container_name")
+		query = `max(sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
+		result = metricCollect(query, historyInterval)
+		writeWorkload(rssWrite, result, "namespace", "pod_name", "container_name")
 
-	query = `max(sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
-	result = metricCollect(query, historyInterval)
-	writeWorkload(diskWrite, result, "namespace", "owner_name", "container_name")
-	query = `max(sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
-	result = metricCollect(query, historyInterval)
-	writeWorkload(diskWrite, result, "namespace", "pod_name", "container_name")
-
-	//
-	//
-	//
-	//fmt.Println(systems["monitoring"].pods["kube-state-metrics-65c9c75856"].containers["addon-resizer"].powerState)
-	//systems["monitoring"].pods["kube-state-metrics-65c9c75856"].containers["addon-resizer"].powerState = 0
-	//fmt.Println(systems["monitoring"].pods["kube-state-metrics-65c9c75856"].containers["addon-resizer"].powerState)
-	//fmt.Println("container")
-	//fmt.Println(systems["monitoring"].pods["kube-state-metrics-65c9c75856"].containers["addon-resizer"])
-	//fmt.Println("pod")
-	//fmt.Println(systems["monitoring"].pods["kube-state-metrics-65c9c75856"])
-	//fmt.Println("namespace")
-	//fmt.Println(systems["monitoring"])
-	//fmt.Println(systems)
-	//fmt.Println(result.(model.Matrix)[0].Metric["owner_kind"])
-	//fmt.Println(result.(model.Matrix)[0].Values[len(result.(model.Matrix)[0].Values)-1].Value)
-
-	//
-	//
-	//
-	//
-	//
-	//
-	//
-	/*
-		//test code below here on how to work with different parts of the results from Prometheus.
-		query = "container_memory_usage_bytes"
-		value := metricCollect(query,historyInterval)
-		log.Println(value)
-
-		//Sample of getting key and value for all labels in the metric returned
-		for key, value2 := range value.(model.Matrix)[2].Metric {
-			fmt.Println(key, value2)
-		}
-		//Getting the labels out of the metric result is a map this case container_name is returned.
-		fmt.Println(value.(model.Matrix)[2].Metric["container_name"])
-		// Get value of the first system for the first value (oldest)
-		fmt.Println(value.(model.Matrix)[0].Values[0].Value)
-		// Get the time of the value for the first system oldest value.
-		fmt.Println(value.(model.Matrix)[0].Values[0].Timestamp)
-	*/
+		query = `max(sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
+		result = metricCollect(query, historyInterval)
+		writeWorkload(diskWrite, result, "namespace", "owner_name", "container_name")
+		query = `max(sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
+		result = metricCollect(query, historyInterval)
+		writeWorkload(diskWrite, result, "namespace", "pod_name", "container_name")
+	}
 }

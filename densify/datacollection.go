@@ -1,5 +1,5 @@
 //Package datacollection collects data from Prometheus and formats the data into CSVs that will be sent to Densify through the Forwarder.
-package datacollection
+package main
 
 import (
 	"context"

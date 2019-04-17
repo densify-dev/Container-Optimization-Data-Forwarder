@@ -3,7 +3,7 @@ kind :  ConfigMap
 metadata :
   name :  densifyconf 
 data : 
-  config.cfg : |
+  config.properties : |
    #
    #  Copyright (c) 2018-, Densify Inc. D/B/A Densify #  All Rights Reserved.
    #

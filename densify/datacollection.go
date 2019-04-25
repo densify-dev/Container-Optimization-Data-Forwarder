@@ -727,64 +727,63 @@ func main() {
 		log.Println("[DEBUG] ", systems)
 	}
 
-	//variables that were used in prometheus to simplify the repetitive code. Was having issues concatinating the strings in Go and getting them to query properly which is why commented out and just coded in the full string.
-	//Prometheus was only reading the query up to the point where the concatination was done.
-	//var kubeStateOwner, kubeStatePod string
-	//kubeStateOwner = ` * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)`
-	//kubeStateOwner = ` * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}) by (pod,namespace,container)`
+	//variables that were used in prometheus to simplify the repetitive code.
+	var kubeStateOwner, kubeStatePod string
+	kubeStateOwner = ` * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)`
+	kubeStatePod = ` * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}) by (pod,namespace,container)`
 
 	//Container metrics
 	//Get the CPU Limit for container
-	query = `max(sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000 * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)`
+	query = `max(sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000` + kubeStateOwner
 	result = metricCollect(query, historyInterval)
 	getContainerMetric(result, "namespace", "owner_name", "container", "cpuLimit")
 
-	query = `max(sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000 * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}) by (pod,namespace,container)`
+	query = `max(sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000` + kubeStatePod
 	result = metricCollect(query, historyInterval)
 	getContainerMetric(result, "namespace", "pod", "container", "cpuLimit")
 
 	//Get the CPU Request for container
-	query = `max(sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000 * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)`
+	query = `max(sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000` + kubeStateOwner
 	result = metricCollect(query, historyInterval)
 	getContainerMetric(result, "namespace", "owner_name", "container", "cpuRequest")
 
-	query = `max(sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000 * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}) by (pod,namespace,container)`
+	query = `max(sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000` + kubeStatePod
 	result = metricCollect(query, historyInterval)
 	getContainerMetric(result, "namespace", "pod", "container", "cpuRequest")
 
 	//Get the Memory Limit for container
-	query = `max(sum(kube_pod_container_resource_limits_memory_bytes) by (pod,namespace,container)/1024/1024 * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)`
+	query = `max(sum(kube_pod_container_resource_limits_memory_bytes) by (pod,namespace,container)/1024/1024` + kubeStateOwner
 	result = metricCollect(query, historyInterval)
 	getContainerMetric(result, "namespace", "owner_name", "container", "memLimit")
 
-	query = `max(sum(kube_pod_container_resource_limits_memory_bytes) by (pod,namespace,container)/1024/1024 * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}) by (pod,namespace,container)`
+	query = `max(sum(kube_pod_container_resource_limits_memory_bytes) by (pod,namespace,container)/1024/1024` + kubeStatePod
 	result = metricCollect(query, historyInterval)
 	getContainerMetric(result, "namespace", "pod", "container", "memLimit")
 
 	//Get the Memory Request for container
-	query = `max(sum(kube_pod_container_resource_requests_memory_bytes) by (pod,namespace,container)/1024/1024 * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)`
+	query = `max(sum(kube_pod_container_resource_requests_memory_bytes) by (pod,namespace,container)/1024/1024` + kubeStateOwner
 	result = metricCollect(query, historyInterval)
 	getContainerMetric(result, "namespace", "owner_name", "container", "memRequest")
 
-	query = `max(sum(kube_pod_container_resource_requests_memory_bytes) by (pod,namespace,container)/1024/1024 * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}) by (pod,namespace,container)`
+	query = `max(sum(kube_pod_container_resource_requests_memory_bytes) by (pod,namespace,container)/1024/1024` + kubeStatePod
 	result = metricCollect(query, historyInterval)
 	getContainerMetric(result, "namespace", "pod", "container", "memRequest")
 
 	//Get the number of times the container has been restarted
-	query = `max(sum(kube_pod_container_status_restarts_total) by (pod,namespace,container) * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)`
+	query = `max(sum(kube_pod_container_status_restarts_total) by (pod,namespace,container)` + kubeStateOwner
 	result = metricCollect(query, historyInterval)
 	getContainerMetric(result, "namespace", "owner_name", "container", "restarts")
 
-	query = `max(sum(kube_pod_container_status_restarts_total) by (pod,namespace,container) * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}) by (pod,namespace,container)`
+	query = `max(sum(kube_pod_container_status_restarts_total) by (pod,namespace,container)` + kubeStatePod
 	result = metricCollect(query, historyInterval)
 	getContainerMetric(result, "namespace", "pod", "container", "restarts")
 
 	//Check to see if the container is still running or if it has been terminated.
-	query = `max(sum(kube_pod_container_status_terminated) by (pod,namespace,container) * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)`
+	query = `max(sum(kube_pod_container_status_terminated) by (pod,namespace,container)` + kubeStateOwner
 	result = metricCollect(query, historyInterval)
 	getContainerMetric(result, "namespace", "owner_name", "container", "powerState")
 
-	query = `max(sum(kube_pod_container_status_terminated) by (pod,namespace,container) * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}) by (pod,namespace,container)`
+	query = `max(sum(kube_pod_container_status_terminated) by (pod,namespace,container)` + kubeStatePod
 	result = metricCollect(query, historyInterval)
 	getContainerMetric(result, "namespace", "pod", "container", "powerState")
 
@@ -847,11 +846,11 @@ func main() {
 	getPodMetric(result, "namespace", "job_name", "currentSize")
 
 	//Get when the pod was originally created.
-	query = `max(kube_pod_created * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}) by (owner_name,owner_kind,namespace,container)`
+	query = `max(kube_pod_created` + kubeStateOwner
 	result = metricCollect(query, historyInterval)
 	getPodMetric(result, "namespace", "owner_name", "creationTime")
 
-	query = `max(kube_pod_created * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}) by (pod,namespace,container)`
+	query = `max(kube_pod_created` + kubeStatePod
 	result = metricCollect(query, historyInterval)
 	getPodMetric(result, "namespace", "pod", "creationTime")
 

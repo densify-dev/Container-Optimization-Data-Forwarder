@@ -3,7 +3,7 @@ kind: CronJob
 metadata:
   name: densify-job
 spec:
-  schedule: "* 1 * * *"
+  schedule: "* */1 * * *"
   jobTemplate:
     spec:
       template:

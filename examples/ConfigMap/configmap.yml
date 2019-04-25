@@ -26,24 +26,16 @@ data :
    #epassword <override plaintext; use result of Encrypt.jar>
    
    ###################################################################
-   # \ PROXY HOST definition section
-   #  Provide information for proxyhost access
-   # \ Will only come into play if proxyhost field defined
+   # \ Specify settings for Prometheus used by the dataCollection
    ###################################################################
-   
-   #proxyhost <proxy.host.com>
-   #proxyport <port>
-   #proxyprotocol <http|https>
-   #proxyauth <Basic|NTLM>
-   
-   #proxyuser <username>
-   #proxypassword <password>
-   #eproxypassword <override plaintext; use result of Encrypt.jar>
-   
-   # Following are used for NTLM authentication
-   #proxyserver <domain user name>
-   #proxydomain <domain>
-   
+   prometheus_address <hostname or IP>
+   prometheus_port <port|9090>
+   #prometheus_protocol <http|https>
+   #cluster_name <optional parameter that allows you to specify name to show for cluster in Densify. If not specified will use the prometheus_address>
+   #interval <days|hours|minutes>
+   #interval_size 1
+   #history 1
+
    ###################################################################
    # \ Client transfer settings / options
    ###################################################################
@@ -66,21 +58,28 @@ data :
    #v2 <true|false>
    
    ###################################################################
-   #\ Specify private trust store information here
-   #  Listed truststore must be accessible by client
+   # \ PROXY HOST definition section
+   #  Provide information for proxyhost access
+   # \ Will only come into play if proxyhost field defined
    ###################################################################
    
-   #truststore densify.jks
-   #trustpassword changeit 
+   #proxyhost <proxy.host.com>
+   #proxyport <port>
+   #proxyprotocol <http|https>
+   #proxyauth <Basic|NTLM>
+   
+   #proxyuser <username>
+   #proxypassword <password>
+   #eproxypassword <override plaintext; use result of Encrypt.jar>
+   
+   # Following are used for NTLM authentication
+   #proxyserver <domain user name>
+   #proxydomain <domain>
    
    ###################################################################
    # \ Pre-run command invocation
    #  This command will be called before client execution
    ###################################################################
-   
-   # Windows sample
-   #command cmd.exe
-   #args /c cd \"C:\\\\Program Files\\\\Microsoft SQL Server\\\" && dir
    
    # Linux sample - data collection using python script
    command python
@@ -92,18 +91,3 @@ data :
    
    #debug <true|false>
    #internal <true|false>
-   
-   ###################################################################
-   # \ Other programs may use this configuration file for their args
-   ###################################################################
-   prometheus_address <hostname or IP>
-   prometheus_port <port|9090>
-   #interval hours
-   #interval_size 1
-   #history 5
-   #collection <kubernetes|swarm>
-   #timeout <seconds>
-   #prometheus_protocol <http|https>
-   #ssl_certificate_verify <True|False|Directory with certificates>
-   #aggregator <max|avg>
-  

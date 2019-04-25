@@ -1,4 +1,4 @@
-In this example you will find a configmap.yml and pod.yml that shows you how to create a pod, then pass the Config Map that provides the settings required in the config.cfg.
+In this example you will find a configmap.yml and pod.yml that shows you how to create a pod, then pass the Config Map that provides the settings required in the config.properties.
 1. Modify the configmap.yml to point to your Prometheus and Densify Servers.
 2. Create the config map in Kubernetes.
     kubectl create -f configmap.yml

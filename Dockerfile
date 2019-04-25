@@ -7,6 +7,6 @@ ADD ./densify/datacollection.go /go/src/build
 WORKDIR /go/src/build
 RUN go build -o dataCollection .
 FROM alpine
+CMD ["./Forwarder", "-c", "-n", "k8s_transfer_v2", "-l", "k8s_transfer_v2", "-o", "upload", "-r", "-C", "config"]
 COPY ./densify .
 COPY --from=builder /go/src/build/dataCollection .
-CMD ["./Forwarder", "-c", "-n", "k8s_transfer_v2", "-l", "k8s_transfer_v2", "-o", "upload", "-r", "-C", "config"]

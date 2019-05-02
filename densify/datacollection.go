@@ -34,10 +34,10 @@ type container struct {
 
 //pod is used to hold information related to the controllers or individual pods in a namespace.
 type pod struct {
-	podInfo, podLabel, ownerKind, ownerName string
-	currentSize                             int
-	creationTime                            int64
-	containers                              map[string]*container
+	podInfo, podLabel, ownerKind, ownerName, controllerLabel string
+	currentSize                                              int
+	creationTime                                             int64
+	containers                                               map[string]*container
 }
 
 //namespace is used to hold information related to the namespaces defined in Kubernetes
@@ -342,6 +342,8 @@ func getPodMetricString(result model.Value, namespace, pod model.LabelName, metr
 					systems[kn].pods[kp].podInfo = tempAttr
 				} else if metric == "podLabel" {
 					systems[kn].pods[kp].podLabel = tempAttr
+				} else if metric == "controllerLabel" {
+					systems[kn].pods[kp].controllerLabel = tempAttr
 				}
 			}
 		}
@@ -477,7 +479,7 @@ func writeAttributes() {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,namespace,pod,container,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Container Info,Pod Info,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Current Nodes,Power State,Created By Kind,Created By Name,Current Size,Create Time,Container Restarts,Namespace Labels,Namespace CPU Request,Namespace CPU Limit,Namespace Memory Request,Namespace Memory Limit")
+	fmt.Fprintln(attributeWrite, "cluster,namespace,pod,container,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Container Info,Pod Info,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Current Nodes,Power State,Created By Kind,Created By Name,Current Size,Create Time,Container Restarts,Namespace Labels,Namespace CPU Request,Namespace CPU Limit,Namespace Memory Request,Namespace Memory Limit,Controller Labels")
 
 	//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.
 	var cluster string
@@ -557,7 +559,7 @@ func writeAttributes() {
 				} else {
 					fmt.Fprintf(attributeWrite, ",%d", vn.memLimit)
 				}
-				fmt.Fprintf(attributeWrite, "\n")
+				fmt.Fprintf(attributeWrite, ",%s\n", vp.controllerLabel)
 			}
 		}
 	}
@@ -593,6 +595,65 @@ func writeWorkload(file io.Writer, result model.Value, namespace, pod, container
 			}
 		}
 	}
+}
+
+//writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
+func writeWorkloadPod(file io.Writer, result model.Value, namespace, pod model.LabelName) {
+	if result != nil {
+		//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.
+		var cluster string
+		if clusterName == "" {
+			cluster = promAddr
+		} else {
+			cluster = clusterName
+		}
+		//Loop through the results for the workload and validate that contains the required labels and that the entity exists in the systems data structure once validated will write out the workload for the system.
+		for i := 0; i < result.(model.Matrix).Len(); i++ {
+			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
+				if _, ok := systems[string(namespaceValue)]; ok {
+					if podValue, ok := result.(model.Matrix)[i].Metric[pod]; ok {
+						if _, ok := systems[string(namespaceValue)].pods[string(podValue)]; ok {
+							for kc := range systems[string(namespaceValue)].pods[string(podValue)].containers {
+								//Loop through the different values over the interval and write out each one to the workload file.
+								for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
+									fmt.Fprintf(file, "%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(podValue), ";", ".", -1), strings.Replace(string(kc), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
+								}
+							}
+
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func getWorkload(fileName, metricName, query2, aggregrator string) {
+	var historyInterval time.Duration
+	historyInterval = 0
+	var result model.Value
+	var query string
+	//Open the files that will be used for the workload data types and write out there headers.
+	workloadWrite, err := os.Create("./data/" + aggregrator + `_` + fileName + ".csv")
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Fprintf(workloadWrite, "cluster,namespace,pod,container,Datetime,%s\n", metricName)
+
+	//If the History parameter is set to anything but default 1 then will loop through the calls starting with the current day\hour\minute interval and work backwards.
+	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
+	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
+	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
+		//Query for CPU usage in millicores.
+		query = aggregrator + `(` + query2 + ` * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
+		result = metricCollect(query, historyInterval)
+		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name")
+		query = aggregrator + `(` + query2 + ` * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
+		result = metricCollect(query, historyInterval)
+		writeWorkload(workloadWrite, result, "namespace", "pod_name", "container_name")
+	}
+	//Close the workload files.
+	workloadWrite.Close()
 }
 
 //main function.
@@ -652,9 +713,9 @@ func main() {
 				if ownerValue, ok := result.(model.Matrix)[i].Metric["owner_name"]; ok {
 					if _, ok := systems[string(namespaceValue)].pods[string(ownerValue)]; ok == false {
 						if ownerKind, ok := result.(model.Matrix)[i].Metric["owner_kind"]; ok {
-							systems[string(namespaceValue)].pods[string(ownerValue)] = &pod{podInfo: "", podLabel: "", ownerKind: string(ownerKind), ownerName: string(ownerValue), creationTime: -1, currentSize: -1, containers: map[string]*container{}}
+							systems[string(namespaceValue)].pods[string(ownerValue)] = &pod{podInfo: "", podLabel: "", ownerKind: string(ownerKind), ownerName: string(ownerValue), controllerLabel: "", creationTime: -1, currentSize: -1, containers: map[string]*container{}}
 						} else {
-							systems[string(namespaceValue)].pods[string(ownerValue)] = &pod{podInfo: "", podLabel: "", ownerKind: "", ownerName: string(ownerValue), creationTime: -1, currentSize: -1, containers: map[string]*container{}}
+							systems[string(namespaceValue)].pods[string(ownerValue)] = &pod{podInfo: "", podLabel: "", ownerKind: "", ownerName: string(ownerValue), controllerLabel: "", creationTime: -1, currentSize: -1, containers: map[string]*container{}}
 						}
 					}
 					//Validate that the data contains the container label with value and check it exists in our systems structure and if not add it
@@ -696,7 +757,7 @@ func main() {
 				//Validate that the data contains the pod_name label (This will be the pod field when writing out data) with value and check it exists in our systems structure and if not add it.
 				if podValue, ok := result.(model.Matrix)[i].Metric["pod_name"]; ok {
 					if _, ok := systems[string(namespaceValue)].pods[string(podValue)]; ok == false {
-						systems[string(namespaceValue)].pods[string(podValue)] = &pod{podInfo: "", podLabel: "", ownerKind: "<none>", ownerName: string(podValue), creationTime: -1, currentSize: -1, containers: map[string]*container{}}
+						systems[string(namespaceValue)].pods[string(podValue)] = &pod{podInfo: "", podLabel: "", ownerKind: "<none>", ownerName: string(podValue), controllerLabel: "", creationTime: -1, currentSize: -1, containers: map[string]*container{}}
 					}
 					//Validate that the data contains the container label with value and check it exists in our systems structure and if not add it
 					if containerValue, ok := result.(model.Matrix)[i].Metric["container_name"]; ok {
@@ -824,26 +885,52 @@ func main() {
 	result = metricCollect(query, historyInterval)
 	getPodMetricString(result, "namespace", "pod", "podLabel")
 
+	currentSizeWrite, err := os.Create("./data/currentSize.csv")
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Fprintf(currentSizeWrite, "cluster,namespace,pod,container,Datetime,currentSize\n")
+
 	//Get the current size of the controller will query each of the differnt types of controller
 	query = `kube_replicaset_spec_replicas`
 	result = metricCollect(query, historyInterval)
 	getPodMetric(result, "namespace", "replicaset", "currentSize")
+	writeWorkloadPod(currentSizeWrite, result, "namespace", "replicaset")
 
 	query = `kube_replicationcontroller_spec_replicas`
 	result = metricCollect(query, historyInterval)
 	getPodMetric(result, "namespace", "replicationcontroller", "currentSize")
+	writeWorkloadPod(currentSizeWrite, result, "namespace", "replicationcontroller")
 
 	query = `kube_daemonset_status_number_available`
 	result = metricCollect(query, historyInterval)
 	getPodMetric(result, "namespace", "daemonset", "currentSize")
+	writeWorkloadPod(currentSizeWrite, result, "namespace", "daemonset")
 
 	query = `kube_statefulset_replicas`
 	result = metricCollect(query, historyInterval)
 	getPodMetric(result, "namespace", "statefulset", "currentSize")
+	writeWorkloadPod(currentSizeWrite, result, "namespace", "statefulset")
 
 	query = `kube_job_spec_parallelism`
 	result = metricCollect(query, historyInterval)
 	getPodMetric(result, "namespace", "job_name", "currentSize")
+	writeWorkloadPod(currentSizeWrite, result, "namespace", "job_name")
+
+	currentSizeWrite.Close()
+
+	//Get the controller labels
+	query = `kube_statefulset_labels`
+	result = metricCollect(query, historyInterval)
+	getPodMetricString(result, "namespace", "statefulset", "controllerLabel")
+
+	query = `kube_job_labels`
+	result = metricCollect(query, historyInterval)
+	getPodMetricString(result, "namespace", "job_name", "controllerLabel")
+
+	query = `kube_daemonset_labels`
+	result = metricCollect(query, historyInterval)
+	getPodMetricString(result, "namespace", "daemonset", "controllerLabel")
 
 	//Get when the pod was originally created.
 	query = `max(kube_pod_created` + kubeStateOwner
@@ -869,67 +956,21 @@ func main() {
 	writeConfig()
 	writeAttributes()
 
-	//Open the files that will be used for the workload data types and write out there headers.
-	cpuWrite, err := os.Create("./data/cpu_mCores_workload.csv")
-	if err != nil {
-		log.Println(err)
-	}
-	fmt.Fprintln(cpuWrite, "cluster,namespace,pod,container,Datetime,CPU Utilization in mCores")
-	memWrite, err := os.Create("./data/mem_workload.csv")
-	if err != nil {
-		log.Println(err)
-	}
-	fmt.Fprintln(memWrite, "cluster,namespace,pod,container,Datetime,Raw Mem Utilization")
-	rssWrite, err := os.Create("./data/rss_workload.csv")
-	if err != nil {
-		log.Println(err)
-	}
-	fmt.Fprintln(rssWrite, "cluster,namespace,pod,container,Datetime,Actual Memory Utilization")
-	diskWrite, err := os.Create("./data/disk_workload.csv")
-	if err != nil {
-		log.Println(err)
-	}
-	fmt.Fprintln(diskWrite, "cluster,namespace,pod,container,Datetime,Raw Disk Utilization")
+	query = `round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1)`
+	getWorkload("cpu_mCores_workload", "CPU Utilization in mCores", query, "max")
+	query = `sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
+	getWorkload("mem_workload", "Raw Mem Utilization", query, "max")
+	query = `sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
+	getWorkload("rss_workload", "Actual Memory Utilization", query, "max")
+	query = `sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
+	getWorkload("disk_workload", "Raw Disk Utilization", query, "max")
 
-	//If the History parameter is set to anything but default 1 then will loop through the calls starting with the current day\hour\minute interval and work backwards.
-	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
-	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
-	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
-		//Query for CPU usage in millicores.
-		query = `max(round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
-		result = metricCollect(query, historyInterval)
-		writeWorkload(cpuWrite, result, "namespace", "owner_name", "container_name")
-		query = `max(round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
-		result = metricCollect(query, historyInterval)
-		writeWorkload(cpuWrite, result, "namespace", "pod_name", "container_name")
-
-		//Query for memory utilization.
-		query = `max(sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
-		result = metricCollect(query, historyInterval)
-		writeWorkload(memWrite, result, "namespace", "owner_name", "container_name")
-		query = `max(sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
-		result = metricCollect(query, historyInterval)
-		writeWorkload(memWrite, result, "namespace", "pod_name", "container_name")
-
-		//Query for the RSS memory
-		query = `max(sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
-		result = metricCollect(query, historyInterval)
-		writeWorkload(rssWrite, result, "namespace", "owner_name", "container_name")
-		query = `max(sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
-		result = metricCollect(query, historyInterval)
-		writeWorkload(rssWrite, result, "namespace", "pod_name", "container_name")
-
-		//Query for disk utilization in bytes.
-		query = `max(sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
-		result = metricCollect(query, historyInterval)
-		writeWorkload(diskWrite, result, "namespace", "owner_name", "container_name")
-		query = `max(sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind) * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
-		result = metricCollect(query, historyInterval)
-		writeWorkload(diskWrite, result, "namespace", "pod_name", "container_name")
-	}
-	//Close the workload files.
-	cpuWrite.Close()
-	memWrite.Close()
-	rssWrite.Close()
-	diskWrite.Close()
+	query = `round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1)`
+	getWorkload("cpu_mCores_workload", "CPU Utilization in mCores", query, "avg")
+	query = `sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
+	getWorkload("mem_workload", "Raw Mem Utilization", query, "avg")
+	query = `sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
+	getWorkload("rss_workload", "Actual Memory Utilization", query, "avg")
+	query = `sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
+	getWorkload("disk_workload", "Raw Disk Utilization", query, "avg")
 }

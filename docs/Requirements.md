@@ -1,7 +1,7 @@
 This section describes the candidate environment for the Container Optimization Data Collection.
 
 The following required configurations are necessary for Densify container optimization.
-- Desnify account account, which is provided with a Densify subscription or through a free trial. See www.densify.com/service/signup. 
+- Desnify account, which is provided with a Densify subscription or through a free trial. See www.densify.com/service/signup. 
 - Kubernetes or OpenShift 
   - Running cAdvisor as part of the kubelet that by default, provides the workload and configuration data required by Densify. 
 - Prometheus
@@ -15,4 +15,4 @@ The following item is not mandatory, but does provide additional environment inf
   - Collects data about the Nodes, on which the containers are running. 
   - https://hub.docker.com/r/prom/node-exporter/
 
-Contact Support@Desnify.com for more details.
+Contact Support@Densify.com for more details.

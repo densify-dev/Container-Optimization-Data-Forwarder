@@ -82,8 +82,8 @@ data :
    ###################################################################
    
    # Linux sample - data collection using python script
-   command python
-   args discover.py --file config/config.cfg
+   command ./dataCollection
+   args --file config --path ./config
    
    ###################################################################
    # \ Debugging options

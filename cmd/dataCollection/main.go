@@ -2,7 +2,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -11,10 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
-
-	"github.com/prometheus/client_golang/api"
-	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/spf13/viper"
 )
 
@@ -22,7 +19,6 @@ import (
 var clusterName, promAddr, promPort, promProtocol, interval, configFile, configPath string
 var intervalSize, history int
 var debug bool
-var step time.Duration
 var currentTime time.Time
 var systems = map[string]*namespace{}
 
@@ -90,42 +86,6 @@ func initParameters() {
 	history = viper.GetInt("history")
 	debug = viper.GetBool("debug")
 
-}
-
-//metricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
-func metricCollect(query string, historyInterval time.Duration) (value model.Value) {
-	//setup the context to use for the API calls
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	//Setup the API client connection
-	client, err := api.NewClient(api.Config{Address: promProtocol + "://" + promAddr + ":" + promPort})
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	//define the start and end times to be used for querying prometheus based on the time the script called.
-	//Depending on the Interval and interval size will determine the start and end times.
-	//For workload metrics the historyInterval will be set depending on how far back in history we are querying currently. Note it will be 0 for all queries that are not workload related.
-	var start, end time.Time
-	if interval == "days" {
-		start = currentTime.Add(time.Hour * -24 * time.Duration(intervalSize)).Add(time.Hour * -24 * time.Duration(intervalSize) * historyInterval)
-		end = currentTime.Add(time.Hour * -24 * time.Duration(intervalSize) * historyInterval)
-	} else if interval == "hours" {
-		start = currentTime.Add(time.Hour * -1 * time.Duration(intervalSize)).Add(time.Hour * -1 * time.Duration(intervalSize) * historyInterval)
-		end = currentTime.Add(time.Hour * -1 * time.Duration(intervalSize) * historyInterval)
-	} else {
-		start = currentTime.Add(time.Minute * -1 * time.Duration(intervalSize)).Add(time.Minute * -1 * time.Duration(intervalSize) * historyInterval)
-		end = currentTime.Add(time.Minute * -1 * time.Duration(intervalSize) * historyInterval)
-	}
-	//Query prometheus with the values defined above as well as the query that was passed into the function.
-	q := v1.NewAPI(client)
-	value, err = q.QueryRange(ctx, query, v1.Range{Start: start, End: end, Step: step})
-	if err != nil {
-		log.Println(err)
-	}
-	//Return the data that was received from Prometheus.
-	return value
 }
 
 //getContainerMetric is used to parse the results from Prometheus related to Container Entities and store them in the systems data structure.
@@ -628,11 +588,12 @@ func writeWorkloadPod(file io.Writer, result model.Value, namespace, pod model.L
 	}
 }
 
-func getWorkload(fileName, metricName, query2, aggregrator string) {
+func getWorkload(promaddress, fileName, metricName, query2, aggregrator string) {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
 	var query string
+	var start, end time.Time
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/" + aggregrator + `_` + fileName + ".csv")
 	if err != nil {
@@ -644,12 +605,13 @@ func getWorkload(fileName, metricName, query2, aggregrator string) {
 	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
+		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
 		//Query for CPU usage in millicores.
 		query = aggregrator + `(` + query2 + ` * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
-		result = metricCollect(query, historyInterval)
+		result = prometheus.MetricCollect(promaddress, query, start, end)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name")
 		query = aggregrator + `(` + query2 + ` * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
-		result = metricCollect(query, historyInterval)
+		result = prometheus.MetricCollect(promaddress, query, start, end)
 		writeWorkload(workloadWrite, result, "namespace", "pod_name", "container_name")
 	}
 	//Close the workload files.
@@ -688,17 +650,19 @@ func main() {
 	//Setup variables used in the code.
 	var historyInterval time.Duration
 	historyInterval = 0
-	//step is set to be 5minutes as it is defined in microseconds.
-	step = 300000000000
-	var query string
+	var query, promaddress string
 	var result model.Value
+	var start, end time.Time
+
+	start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
+	promaddress = promProtocol + "://" + promAddr + ":" + promPort
 
 	// For the queries we have throughout you will see each query is called twice with minor tweaks this is cause we query once to get all the containers that are part of controllers and a second time to get all the containers that are setup as individual pods.
 	//This was done as the label we use for controller based (owner_name) is set to be <none> for all the individual pods and if we query them together for certain fields it would combine values\labels of the individual pods so you would see tags that aren't actually on your container.
 
 	//Query for memory limit set for containers. This query is for the controller based pods.
 	query = `max(sum(container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)/1024/1024 * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (owner_name,owner_kind,namespace,container_name)`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 
 	//setup the system data structure for new systems and load existing ones.
 	if result != nil {
@@ -744,7 +708,7 @@ func main() {
 
 	//Query for memory limit set for containers. This query is for the individual based pods.
 	query = `max(sum(container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)/1024/1024 * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")) by (pod_name,namespace,container_name)`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 
 	if result != nil {
 		//Loop through the different entities in the results.
@@ -796,93 +760,93 @@ func main() {
 	//Container metrics
 	//Get the CPU Limit for container
 	query = `max(sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000` + kubeStateOwner
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "owner_name", "container", "cpuLimit")
 
 	query = `max(sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000` + kubeStatePod
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "pod", "container", "cpuLimit")
 
 	//Get the CPU Request for container
 	query = `max(sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000` + kubeStateOwner
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "owner_name", "container", "cpuRequest")
 
 	query = `max(sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000` + kubeStatePod
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "pod", "container", "cpuRequest")
 
 	//Get the Memory Limit for container
 	query = `max(sum(kube_pod_container_resource_limits_memory_bytes) by (pod,namespace,container)/1024/1024` + kubeStateOwner
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "owner_name", "container", "memLimit")
 
 	query = `max(sum(kube_pod_container_resource_limits_memory_bytes) by (pod,namespace,container)/1024/1024` + kubeStatePod
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "pod", "container", "memLimit")
 
 	//Get the Memory Request for container
 	query = `max(sum(kube_pod_container_resource_requests_memory_bytes) by (pod,namespace,container)/1024/1024` + kubeStateOwner
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "owner_name", "container", "memRequest")
 
 	query = `max(sum(kube_pod_container_resource_requests_memory_bytes) by (pod,namespace,container)/1024/1024` + kubeStatePod
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "pod", "container", "memRequest")
 
 	//Get the number of times the container has been restarted
 	query = `max(sum(kube_pod_container_status_restarts_total) by (pod,namespace,container)` + kubeStateOwner
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "owner_name", "container", "restarts")
 
 	query = `max(sum(kube_pod_container_status_restarts_total) by (pod,namespace,container)` + kubeStatePod
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "pod", "container", "restarts")
 
 	//Check to see if the container is still running or if it has been terminated.
 	query = `max(sum(kube_pod_container_status_terminated) by (pod,namespace,container)` + kubeStateOwner
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "owner_name", "container", "powerState")
 
 	query = `max(sum(kube_pod_container_status_terminated) by (pod,namespace,container)` + kubeStatePod
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "pod", "container", "powerState")
 
 	//Get the container labels.
 	query = `(sum(container_spec_cpu_shares{name!~"k8s_POD_.*"}) by (pod_name,namespace,container_name)) * on (namespace,pod_name,container_name) group_right container_spec_cpu_shares * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind!="<none>"}, "pod_name", "$1", "pod", "(.*)")`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetricString(result, "namespace", "owner_name", "container_name", "conLabel")
 
 	query = `(sum(container_spec_cpu_shares{name!~"k8s_POD_.*"}) by (pod_name,namespace,container_name)) * on (namespace,pod_name,container_name) group_right container_spec_cpu_shares * on (namespace,pod_name) group_left (owner_name,owner_kind) label_replace(kube_pod_owner{owner_kind="<none>"}, "pod_name", "$1", "pod", "(.*)")`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetricString(result, "namespace", "pod_name", "container_name", "conLabel")
 
 	//Get the container info values.
 	query = `sum(kube_pod_container_info) by (pod,namespace,container) * on (namespace,pod,container) group_right kube_pod_container_info * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetricString(result, "namespace", "owner_name", "container", "conInfo")
 
 	query = `sum(kube_pod_container_info) by (pod,namespace,container) * on (namespace,pod,container) group_right kube_pod_container_info * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetricString(result, "namespace", "pod", "container", "conInfo")
 
 	//Pod Metrics
 	//Get the pod info values
 	query = `sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_owner{owner_kind!="<none>"}`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getPodMetricString(result, "namespace", "owner_name", "podInfo")
 
 	query = `sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_owner{owner_kind="<none>"}`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getPodMetricString(result, "namespace", "pod", "podInfo")
 
 	//Get the pod labels.
 	query = `sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_labels * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind!="<none>"}`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getPodMetricString(result, "namespace", "owner_name", "podLabel")
 
 	query = `sum(kube_pod_container_info) by (pod,namespace) * on (namespace,pod) group_right kube_pod_labels * on (namespace,pod) group_left (owner_name,owner_kind) kube_pod_owner{owner_kind="<none>"}`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getPodMetricString(result, "namespace", "pod", "podLabel")
 
 	currentSizeWrite, err := os.Create("./data/currentSize.csv")
@@ -893,27 +857,27 @@ func main() {
 
 	//Get the current size of the controller will query each of the differnt types of controller
 	query = `kube_replicaset_spec_replicas`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getPodMetric(result, "namespace", "replicaset", "currentSize")
 	writeWorkloadPod(currentSizeWrite, result, "namespace", "replicaset")
 
 	query = `kube_replicationcontroller_spec_replicas`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getPodMetric(result, "namespace", "replicationcontroller", "currentSize")
 	writeWorkloadPod(currentSizeWrite, result, "namespace", "replicationcontroller")
 
 	query = `kube_daemonset_status_number_available`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getPodMetric(result, "namespace", "daemonset", "currentSize")
 	writeWorkloadPod(currentSizeWrite, result, "namespace", "daemonset")
 
 	query = `kube_statefulset_replicas`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getPodMetric(result, "namespace", "statefulset", "currentSize")
 	writeWorkloadPod(currentSizeWrite, result, "namespace", "statefulset")
 
 	query = `kube_job_spec_parallelism`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getPodMetric(result, "namespace", "job_name", "currentSize")
 	writeWorkloadPod(currentSizeWrite, result, "namespace", "job_name")
 
@@ -921,35 +885,35 @@ func main() {
 
 	//Get the controller labels
 	query = `kube_statefulset_labels`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getPodMetricString(result, "namespace", "statefulset", "controllerLabel")
 
 	query = `kube_job_labels`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getPodMetricString(result, "namespace", "job_name", "controllerLabel")
 
 	query = `kube_daemonset_labels`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getPodMetricString(result, "namespace", "daemonset", "controllerLabel")
 
 	//Get when the pod was originally created.
 	query = `max(kube_pod_created` + kubeStateOwner
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getPodMetric(result, "namespace", "owner_name", "creationTime")
 
 	query = `max(kube_pod_created` + kubeStatePod
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getPodMetric(result, "namespace", "pod", "creationTime")
 
 	//Namespace Metrics
 	//Get the namespace labels
 	query = `kube_namespace_labels`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getNamespaceMetricString(result, "namespace", "namespaceLabel")
 
 	//Get the CPU and Memory Limit and Request quotes for the namespace.
 	query = `kube_limitrange`
-	result = metricCollect(query, historyInterval)
+	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getNamespacelimits(result, "namespace")
 
 	//Write out the config and attributes files.
@@ -957,20 +921,20 @@ func main() {
 	writeAttributes()
 
 	query = `round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1)`
-	getWorkload("cpu_mCores_workload", "CPU Utilization in mCores", query, "max")
+	getWorkload(promaddress, "cpu_mCores_workload", "CPU Utilization in mCores", query, "max")
 	query = `sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
-	getWorkload("mem_workload", "Raw Mem Utilization", query, "max")
+	getWorkload(promaddress, "mem_workload", "Raw Mem Utilization", query, "max")
 	query = `sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
-	getWorkload("rss_workload", "Actual Memory Utilization", query, "max")
+	getWorkload(promaddress, "rss_workload", "Actual Memory Utilization", query, "max")
 	query = `sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
-	getWorkload("disk_workload", "Raw Disk Utilization", query, "max")
+	getWorkload(promaddress, "disk_workload", "Raw Disk Utilization", query, "max")
 
 	query = `round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1)`
-	getWorkload("cpu_mCores_workload", "CPU Utilization in mCores", query, "avg")
+	getWorkload(promaddress, "cpu_mCores_workload", "CPU Utilization in mCores", query, "avg")
 	query = `sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
-	getWorkload("mem_workload", "Raw Mem Utilization", query, "avg")
+	getWorkload(promaddress, "mem_workload", "Raw Mem Utilization", query, "avg")
 	query = `sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
-	getWorkload("rss_workload", "Actual Memory Utilization", query, "avg")
+	getWorkload(promaddress, "rss_workload", "Actual Memory Utilization", query, "avg")
 	query = `sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
-	getWorkload("disk_workload", "Raw Disk Utilization", query, "avg")
+	getWorkload(promaddress, "disk_workload", "Raw Disk Utilization", query, "avg")
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
 	"github.com/spf13/viper"
 )
 
@@ -92,6 +93,7 @@ func main() {
 		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), 0, 0, t.Location())
 	}
 
-	container.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-
+	container.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, false, currentTime)
+	node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, false, currentTime)
+	//new_container_test.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, true, currentTime)
 }

@@ -121,13 +121,10 @@ func writeAttributes(clusterName, promAddr string) {
 				if vc.restarts == -1 {
 					fmt.Fprintf(attributeWrite, ",")
 				} else {
-					fmt.Fprintf(attributeWrite, ",%d", vc.restarts)
+					fmt.Fprintf(attributeWrite, ",%d,", vc.restarts)
 				}
-				fmt.Fprintf(attributeWrite, ",%s", vn.namespaceLabel)
-				if vn.cpuRequest == -1 {
-					fmt.Fprintf(attributeWrite, ",")
-				} else {
-					fmt.Fprintf(attributeWrite, ",%d", vn.cpuRequest)
+				for key, value := range vn.labelMap {
+					fmt.Fprintf(attributeWrite, key+" : "+value+"|")
 				}
 				if vn.cpuLimit == -1 {
 					fmt.Fprintf(attributeWrite, ",")

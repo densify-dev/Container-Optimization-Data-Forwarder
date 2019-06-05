@@ -200,37 +200,9 @@ func getNamespaceMetricString(result model.Value, namespace model.LabelName, met
 					}
 					//loop through all the labels for an entity and store them in a map.
 					for key, value := range result.(model.Matrix)[i].Metric {
-						if _, ok := tempSystems[string(namespaceValue)][string(key)]; ok == false {
-							tempSystems[string(namespaceValue)][string(key)] = strings.Replace(string(value), ",", ";", -1)
-						} else {
-							if strings.Contains(tempSystems[string(namespaceValue)][string(key)], strings.Replace(string(value), ",", ";", -1)) {
-								tempSystems[string(namespaceValue)][string(key)] += ";" + strings.Replace(string(value), ",", ";", -1)
-							}
-						}
-
-					}
-
-				}
-			}
-		}
-		//Process the temp data structure to produce 1 string that will written into specific variable in the system data structure.
-		for kn := range tempSystems {
-			tempAttr := ""
-			for key, value := range tempSystems[kn] {
-				//Validate the length of the key and value to be less then 256 characters when combined together per value in the attribute to be loaded.
-				if len(key) < 250 {
-					if len(value)+3+len(key) < 256 {
-						tempAttr += key + " : " + value + "|"
-					} else {
-						templength := 256 - 3 - len(key)
-						tempAttr += key + " : " + value[:templength] + "|"
+						addToLabelMap(string(key), string(value), namespaces[string(namespaceValue)].labelMap)
 					}
 				}
-			}
-			//Write out the combined string into the variable in the systems data structure based on which metric you provided.
-			tempAttr = tempAttr[:len(tempAttr)-1]
-			if metric == "namespaceLabel" {
-				namespaces[kn].namespaceLabel = tempAttr
 			}
 		}
 	}

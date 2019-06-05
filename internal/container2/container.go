@@ -14,10 +14,10 @@ import (
 var namespaces = map[string]*namespace{}
 
 type namespace struct {
-	namespaceLabel                             string
 	pointers                                   map[string]*topLevel
 	topLevels                                  map[string]*topLevel
 	cpuLimit, cpuRequest, memLimit, memRequest int
+	labelMap map[string]string
 }
 
 //topLevel is used to hold information related to the highest owner of any containers
@@ -106,7 +106,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 		namespaceName := podNamespaces[podName]
 		if _, ok := namespaces[namespaceName]; !ok {
-			namespaces[namespaceName] = &namespace{pointers: map[string]*topLevel{}, topLevels: map[string]*topLevel{}, cpuRequest: -1, cpuLimit: -1, memRequest: -1, memLimit: -1}
+			namespaces[namespaceName] = &namespace{pointers: map[string]*topLevel{}, topLevels: map[string]*topLevel{}, cpuRequest: -1, cpuLimit: -1, memRequest: -1, memLimit: -1, labelMap: map[string]string{}}
 		}
 
 		//namespaces[namespaceName].pods[podName] = &pod{labelMap: map[string]string{}}
@@ -169,7 +169,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//for printing containers
 	/*
-		for i := range namespaces {
+		for i, vi := range namespaces {
 			fmt.Println("\n\nnamespace: " + i)
 			for j, v := range namespaces[i].topLevels {
 				fmt.Println("\n\n  owner name: " + j + "\n  owner kind: " + v.kind + "\n  namespace: " + i + "\n  containers:")

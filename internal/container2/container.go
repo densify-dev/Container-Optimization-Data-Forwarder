@@ -380,4 +380,5 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 			}
 		}*/
 	writeAttributes(clusterName, promAddr)
+	writeConfig(clusterName, promAddr)
 }

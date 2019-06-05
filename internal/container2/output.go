@@ -12,7 +12,6 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-/*
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
 func writeConfig(clusterName, promAddr string) {
 	//Create the config file and open it for writing.
@@ -32,18 +31,18 @@ func writeConfig(clusterName, promAddr string) {
 	}
 	//Loop through the systems and write out the config data for each system.
 	for kn := range namespaces {
-		for kp := range namespaces[kn].pods {
-			for kc, vc := range namespaces[kn].pods[kp].containers {
+		for kt := range namespaces[kn].topLevels {
+			for kc, vc := range namespaces[kn].topLevels[kt].containers {
 				//If memory is not set then use first write that will leave it blank otherwise use the second that sets the value.
 				if vc.memory == -1 {
-					fmt.Fprintf(configWrite, "%s,%s,%s,%s,,Linux,CONTAINERS,%s,%s\n", cluster, kn, strings.Replace(kp, ";", ".", -1), strings.Replace(kc, ":", ".", -1), kn, kn)
+					fmt.Fprintf(configWrite, "%s,%s,%s,%s,,Linux,CONTAINERS,%s,%s\n", cluster, kn, strings.Replace(kt, ";", ".", -1), strings.Replace(kc, ":", ".", -1), kn, kn)
 				} else {
-					fmt.Fprintf(configWrite, "%s,%s,%s,%s,%d,Linux,CONTAINERS,%s,%s\n", cluster, kn, strings.Replace(kp, ";", ".", -1), strings.Replace(kc, ":", ".", -1), vc.memory, kn, kn)
+					fmt.Fprintf(configWrite, "%s,%s,%s,%s,%d,Linux,CONTAINERS,%s,%s\n", cluster, kn, strings.Replace(kt, ";", ".", -1), strings.Replace(kc, ":", ".", -1), vc.memory, kn, kn)
 				}
 			}
 		}
 	}
-}*/
+}
 
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
 func writeAttributes(clusterName, promAddr string) {

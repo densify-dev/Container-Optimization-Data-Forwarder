@@ -207,9 +207,7 @@ func writeWorkloadMid(file io.Writer, result model.Value, namespace, mid model.L
 								for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
 									fmt.Fprintf(file, "%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(midValue), ";", ".", -1), strings.Replace(string(kc), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
 								}
-								fmt.Println(cluster)
 							}
-
 						}
 					}
 				}

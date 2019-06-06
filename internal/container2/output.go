@@ -12,7 +12,6 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-/*
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
 func writeConfig(clusterName, promAddr string) {
 	//Create the config file and open it for writing.
@@ -32,18 +31,18 @@ func writeConfig(clusterName, promAddr string) {
 	}
 	//Loop through the systems and write out the config data for each system.
 	for kn := range namespaces {
-		for kp := range namespaces[kn].pods {
-			for kc, vc := range namespaces[kn].pods[kp].containers {
+		for kt := range namespaces[kn].topLevels {
+			for kc, vc := range namespaces[kn].topLevels[kt].containers {
 				//If memory is not set then use first write that will leave it blank otherwise use the second that sets the value.
 				if vc.memory == -1 {
-					fmt.Fprintf(configWrite, "%s,%s,%s,%s,,Linux,CONTAINERS,%s,%s\n", cluster, kn, strings.Replace(kp, ";", ".", -1), strings.Replace(kc, ":", ".", -1), kn, kn)
+					fmt.Fprintf(configWrite, "%s,%s,%s,%s,,Linux,CONTAINERS,%s,%s\n", cluster, kn, strings.Replace(kt, ";", ".", -1), strings.Replace(kc, ":", ".", -1), kn, kn)
 				} else {
-					fmt.Fprintf(configWrite, "%s,%s,%s,%s,%d,Linux,CONTAINERS,%s,%s\n", cluster, kn, strings.Replace(kp, ";", ".", -1), strings.Replace(kc, ":", ".", -1), vc.memory, kn, kn)
+					fmt.Fprintf(configWrite, "%s,%s,%s,%s,%d,Linux,CONTAINERS,%s,%s\n", cluster, kn, strings.Replace(kt, ";", ".", -1), strings.Replace(kc, ":", ".", -1), vc.memory, kn, kn)
 				}
 			}
 		}
 	}
-}*/
+}
 
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
 func writeAttributes(clusterName, promAddr string) {
@@ -54,7 +53,7 @@ func writeAttributes(clusterName, promAddr string) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,namespace,top level,top kind,container,pod name,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Container Info,All Container Labels,All Mid Level Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Current Nodes,Power State,Created By Kind,Created By Name,Current Size,Create Time,Container Restarts,Namespace Labels,Namespace CPU Request,Namespace CPU Limit,Namespace Memory Request,Namespace Memory Limit")
+	fmt.Fprintln(attributeWrite, "cluster,namespace,top level,top kind,container,pod name,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,All Container Labels,All Mid Level Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Current Nodes,Power State,Created By Kind,Created By Name,Current Size,Create Time,Container Restarts,Namespace Labels,Namespace CPU Request,Namespace CPU Limit,Namespace Memory Request,Namespace Memory Limit")
 
 	//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.
 	var cluster string
@@ -77,7 +76,7 @@ func writeAttributes(clusterName, promAddr string) {
 
 				//for wt, vt := range namespaces[kn].pods
 				//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-				fmt.Fprintf(attributeWrite, "%s,%s,%s,%s,%s,%s,Containers,%s,%s,%s,%s,%s,", cluster, kn, strings.Replace(vt.name, ";", ".", -1), vt.kind, strings.Replace(kc, ":", ".", -1), vc.podName, cluster, kn, vt.name, vc.conLabel, vc.conInfo)
+				fmt.Fprintf(attributeWrite, "%s,%s,%s,%s,%s,%s,Containers,%s,%s,%s,", cluster, kn, strings.Replace(vt.name, ";", ".", -1), vt.kind, strings.Replace(kc, ":", ".", -1), vc.labelMap["pod"], cluster, kn, vt.name)
 				for key, value := range namespaces[kn].topLevels[kt].containers[kc].labelMap {
 					fmt.Fprintf(attributeWrite, key+" : "+value+"|")
 				}
@@ -107,13 +106,7 @@ func writeAttributes(clusterName, promAddr string) {
 				} else {
 					fmt.Fprintf(attributeWrite, ",%d", vc.memRequest)
 				}
-				var nodeOut string
-				if len(vc.currentNodes) < 1 {
-					nodeOut = ""
-				} else {
-					nodeOut = vc.currentNodes[:len(vc.currentNodes)-1]
-				}
-				fmt.Fprintf(attributeWrite, ",%s,%s,%s,%s,%s", kc, nodeOut, cstate, vt.kind, vt.name)
+				fmt.Fprintf(attributeWrite, ",%s,%s,%s,%s,%s", kc, vt.labelMap["node_instance"], cstate, vt.kind, vt.name)
 				if vt.currentSize == -1 {
 					fmt.Fprintf(attributeWrite, ",")
 				} else {
@@ -128,25 +121,22 @@ func writeAttributes(clusterName, promAddr string) {
 				if vc.restarts == -1 {
 					fmt.Fprintf(attributeWrite, ",")
 				} else {
-					fmt.Fprintf(attributeWrite, ",%d", vc.restarts)
+					fmt.Fprintf(attributeWrite, ",%d,", vc.restarts)
 				}
-				fmt.Fprintf(attributeWrite, ",%s", vn.namespaceLabel)
-				if vc.cpuRequest == -1 {
-					fmt.Fprintf(attributeWrite, ",")
-				} else {
-					fmt.Fprintf(attributeWrite, ",%d", vn.cpuRequest)
+				for key, value := range vn.labelMap {
+					fmt.Fprintf(attributeWrite, key+" : "+value+"|")
 				}
-				if vc.cpuLimit == -1 {
+				if vn.cpuLimit == -1 {
 					fmt.Fprintf(attributeWrite, ",")
 				} else {
 					fmt.Fprintf(attributeWrite, ",%d", vn.cpuLimit)
 				}
-				if vc.memLimit == -1 {
+				if vn.memLimit == -1 {
 					fmt.Fprintf(attributeWrite, ",")
 				} else {
 					fmt.Fprintf(attributeWrite, ",%d", vn.memRequest)
 				}
-				if vc.memLimit == -1 {
+				if vn.memLimit == -1 {
 					fmt.Fprintf(attributeWrite, ",")
 				} else {
 					fmt.Fprintf(attributeWrite, ",%d", vn.memLimit)
@@ -190,7 +180,7 @@ func writeWorkload(file io.Writer, result model.Value, namespace, pod, container
 }
 
 //writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
-func writeWorkloadPod(file io.Writer, result model.Value, namespace, pod model.LabelName, clusterName, promAddr string) {
+func writeWorkloadMid(file io.Writer, result model.Value, namespace, mid model.LabelName, clusterName, promAddr string, prefix string) {
 	if result != nil {
 		//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.
 		var cluster string
@@ -203,19 +193,17 @@ func writeWorkloadPod(file io.Writer, result model.Value, namespace, pod model.L
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
 				if _, ok := namespaces[string(namespaceValue)]; ok {
-					if podValue, ok := result.(model.Matrix)[i].Metric[pod]; ok {
-						//fmt.Println(namespaces[string(namespaceValue)].pods[string(podValue)].podInfo)
-						//fmt.Println(namespaceValue, "-------", podValue)
-						//fmt.Println(result.(model.Matrix)[i].Metric[pod])
-						if _, ok := namespaces[string(namespaceValue)].pointers[string(podValue)]; ok { //NOT PASSING THIS STATMENT
-							for kc := range namespaces[string(namespaceValue)].pointers[string(podValue)].containers {
+					if midValue, ok := result.(model.Matrix)[i].Metric[mid]; ok {
+						//fmt.Println(namespaces[string(namespaceValue)].mids[string(midValue)].midInfo)
+						//fmt.Println(namespaceValue, "-------", midValue)
+						//fmt.Println(result.(model.Matrix)[i].Metric[mid])
+						if _, ok := namespaces[string(namespaceValue)].pointers[prefix+"__"+string(midValue)]; ok { //NOT PASSING THIS STATMENT
+							for kc := range namespaces[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].containers {
 								//Loop through the different values over the interval and write out each one to the workload file.
 								for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-									fmt.Fprintf(file, "%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(podValue), ";", ".", -1), strings.Replace(string(kc), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
+									fmt.Fprintf(file, "%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(midValue), ";", ".", -1), strings.Replace(string(kc), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
 								}
-								fmt.Println(cluster)
 							}
-
 						}
 					}
 				}

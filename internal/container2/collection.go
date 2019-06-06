@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -113,6 +114,8 @@ func getMidMetric(result model.Value, namespace model.LabelName, mid model.Label
 									namespaces[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].currentSize = int(value)
 								} else if metric == "creationTime" {
 									namespaces[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].creationTime = value
+								} else {
+									addToLabelMap(metric, strconv.FormatInt(value,10), namespaces[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
 								}
 							}
 						}
@@ -187,7 +190,6 @@ func getNamespacelimits(result model.Value, namespace model.LabelName) {
 
 //getNamespaceMetricString is used to parse the label based results from Prometheus related to Namespace Entities and store them in the systems data structure.
 func getNamespaceMetricString(result model.Value, namespace model.LabelName, metric string) {
-	var tempSystems = map[string]map[string]string{}
 	//Validate there is data in the results.
 	if result != nil {
 		//Loop through the different entities in the results.
@@ -195,9 +197,6 @@ func getNamespaceMetricString(result model.Value, namespace model.LabelName, met
 			//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
 			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
 				if _, ok := namespaces[string(namespaceValue)]; ok {
-					if _, ok := tempSystems[string(namespaceValue)]; ok == false {
-						tempSystems[string(namespaceValue)] = map[string]string{}
-					}
 					//loop through all the labels for an entity and store them in a map.
 					for key, value := range result.(model.Matrix)[i].Metric {
 						addToLabelMap(string(key), string(value), namespaces[string(namespaceValue)].labelMap)

@@ -305,6 +305,92 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetric(result, "namespace", "replicaset", "creationTime", "ReplicaSet")
 
+	//Deployment Metrics
+	query = `kube_deployment_labels`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetricString(result, "namespace", "deployment", "deploymentLabel", "Deployment")
+
+	query = `kube_deployment_spec_strategy_rollingupdate_max_surge`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetric(result, "namespace", "deployment", "maxSurge", "Deployment")
+
+	query = `kube_deployment_spec_strategy_rollingupdate_max_unavailable`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetric(result, "namespace", "deployment", "maxUnavailable", "Deployment")
+
+	query = `kube_deployment_metadata_generation`
+	getMidMetric(result, "namespace", "deployment", "metadataGeneration", "Deployment")
+
+	query = `kube_deployment_status_replicas_available`
+	getWorkload(promaddress, "status_replicas_available", "Status Replicas Available", query, "deployment", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	query = `kube_deployment_status_replicas`
+	getWorkload(promaddress, "status_replicas", "Status Replicas", query, "deployment", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	query = `kube_deployment_spec_replicas`
+	getWorkload(promaddress, "spec_replicas", "Spec Replicas", query, "deployment", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	//CronJob & Job Metrics
+	query = `kube_cronjob_labels`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetricString(result, "namespace", "cronjob", "cronjobLabel", "CronJob")
+
+	query = `kube_cronjob_info`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetricString(result, "namespace", "cronjob", "cronjobInfo", "CronJob")
+
+	query = `kube_cronjob_next_schedule_time`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetric(result, "namespace", "cronjob", "nextScheduleTime", "CronJob")
+
+	query = `kube_cronjob_status_last_schedule_time`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetric(result, "namespace", "cronjob", "lastScheduleTime", "CronJob")
+
+	query = `kube_cronjob_status_active`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetric(result, "namespace", "cronjob", "statusActive", "CronJob")
+
+	query = `kube_job_info * on (job_name) group_left (owner_name) kube_job_owner`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetricString(result, "namespace", "job_name", "jobInfo", "Job")
+
+	query = `kube_job_labels * on (job_name) group_left (owner_name) kube_job_owner`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetricString(result, "namespace", "job_name", "jobLabel", "Job")
+
+	query = `kube_job_spec_completions * on (job_name) group_left (owner_name) kube_job_owner`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetric(result, "namespace", "job_name", "specCompletions", "Job")
+
+	query = `kube_job_spec_parallelism * on (job_name) group_left (owner_name) kube_job_owner`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetric(result, "namespace", "job_name", "specParallelism", "Job")
+
+	query = `kube_job_status_completion_time * on (job_name) group_left (owner_name) kube_job_owner`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetric(result, "namespace", "job_name", "statusCompletionTime", "Job")
+
+	query = `kube_job_status_start_time * on (job_name) group_left (owner_name) kube_job_owner`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetric(result, "namespace", "job_name", "statusStartTime", "Job")
+	/*
+		query = `kube_job_status_active * on (job_name) group_left (owner_name) kube_job_owner`
+		result = prometheus.MetricCollect(promaddress, query, start, end)
+		getMidMetric(result, "namespace", "job", "statusActive", "Job")
+
+		query = `kube_job_status_failed * on (job_name) group_left (owner_name) kube_job_owner`
+		result = prometheus.MetricCollect(promaddress, query, start, end)
+		getMidMetric(result, "namespace", "job", "statusFailed", "Job")
+
+		query = `kube_job_status_succeeded * on (job_name) group_left (owner_name) kube_job_owner`
+		result = prometheus.MetricCollect(promaddress, query, start, end)
+		getMidMetric(result, "namespace", "job", "statusSucceeded", "Job")
+
+		query = `kube_job_complete * on (job_name) group_left (owner_name) kube_job_owner`
+		result = prometheus.MetricCollect(promaddress, query, start, end)
+		getMidMetric(result, "namespace", "job", "complete", "Job")*/
+
 	currentSizeWrite, err := os.Create("./data/currentSize.csv")
 	if err != nil {
 		log.Println(err)

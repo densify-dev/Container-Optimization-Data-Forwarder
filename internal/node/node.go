@@ -11,7 +11,7 @@ The skeleton query to group metrics by node and their values is (query made by J
 		-Update the CSV file names
 		-Add taint query
 
-	Last updated 24/05/2019
+	Last updated 06/06/2019
 */
 
 //Package node collects data related to containers and formats into csv files to send to Densify.

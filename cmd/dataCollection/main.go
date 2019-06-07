@@ -9,10 +9,7 @@ import (
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/cronjob"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/deployment"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/hpa"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
 	"github.com/spf13/viper"
 )
 
@@ -71,7 +68,7 @@ func initParameters() {
 func main() {
 
 	//Open the debug log file for writing.
-	debugLog, err := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
+	debugLog, err := os.OpenFile("./data/container/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -97,9 +94,10 @@ func main() {
 	}
 
 	container.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	deployment.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	hpa.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	cronjob.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, false, currentTime)
+	//deployment.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+	//hpa.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+	//cronjob.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+	//node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, false, currentTime)
 	//new_container_test.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, true, currentTime)
+	container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, true, currentTime)
 }

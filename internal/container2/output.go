@@ -15,7 +15,7 @@ import (
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
 func writeConfig(clusterName, promAddr string) {
 	//Create the config file and open it for writing.
-	configWrite, err := os.Create("./data/config.csv")
+	configWrite, err := os.Create("./data/container/config.csv")
 	if err != nil {
 		log.Println(err)
 	}
@@ -30,9 +30,9 @@ func writeConfig(clusterName, promAddr string) {
 		cluster = clusterName
 	}
 	//Loop through the systems and write out the config data for each system.
-	for kn := range namespaces {
-		for kt := range namespaces[kn].topLevels {
-			for kc, vc := range namespaces[kn].topLevels[kt].containers {
+	for kn := range systems {
+		for kt := range systems[kn].midLevels {
+			for kc, vc := range systems[kn].midLevels[kt].containers {
 				//If memory is not set then use first write that will leave it blank otherwise use the second that sets the value.
 				if vc.memory == -1 {
 					fmt.Fprintf(configWrite, "%s,%s,%s,%s,,Linux,CONTAINERS,%s,%s\n", cluster, kn, strings.Replace(kt, ";", ".", -1), strings.Replace(kc, ":", ".", -1), kn, kn)
@@ -47,7 +47,7 @@ func writeConfig(clusterName, promAddr string) {
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
 func writeAttributes(clusterName, promAddr string) {
 	//Create the attributes file and open it for writing
-	attributeWrite, err := os.Create("./data/attributes.csv")
+	attributeWrite, err := os.Create("./data/container/attributes.csv")
 	if err != nil {
 		log.Println(err)
 	}
@@ -63,9 +63,9 @@ func writeAttributes(clusterName, promAddr string) {
 		cluster = clusterName
 	}
 	//Loop through the systems and write out the attributes data for each system.
-	for kn, vn := range namespaces {
-		for kt, vt := range namespaces[kn].topLevels {
-			for kc, vc := range namespaces[kn].topLevels[kt].containers {
+	for kn, vn := range systems {
+		for kt, vt := range systems[kn].midLevels {
+			for kc, vc := range systems[kn].midLevels[kt].containers {
 				var cstate string
 				//convert the powerState from number to string 1 is Terminated and 0 is running.
 				if vc.powerState == 1 {
@@ -74,10 +74,10 @@ func writeAttributes(clusterName, promAddr string) {
 					cstate = "Running"
 				}
 
-				//for wt, vt := range namespaces[kn].pods
+				//for wt, vt := range systems[kn].pods
 				//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
 				fmt.Fprintf(attributeWrite, "%s,%s,%s,%s,%s,%s,Containers,%s,%s,%s,", cluster, kn, strings.Replace(vt.name, ";", ".", -1), vt.kind, strings.Replace(kc, ":", ".", -1), vc.labelMap["pod"], cluster, kn, vt.name)
-				for key, value := range namespaces[kn].topLevels[kt].containers[kc].labelMap {
+				for key, value := range systems[kn].midLevels[kt].containers[kc].labelMap {
 					fmt.Fprintf(attributeWrite, key+" : "+value+"|")
 				}
 				fmt.Fprintf(attributeWrite, ",")
@@ -147,6 +147,27 @@ func writeAttributes(clusterName, promAddr string) {
 	}
 }
 
+//writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
+func writeHPAAttributes(clusterName, promAddr string, systems map[string]map[string]string) {
+	//Create the attributes file and open it for writing
+	attributeWrite, err := os.Create("./data/container/unmatched_hpa_attributes.csv")
+	if err != nil {
+		log.Println(err)
+	}
+
+	//Write out the header.
+	fmt.Fprintln(attributeWrite, "HPA,All Labels")
+	//Loop through the systems and write out the attributes data for each system.
+	for i := range systems {
+		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
+		fmt.Fprintf(attributeWrite, "%s,", i)
+		for key, value := range systems[i] {
+			fmt.Fprintf(attributeWrite, key+" : "+value+"|")
+		}
+		fmt.Fprintf(attributeWrite, "\n")
+	}
+}
+
 //writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
 func writeWorkload(file io.Writer, result model.Value, namespace, pod, container model.LabelName, clusterName, promAddr string) {
 	if result != nil {
@@ -160,16 +181,55 @@ func writeWorkload(file io.Writer, result model.Value, namespace, pod, container
 		//Loop through the results for the workload and validate that contains the required labels and that the entity exists in the systems data structure once validated will write out the workload for the system.
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := namespaces[string(namespaceValue)]; ok {
+				if _, ok := systems[string(namespaceValue)]; ok {
 					if podValue, ok := result.(model.Matrix)[i].Metric[pod]; ok {
-						if _, ok := namespaces[string(namespaceValue)].pointers["Pod__"+string(podValue)]; ok {
+						if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)]; ok {
 							if containerValue, ok := result.(model.Matrix)[i].Metric[container]; ok {
-								if _, ok := namespaces[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)]; ok {
+								if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)]; ok {
 									//Loop through the different values over the interval and write out each one to the workload file.
 									for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
 										fmt.Fprintf(file, "%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(podValue), ";", ".", -1), strings.Replace(string(containerValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
 									}
 								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+//writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
+func writeHPAWorkload(file io.Writer, result model.Value, namespace, hpa, container model.LabelName, clusterName, promAddr string) {
+	if result != nil {
+		//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.
+		var cluster string
+		if clusterName == "" {
+			cluster = promAddr
+		} else {
+			cluster = clusterName
+		}
+		//Loop through the results for the workload and validate that contains the required labels and that the entity exists in the systems data structure once validated will write out the workload for the system.
+		for i := 0; i < result.(model.Matrix).Len(); i++ {
+			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
+				if _, ok := systems[string(namespaceValue)]; ok {
+					if hpaValue, ok := result.(model.Matrix)[i].Metric[hpa]; ok {
+						if _, ok := systems[string(namespaceValue)].pointers["Deployment__"+string(hpaValue)]; ok {
+							for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
+								fmt.Fprintf(file, "%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(hpaValue), ";", ".", -1), strings.Replace(string(hpaValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
+							}
+						} else if _, ok := systems[string(namespaceValue)].pointers["ReplicaSet__"+string(hpaValue)]; ok {
+							for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
+								fmt.Fprintf(file, "%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(hpaValue), ";", ".", -1), strings.Replace(string(hpaValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
+							}
+						} else if _, ok := systems[string(namespaceValue)].pointers["ReplicationController__"+string(hpaValue)]; ok {
+							for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
+								fmt.Fprintf(file, "%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(hpaValue), ";", ".", -1), strings.Replace(string(hpaValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
+							}
+						} else {
+							for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
+								fmt.Fprintf(file, "%s,%s,,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(hpaValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
 							}
 						}
 					}
@@ -192,13 +252,13 @@ func writeWorkloadMid(file io.Writer, result model.Value, namespace, mid model.L
 		//Loop through the results for the workload and validate that contains the required labels and that the entity exists in the systems data structure once validated will write out the workload for the system.
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := namespaces[string(namespaceValue)]; ok {
+				if _, ok := systems[string(namespaceValue)]; ok {
 					if midValue, ok := result.(model.Matrix)[i].Metric[mid]; ok {
-						//fmt.Println(namespaces[string(namespaceValue)].mids[string(midValue)].midInfo)
+						//fmt.Println(systems[string(namespaceValue)].mids[string(midValue)].midInfo)
 						//fmt.Println(namespaceValue, "-------", midValue)
 						//fmt.Println(result.(model.Matrix)[i].Metric[mid])
-						if _, ok := namespaces[string(namespaceValue)].pointers[prefix+"__"+string(midValue)]; ok { //NOT PASSING THIS STATMENT
-							for kc := range namespaces[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].containers {
+						if _, ok := systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)]; ok { //NOT PASSING THIS STATMENT
+							for kc := range systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].containers {
 								//Loop through the different values over the interval and write out each one to the workload file.
 								for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
 									fmt.Fprintf(file, "%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(midValue), ";", ".", -1), strings.Replace(string(kc), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)

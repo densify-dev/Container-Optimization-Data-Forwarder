@@ -11,28 +11,28 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-var namespaces = map[string]*namespace{}
+var systems = map[string]*namespace{}
 
 type namespace struct {
-	pointers                                   map[string]*topLevel
-	topLevels                                  map[string]*topLevel
+	pointers                                   map[string]*midLevel
+	midLevels                                  map[string]*midLevel
 	cpuLimit, cpuRequest, memLimit, memRequest int
 	labelMap map[string]string
 }
 
-//topLevel is used to hold information related to the highest owner of any containers
-type topLevel struct {
-	name, kind, namespace               string
+//midLevel is used to hold information related to the highest owner of any containers
+type midLevel struct {
+	name, kind              string
 	containers                          map[string]*container
-	currentSize, restarts int
-	creationTime int64
+	currentSize, restarts  int
+	creationTime  int64
 	labelMap                            map[string]string
 }
 
 //container is used to hold information related to containers
 type container struct {
 	memory, cpuLimit, cpuRequest, memLimit, memRequest, restarts, powerState        int
-	name, conLabel, conInfo, currentNodes, namespaceLabel, controllerLabel, podName string
+	name                                                                    string
 	labelMap                                                                        map[string]string
 }
 
@@ -41,145 +41,134 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	//Setup variables used in the code.
 	var historyInterval time.Duration
 	historyInterval = 0
-	var query1, query2, query3, query4, promaddress string
-	var result, result1, result2, result3, result4 model.Value
+	var query, promaddress string
+	var result model.Value
 	var start, end time.Time
+	var rslt model.Matrix
 
-	_ = result
-
-	start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
-	promaddress = promProtocol + "://" + promAddr + ":" + promPort
-
-	//querys gathering hierarchy information for the containers
-	query1 = `max(kube_pod_container_info) by (container, pod, namespace)`
-	query2 = `kube_pod_owner{owner_name!="<none>"}`
-	query3 = `kube_replicaset_owner{owner_name!="<none>"}`
-	query4 = `kube_job_owner{owner_name!="<none>"}`
-
-	//results stored in variables
-	result1 = prometheus.MetricCollect(promaddress, query1, start, end)
-	result2 = prometheus.MetricCollect(promaddress, query2, start, end)
-	result3 = prometheus.MetricCollect(promaddress, query3, start, end)
-	result4 = prometheus.MetricCollect(promaddress, query4, start, end)
-
-	//maps of names corresponding to owner information
 	var podNamespaces = map[string]string{}
 	var podOwners = map[string]string{}
 	var podOwnersKind = map[string]string{}
 	var replicaSetOwners = map[string]string{}
 	var jobOwners = map[string]string{}
 
-	//variables to shorten typing out results
-	var containerRslt = result1.(model.Matrix)
-	var podRslt = result2.(model.Matrix)
-	var replicaSetRslt = result3.(model.Matrix)
-	var jobRslt = result4.(model.Matrix)
+	start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
+	promaddress = promProtocol + "://" + promAddr + ":" + promPort
+
+	//querys gathering hierarchy information for the containers
+	query = `kube_pod_owner{owner_name!="<none>"}`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	rslt = result.(model.Matrix)
+	for i := 0; i < rslt.Len(); i++ {
+		podOwners[string(rslt[i].Metric["pod"])] = string(rslt[i].Metric["owner_name"])
+		podOwnersKind[string(rslt[i].Metric["pod"])] = string(rslt[i].Metric["owner_kind"])
+	}
+
+	query = `kube_replicaset_owner{owner_name!="<none>"}`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	rslt = result.(model.Matrix)
+	for i := 0; i < rslt.Len(); i++ {
+		replicaSetOwners[string(rslt[i].Metric["replicaset"])] = string(rslt[i].Metric["owner_name"])
+	}
+
+	query = `kube_job_owner{owner_name!="<none>"}`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	rslt = result.(model.Matrix)
+	for i := 0; i < rslt.Len(); i++ {
+		jobOwners[string(rslt[i].Metric["job_name"])] = string(rslt[i].Metric["owner_name"])
+	}
+
+	
+	query = `max(kube_pod_container_info) by (container, pod, namespace)`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	rslt = result.(model.Matrix)
+	for i := 0; i <rslt.Len(); i++ {
+		podNamespaces[string(rslt[i].Metric["pod"])] = string(rslt[i].Metric["namespace"])
+	}
+
 	var currentOwner string
 
-	//use the pod name to store the namespace the pod resides in
-	for i := 0; i < containerRslt.Len(); i++ {
-		podNamespaces[string(containerRslt[i].Metric["pod"])] = string(containerRslt[i].Metric["namespace"])
-	}
-
-	//use the pod name to store namespace, owner_name and owner_kind into respective maps
-	for i := 0; i < podRslt.Len(); i++ {
-		podNamespaces[string(podRslt[i].Metric["pod"])] = string(podRslt[i].Metric["namespace"])
-		podOwners[string(podRslt[i].Metric["pod"])] = string(podRslt[i].Metric["owner_name"])
-		podOwnersKind[string(podRslt[i].Metric["pod"])] = string(podRslt[i].Metric["owner_kind"])
-	}
-
-	//uses replicasets as key to store
-	for i := 0; i < replicaSetRslt.Len(); i++ {
-		replicaSetOwners[string(replicaSetRslt[i].Metric["replicaset"])] = string(replicaSetRslt[i].Metric["owner_name"])
-	}
-
-	//uses jobs as ke to store
-	for i := 0; i < jobRslt.Len(); i++ {
-		jobOwners[string(jobRslt[i].Metric["job_name"])] = string(jobRslt[i].Metric["owner_name"])
-	}
 	//Add containers and top owners to structure
-	for i := 0; i < containerRslt.Len(); i++ {
+	for i := 0; i < rslt.Len(); i++ {
 
-		containerName := string(containerRslt[i].Metric["container"])
-		podName := string(containerRslt[i].Metric["pod"])
+		containerName := string(rslt[i].Metric["container"])
+		podName := string(rslt[i].Metric["pod"])
 		var ownerKind string
 
 		namespaceName := podNamespaces[podName]
-		if _, ok := namespaces[namespaceName]; !ok {
-			namespaces[namespaceName] = &namespace{pointers: map[string]*topLevel{}, topLevels: map[string]*topLevel{}, cpuRequest: -1, cpuLimit: -1, memRequest: -1, memLimit: -1, labelMap: map[string]string{}}
+		if _, ok := systems[namespaceName]; !ok {
+			systems[namespaceName] = &namespace{pointers: map[string]*midLevel{}, midLevels: map[string]*midLevel{}, cpuRequest: -1, cpuLimit: -1, memRequest: -1, memLimit: -1, labelMap: map[string]string{}}
 		}
 
-		//namespaces[namespaceName].pods[podName] = &pod{labelMap: map[string]string{}}
+		//systems[namespaceName].pods[podName] = &pod{labelMap: map[string]string{}}
 		if controllerName, ok := podOwners[podName]; ok {
 			if deploymentName, ok := replicaSetOwners[controllerName]; ok && podOwnersKind[podName] == "ReplicaSet" {
 				currentOwner = deploymentName
 				ownerKind = "Deployment"
 				//Create deployment as top owner and add container
-				if _, ok := namespaces[namespaceName].topLevels["Deployment__"+deploymentName]; !ok {
-					namespaces[namespaceName].topLevels["Deployment__"+deploymentName] = &topLevel{name: deploymentName, kind: "Deployment", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
-					namespaces[namespaceName].topLevels["Deployment__"+deploymentName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}}
-				} else if _, ok := namespaces[namespaceName].topLevels["Deployment__"+deploymentName].containers[containerName]; !ok {
-					namespaces[namespaceName].topLevels["Deployment__"+deploymentName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}}
+				if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+deploymentName]; !ok {
+					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName] = &midLevel{name: deploymentName, kind: "Deployment", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
+					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
+				} else if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName]; !ok {
+					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
 				}
-				if _, ok := namespaces[namespaceName].pointers["Deployment__"+deploymentName]; !ok {
-					namespaces[namespaceName].pointers["Deployment__"+deploymentName] = namespaces[namespaceName].topLevels[ownerKind+"__"+currentOwner]
+				if _, ok := systems[namespaceName].pointers[ownerKind+"__"+deploymentName]; !ok {
+					systems[namespaceName].pointers[ownerKind+"__"+deploymentName] = systems[namespaceName].midLevels[ownerKind+"__"+currentOwner]
 				}
 			} else if cronJobName, ok := jobOwners[controllerName]; ok && podOwnersKind[podName] == "Job" {
 				currentOwner = cronJobName
 				ownerKind = "CronJob"
 				//Create deployment as top owner and add container
-				if _, ok := namespaces[namespaceName].topLevels["CronJob__"+cronJobName]; !ok {
-					namespaces[namespaceName].topLevels["CronJob__"+cronJobName] = &topLevel{name: cronJobName, kind: "CronJob", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
-					namespaces[namespaceName].topLevels["CronJob__"+cronJobName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}}
-				} else if _, ok := namespaces[namespaceName].topLevels["CronJob__"+cronJobName].containers[containerName]; !ok {
-					namespaces[namespaceName].topLevels["CronJob__"+cronJobName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}}
+				if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+cronJobName]; !ok {
+					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName] = &midLevel{name: cronJobName, kind: "CronJob", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
+					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
+				} else if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName]; !ok {
+					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
 				}
-				if _, ok := namespaces[namespaceName].pointers["CronJob__"+cronJobName]; !ok {
-					namespaces[namespaceName].pointers["CronJob__"+cronJobName] = namespaces[namespaceName].topLevels[ownerKind+"__"+currentOwner]
+				if _, ok := systems[namespaceName].pointers[ownerKind+"__"+cronJobName]; !ok {
+					systems[namespaceName].pointers[ownerKind+"__"+cronJobName] = systems[namespaceName].midLevels[ownerKind+"__"+currentOwner]
 				}
 			} else {
 				currentOwner = controllerName
 				ownerKind = podOwnersKind[podName]
 				//Create controller as top owner and add container
-				if _, ok := namespaces[namespaceName].topLevels[podOwnersKind[podName]+"__"+controllerName]; !ok {
-					namespaces[namespaceName].topLevels[podOwnersKind[podName]+"__"+controllerName] = &topLevel{name: controllerName, kind: podOwnersKind[podName], containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
-					namespaces[namespaceName].topLevels[podOwnersKind[podName]+"__"+controllerName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}}
-				} else if _, ok := namespaces[namespaceName].topLevels[podOwnersKind[podName]+"__"+controllerName].containers[containerName]; !ok {
-					namespaces[namespaceName].topLevels[podOwnersKind[podName]+"__"+controllerName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}}
+				if _, ok := systems[namespaceName].midLevels[podOwnersKind[podName]+"__"+controllerName]; !ok {
+					systems[namespaceName].midLevels[podOwnersKind[podName]+"__"+controllerName] = &midLevel{name: controllerName, kind: podOwnersKind[podName], containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
+					systems[namespaceName].midLevels[podOwnersKind[podName]+"__"+controllerName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
+				} else if _, ok := systems[namespaceName].midLevels[podOwnersKind[podName]+"__"+controllerName].containers[containerName]; !ok {
+					systems[namespaceName].midLevels[podOwnersKind[podName]+"__"+controllerName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
 				}
 			}
-			if _, ok := namespaces[namespaceName].pointers[podOwnersKind[podName]+"__"+controllerName]; !ok {
-				namespaces[namespaceName].pointers[podOwnersKind[podName]+"__"+controllerName] = namespaces[namespaceName].topLevels[ownerKind+"__"+currentOwner]
+			if _, ok := systems[namespaceName].pointers[podOwnersKind[podName]+"__"+controllerName]; !ok {
+				systems[namespaceName].pointers[podOwnersKind[podName]+"__"+controllerName] = systems[namespaceName].midLevels[ownerKind+"__"+currentOwner]
 			}
 		} else {
 			currentOwner = podName
 			ownerKind = "Pod"
 			//Create pod as top owner and add container
-			if _, ok := namespaces[namespaceName].topLevels["Pod__"+podName]; ok {
-			} else {
-				namespaces[namespaceName].topLevels["Pod__"+podName] = &topLevel{name: podName, kind: "Pod", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
+			if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+podName]; !ok {
+				systems[namespaceName].midLevels[ownerKind+"__"+podName] = &midLevel{name: podName, kind: "Pod", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
 			}
-			namespaces[namespaceName].topLevels["Pod__"+podName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}}
+			systems[namespaceName].midLevels[ownerKind+"__"+podName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
 		}
-		if _, ok := namespaces[namespaceName].pointers[podName]; !ok {
-			namespaces[namespaceName].pointers["Pod__"+podName] = namespaces[namespaceName].topLevels[ownerKind+"__"+currentOwner]
+		if _, ok := systems[namespaceName].pointers["Pod__"+podName]; !ok {
+			systems[namespaceName].pointers["Pod__"+podName] = systems[namespaceName].midLevels[ownerKind+"__"+currentOwner]
 		}
-		namespaces[namespaceName].topLevels[ownerKind+"__"+currentOwner].namespace = namespaceName
 	}
 
 	//for printing containers
 	/*
-		for i, vi := range namespaces {
+		for i, vi := range systems {
 			fmt.Println("\n\nnamespace: " + i)
-			for j, v := range namespaces[i].topLevels {
+			for j, v := range systems[i].midLevels {
 				fmt.Println("\n\n  owner name: " + j + "\n  owner kind: " + v.kind + "\n  namespace: " + i + "\n  containers:")
-				for k := range namespaces[i].topLevels[j].containers {
+				for k := range systems[i].midLevels[j].containers {
 					fmt.Println("  - " + k)
 				}
 			}
 		} */
 
-	var query = `sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000`
+	query = `sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "pod", "container", "cpuLimit")
 
@@ -305,7 +294,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetric(result, "namespace", "replicaset", "creationTime", "ReplicaSet")
 
-	//Deployment Metrics
+	//Deployment metrics
 	query = `kube_deployment_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetricString(result, "namespace", "deployment", "deploymentLabel", "Deployment")
@@ -330,7 +319,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	query = `kube_deployment_spec_replicas`
 	getWorkload(promaddress, "spec_replicas", "Spec Replicas", query, "deployment", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
-	//CronJob & Job Metrics
+	//CronJob & Job metrics
 	query = `kube_cronjob_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetricString(result, "namespace", "cronjob", "cronjobLabel", "CronJob")
@@ -391,7 +380,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 		result = prometheus.MetricCollect(promaddress, query, start, end)
 		getMidMetric(result, "namespace", "job", "complete", "Job")*/
 
-	currentSizeWrite, err := os.Create("./data/currentSize.csv")
+	currentSizeWrite, err := os.Create("./data/container/currentSize.csv")
 	if err != nil {
 		log.Println(err)
 	}
@@ -453,13 +442,42 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	query = `sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
 	getWorkload(promaddress, "disk_workload", "Raw Disk Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
+	//HPA metrics
+	query = `kube_hpa_labels`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getHPAMetricString(result, "namespace", "hpa", "hpaLabel", clusterName, promAddr)
+
+	query = `kube_hpa_spec_max_replicas`
+	getHPAWorkload(promaddress, "max_replicas", "Max Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	query = `kube_hpa_spec_min_replicas`
+	getHPAWorkload(promaddress, "min_replicas", "Min Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	/*
+		query = `kube_hpa_status_condition{status="AbleToScale",condition="true"}`
+		result = prometheus.MetricCollect(promaddress, query, start, end)
+		getHPAMetric(result, "namespace", "hpa", "ableToScale")
+
+		query = `kube_hpa_status_condition{status="ScalingActive",condition="true"}`
+		result = prometheus.MetricCollect(promaddress, query, start, end)
+		getHPAMetric(result, "namespace", "hpa", "scalingActive")
+	*/
+	query = `kube_hpa_status_condition{status="ScalingLimited",condition="true"}`
+	getHPAWorkload(promaddress, "condition_scaling_limited", "Scaling Limited", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	query = `kube_hpa_status_current_replicas`
+	getHPAWorkload(promaddress, "current_replicas", "Current Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	query = `kube_hpa_status_desired_replicas`
+	getHPAWorkload(promaddress, "desired_replicas", "Desired Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+
 	//for printing label maps
 	/*
-		for i := range namespaces {
-			for j := range namespaces[i].topLevels {
-				for k := range namespaces[i].topLevels[j].containers {
+		for i := range systems {
+			for j := range systems[i].midLevels {
+				for k := range systems[i].midLevels[j].containers {
 					fmt.Println("\n" + k)
-					for l, v := range namespaces[i].topLevels[j].containers[k].labelMap {
+					for l, v := range systems[i].midLevels[j].containers[k].labelMap {
 						fmt.Println("  " + l + " --- " + v)
 					}
 				}

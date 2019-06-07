@@ -21,13 +21,13 @@ func getContainerMetric(result model.Value, namespace model.LabelName, pod, cont
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			//Validate that the data contains the namespace label with value and check it exists in our systems structure.
 			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := namespaces[string(namespaceValue)]; ok {
+				if _, ok := systems[string(namespaceValue)]; ok {
 					//Validate that the data contains the pod label with value and check it exists in our systems structure
 					if podValue, ok := result.(model.Matrix)[i].Metric[pod]; ok {
-						if _, ok := namespaces[string(namespaceValue)].pointers["Pod__"+string(podValue)]; ok {
+						if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)]; ok {
 							//Validate that the data contains the container label with value and check it exists in our systems structure
 							if containerValue, ok := result.(model.Matrix)[i].Metric[container]; ok {
-								if _, ok := namespaces[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)]; ok {
+								if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)]; ok {
 									//validates that the value of the entity is set and if not will default to 0
 									var value int
 									if len(result.(model.Matrix)[i].Values) == 0 {
@@ -37,17 +37,17 @@ func getContainerMetric(result model.Value, namespace model.LabelName, pod, cont
 									}
 									//Check which metric this is for and update the corresponding variable for this container in the system data structure
 									if metric == "cpuLimit" {
-										namespaces[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuLimit = value
+										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuLimit = value
 									} else if metric == "cpuRequest" {
-										namespaces[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuRequest = value
+										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuRequest = value
 									} else if metric == "memLimit" {
-										namespaces[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memLimit = value
+										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memLimit = value
 									} else if metric == "memRequest" {
-										namespaces[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memRequest = value
+										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memRequest = value
 									} else if metric == "restarts" {
-										namespaces[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].restarts = value
+										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].restarts = value
 									} else if metric == "powerState" {
-										namespaces[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].powerState = value
+										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].powerState = value
 									}
 								}
 							}
@@ -66,16 +66,16 @@ func getContainerMetricString(result model.Value, namespace model.LabelName, pod
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
 			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := namespaces[string(namespaceValue)]; ok {
+				if _, ok := systems[string(namespaceValue)]; ok {
 					//Validate that the data contains the pod label with value and check it exists in our temp structure if not it will be added
 					if podValue, ok := result.(model.Matrix)[i].Metric[pod]; ok {
-						if _, ok := namespaces[string(namespaceValue)].pointers["Pod__"+string(podValue)]; ok {
+						if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)]; ok {
 							//Validate that the data contains the container label with value and check it exists in our temp structure if not it will be added
 							if containerValue, ok := result.(model.Matrix)[i].Metric[container]; ok {
-								if _, ok := namespaces[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)]; ok {
+								if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)]; ok {
 									//loop through all the labels for an entity and store them in a map. For controller based entities where there will be multiple copies of containers they will have there values concatinated together.
 									for key, value := range result.(model.Matrix)[i].Metric {
-										addToLabelMap(string(key), string(value), namespaces[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].labelMap)
+										addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].labelMap)
 									}
 								}
 							}
@@ -95,11 +95,11 @@ func getMidMetric(result model.Value, namespace model.LabelName, mid model.Label
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			//Validate that the data contains the namespace label with value and check it exists in our systems structure.
 			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := namespaces[string(namespaceValue)]; ok {
+				if _, ok := systems[string(namespaceValue)]; ok {
 					//Validate that the data contains the mid label with value and check it exists in our systems structure
 					if midValue, ok := result.(model.Matrix)[i].Metric[mid]; ok {
-						if _, ok := namespaces[string(namespaceValue)].pointers[prefix+"__"+string(midValue)]; ok {
-							if _, ok := namespaces[string(namespaceValue)].topLevels[prefix+"__"+string(midValue)]; ok {
+						if _, ok := systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)]; ok {
+							if _, ok := systems[string(namespaceValue)].midLevels[prefix+"__"+string(midValue)]; ok {
 								//validates that the value of the entity is set and if not will default to 0
 								var value int64
 								if len(result.(model.Matrix)[i].Values) == 0 {
@@ -111,11 +111,11 @@ func getMidMetric(result model.Value, namespace model.LabelName, mid model.Label
 								//Check which metric this is for and update the corresponding variable for this mid in the system data structure
 
 								if metric == "currentSize" {
-									namespaces[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].currentSize = int(value)
+									systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].currentSize = int(value)
 								} else if metric == "creationTime" {
-									namespaces[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].creationTime = value
+									systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].creationTime = value
 								} else {
-									addToLabelMap(metric, strconv.FormatInt(value,10), namespaces[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
+									addToLabelMap(metric, strconv.FormatInt(value, 10), systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
 								}
 							}
 						}
@@ -134,19 +134,58 @@ func getMidMetricString(result model.Value, namespace model.LabelName, mid model
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
 			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := namespaces[string(namespaceValue)]; ok {
+				if _, ok := systems[string(namespaceValue)]; ok {
 					//Validate that the data contains the mid label with value and check it exists in our temp structure if not it will be added
 					if midValue, ok := result.(model.Matrix)[i].Metric[mid]; ok {
-						if _, ok := namespaces[string(namespaceValue)].pointers[prefix+"__"+string(midValue)]; ok {
+						if _, ok := systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)]; ok {
 							//loop through all the labels for an entity and store them in a map. For controller based entities where there will be multiple copies of containers they will have there values concatinated together.
 							for key, value := range result.(model.Matrix)[i].Metric {
-								addToLabelMap(string(key), string(value), namespaces[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
+								addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
 							}
 						}
 					}
 				}
 			}
 		}
+	}
+}
+
+//getmidMetricString is used to parse the label based results from Prometheus related to mid Entities and store them in the systems data structure.
+func getHPAMetricString(result model.Value, namespace model.LabelName, hpa model.LabelName, metric string, clusterName string, promAddr string) {
+	hpas := map[string]map[string]string{}
+	//Validate there is data in the results.
+	if result != nil {
+		for i := 0; i < result.(model.Matrix).Len(); i++ {
+			//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
+			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
+				if _, ok := systems[string(namespaceValue)]; ok {
+					//Validate that the data contains the mid label with value and check it exists in our temp structure if not it will be added
+					if hpaValue, ok := result.(model.Matrix)[i].Metric[hpa]; ok {
+						if _, ok := systems[string(namespaceValue)].pointers["Deployment__"+string(hpaValue)]; ok {
+							for key, value := range result.(model.Matrix)[i].Metric {
+								addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["Deployment__"+string(hpaValue)].labelMap)
+							}
+						} else if _, ok := systems[string(namespaceValue)].pointers["ReplicaSet__"+string(hpaValue)]; ok {
+							for key, value := range result.(model.Matrix)[i].Metric {
+								addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["ReplicaSet__"+string(hpaValue)].labelMap)
+							}
+						} else if _, ok := systems[string(namespaceValue)].pointers["ReplicationController__"+string(hpaValue)]; ok {
+							for key, value := range result.(model.Matrix)[i].Metric {
+								addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["ReplicationController__"+string(hpaValue)].labelMap)
+							}
+						} else {
+							hpas[string(hpaValue)] = map[string]string{}
+							for key, value := range result.(model.Matrix)[i].Metric {
+								addToLabelMap(string(key), string(value), hpas[string(hpaValue)])
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	if len(hpas)>0{
+		writeHPAAttributes(clusterName, promAddr, hpas)
 	}
 }
 
@@ -158,7 +197,7 @@ func getNamespacelimits(result model.Value, namespace model.LabelName) {
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			//Validate that the data contains the namespace label with value and check it exists in our systems structure.
 			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := namespaces[string(namespaceValue)]; ok {
+				if _, ok := systems[string(namespaceValue)]; ok {
 					//validates that the value of the entity is set and if not will default to 0
 					var value int
 					if len(result.(model.Matrix)[i].Values) == 0 {
@@ -167,19 +206,19 @@ func getNamespacelimits(result model.Value, namespace model.LabelName) {
 						value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
 					}
 					//Check which metric this is for and update the corresponding variable for this container in the system data structure
-					//For namespaces limits they are defined based on 2 of the labels as they combine the Limits and Request for CPU and Memory all into 1 call.
+					//For systems limits they are defined based on 2 of the labels as they combine the Limits and Request for CPU and Memory all into 1 call.
 
 					if constraint := result.(model.Matrix)[i].Metric["constraint"]; constraint == "defaultRequest" {
 						if resource := result.(model.Matrix)[i].Metric["resource"]; resource == "cpu" {
-							namespaces[string(namespaceValue)].cpuRequest = value
+							systems[string(namespaceValue)].cpuRequest = value
 						} else if resource := result.(model.Matrix)[i].Metric["resource"]; resource == "memory" {
-							namespaces[string(namespaceValue)].memRequest = value
+							systems[string(namespaceValue)].memRequest = value
 						}
 					} else if constraint := result.(model.Matrix)[i].Metric["constraint"]; constraint == "default" {
 						if resource := result.(model.Matrix)[i].Metric["resource"]; resource == "cpu" {
-							namespaces[string(namespaceValue)].cpuLimit = value
+							systems[string(namespaceValue)].cpuLimit = value
 						} else if resource := result.(model.Matrix)[i].Metric["resource"]; resource == "memory" {
-							namespaces[string(namespaceValue)].memLimit = value
+							systems[string(namespaceValue)].memLimit = value
 						}
 					}
 				}
@@ -196,10 +235,10 @@ func getNamespaceMetricString(result model.Value, namespace model.LabelName, met
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
 			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := namespaces[string(namespaceValue)]; ok {
+				if _, ok := systems[string(namespaceValue)]; ok {
 					//loop through all the labels for an entity and store them in a map.
 					for key, value := range result.(model.Matrix)[i].Metric {
-						addToLabelMap(string(key), string(value), namespaces[string(namespaceValue)].labelMap)
+						addToLabelMap(string(key), string(value), systems[string(namespaceValue)].labelMap)
 					}
 				}
 			}
@@ -213,7 +252,7 @@ func getWorkload(promaddress, fileName, metricName, query, aggregrator, clusterN
 	var result model.Value
 	var start, end time.Time
 	//Open the files that will be used for the workload data types and write out there headers.
-	workloadWrite, err := os.Create("./data/" + aggregrator + `_` + fileName + ".csv")
+	workloadWrite, err := os.Create("./data/container/" + aggregrator + `_` + fileName + ".csv")
 	if err != nil {
 		log.Println(err)
 	}
@@ -227,6 +266,30 @@ func getWorkload(promaddress, fileName, metricName, query, aggregrator, clusterN
 		query = aggregrator + `(` + query + `) by (pod_name,namespace,container_name)`
 		result = prometheus.MetricCollect(promaddress, query, start, end)
 		writeWorkload(workloadWrite, result, "namespace", "pod_name", "container_name", clusterName, promAddr)
+	}
+	//Close the workload files.
+	workloadWrite.Close()
+}
+
+func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) {
+	var historyInterval time.Duration
+	historyInterval = 0
+	var result model.Value
+	var start, end time.Time
+	//Open the files that will be used for the workload data types and write out there headers.
+	workloadWrite, err := os.Create("./data/container/hpa" + `_` + fileName + ".csv")
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Fprintf(workloadWrite, "cluster,namespace,deployment,hpa,Datetime,%s\n", metricName)
+
+	//If the History parameter is set to anything but default 1 then will loop through the calls starting with the current day\hour\minute interval and work backwards.
+	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
+	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
+	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
+		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
+		result = prometheus.MetricCollect(promaddress, query, start, end)
+		writeHPAWorkload(workloadWrite, result, "namespace", "hpa", "hpa", clusterName, promAddr)
 	}
 	//Close the workload files.
 	workloadWrite.Close()

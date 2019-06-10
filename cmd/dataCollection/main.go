@@ -68,7 +68,7 @@ func initParameters() {
 func main() {
 
 	//Open the debug log file for writing.
-	debugLog, err := os.OpenFile("./data/container/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
+	debugLog, err := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -99,5 +99,5 @@ func main() {
 	//cronjob.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
 	//node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, false, currentTime)
 	//new_container_test.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, true, currentTime)
-	container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, true, currentTime)
+	container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
 }

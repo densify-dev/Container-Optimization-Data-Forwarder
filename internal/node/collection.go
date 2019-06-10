@@ -105,7 +105,7 @@ func getWorkload(promaddress, fileName, metricName, query2, aggregrator, cluster
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Fprintf(workloadWrite, "namespace,node,Datetime,%s\n", metricName)
+	fmt.Fprintf(workloadWrite, "node,Datetime,%s\n", metricName)
 
 	//If the History parameter is set to anything but default 1 then will loop through the calls starting with the current day\hour\minute interval and work backwards.
 	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.

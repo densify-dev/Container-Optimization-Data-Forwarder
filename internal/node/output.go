@@ -25,8 +25,7 @@ func writeWorkload(file io.Writer, result model.Value, node model.LabelName, pro
 				if _, ok := nodes[string(nodeValue)]; ok {
 					//Loop through the different values over the interval and write out each one to the workload file.
 					for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-						fmt.Fprintf(file, "%s,%s,%s,%f\n",
-							nodes[string(nodeValue)].namespace,
+						fmt.Fprintf(file, "%s,%s,%f\n",
 							strings.Replace(string(nodeValue), ";", ".", -1),
 							time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"),
 							result.(model.Matrix)[i].Values[j].Value)
@@ -46,11 +45,11 @@ func writeConfig(promAddr string) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "namespace,node,label_beta_kubernetes_io_os,label_kubernetes_io_hostname")
+	fmt.Fprintln(configWrite, "node,label_beta_kubernetes_io_os,label_kubernetes_io_hostname")
 
 	//Loop through the nodes and write out the config data for each system.
 	for kn := range nodes {
-		fmt.Fprintf(configWrite, "%s,%s,%s,%s\n", nodes[kn].namespace, kn, nodes[kn].labelBetaKubernetesIoOs, nodes[kn].labelKubernetesIoHostname)
+		fmt.Fprintf(configWrite, "%s,%s,%s\n", kn, nodes[kn].labelBetaKubernetesIoOs, nodes[kn].labelKubernetesIoHostname)
 	}
 }
 
@@ -63,13 +62,13 @@ func writeAttributes(promAddr string) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "namespace, node, label_beta_kubernetes_io_arch, network_speed_bytes, pods_capacity, cpu_capacity, memory_capacity, ephemeral_storage_capacity, hugepages_2Mi_capacity, pods_allocatable, cpu_allocatable, memory_allocatable, ephemeral_storage_allocatable, hugepages_2Mi_allocatable, labels")
+	fmt.Fprintln(attributeWrite, "node, label_beta_kubernetes_io_arch, network_speed_bytes, pods_capacity, cpu_capacity, memory_capacity, ephemeral_storage_capacity, hugepages_2Mi_capacity, pods_allocatable, cpu_allocatable, memory_allocatable, ephemeral_storage_allocatable, hugepages_2Mi_allocatable, labels")
 
 	//Loop through the nodes and write out the attributes data for each system.
 	for kn := range nodes {
 
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-		fmt.Fprintf(attributeWrite, "%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s\n", nodes[kn].namespace, kn, nodes[kn].labelBetaKubernetesIoArch, nodes[kn].netSpeedBytes,
+		fmt.Fprintf(attributeWrite, "%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s\n", kn, nodes[kn].labelBetaKubernetesIoArch, nodes[kn].netSpeedBytes,
 			nodes[kn].podsCapacity, nodes[kn].cpuCapacity, nodes[kn].memCapacity, nodes[kn].ephemeralStorageCapacity, nodes[kn].hugepages2MiCapacity,
 			nodes[kn].podsAllocatable, nodes[kn].cpuAllocatable, nodes[kn].memAllocatable, nodes[kn].ephemeralStorageAllocatable, nodes[kn].hugepages2MiAllocatable,
 			nodes[kn].nodeLabel)

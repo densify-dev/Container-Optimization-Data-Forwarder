@@ -26,7 +26,7 @@ import (
 
 //A node structure. Used for storing attributes and config details. (Maybe delete the values?)
 type node struct {
-	node, namespace, nodeLabel                                                    string
+	node, nodeLabel                                                               string
 	labelBetaKubernetesIoArch, labelBetaKubernetesIoOs, labelKubernetesIoHostname string
 
 	//Value fields
@@ -54,7 +54,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	promaddress = promProtocol + "://" + promAddr + ":" + promPort
 
 	//Query and store kubernetes node information/labels
-	query = "max(kube_node_labels) by (instance, label_beta_kubernetes_io_arch, label_beta_kubernetes_io_os, label_kubernetes_io_hostname, node, namespace)"
+	query = "max(kube_node_labels) by (instance, label_beta_kubernetes_io_arch, label_beta_kubernetes_io_os, label_kubernetes_io_hostname, node)"
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 
 	//Prefix for indexing (less clutter on screen)
@@ -66,7 +66,6 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 			nodes[string(rsltIndex[i].Metric["node"])] =
 				&node{
 					node:                      string(rsltIndex[i].Metric["node"]),
-					namespace:                 string(rsltIndex[i].Metric["namespace"]),
 					labelBetaKubernetesIoArch: string(rsltIndex[i].Metric["label_beta_kubernetes_io_arch"]),
 					labelBetaKubernetesIoOs:   string(rsltIndex[i].Metric["label_beta_kubernetes_io_os"]),
 					labelKubernetesIoHostname: string(rsltIndex[i].Metric["label_kubernetes_io_hostname"])}

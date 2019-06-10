@@ -388,7 +388,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Fprintf(currentSizeWrite, "cluster,namespace,pod,container,Datetime,currentSize\n")
+	fmt.Fprintf(currentSizeWrite, "cluster,namespace,top level,top kind,container,Datetime,currentSize\n")
 
 	//Get the current size of the controller will query each of the differnt types of controller
 	query = `kube_replicaset_spec_replicas`

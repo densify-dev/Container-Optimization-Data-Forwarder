@@ -10,6 +10,7 @@ import (
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
 	"github.com/spf13/viper"
 )
 
@@ -97,7 +98,7 @@ func main() {
 	//deployment.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
 	//hpa.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
 	//cronjob.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	//node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, false, currentTime)
+	node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, false, currentTime)
 	//new_container_test.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, true, currentTime)
 	container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
 }

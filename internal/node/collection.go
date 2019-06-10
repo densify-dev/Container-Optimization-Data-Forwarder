@@ -34,6 +34,10 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 					}
 					//Check which metric this is for and update the corresponding variable for this container in the system data structure
 					switch metric {
+					case "capacity":
+						nodes[string(nodeValue)].capacity = int(value)
+					case "allocatable":
+						nodes[string(nodeValue)].allocatable = int(value)
 					case "diskReadBytes":
 						nodes[string(nodeValue)].diskReadBytes = int(value)
 					case "diskWriteBytes":

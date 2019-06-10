@@ -18,7 +18,6 @@ The skeleton query to group metrics by node and their values is (query made by J
 package node
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
@@ -72,28 +71,22 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 		}
 	}
 
-	query = `sum(kube_node_status_capacity) by (node)`
-	result = prometheus.MetricCollect(promaddress, query, start, end)
+	/*
+		//Prefix for indexing (less clutter on screen)
+		rsltIndex = result.(model.Matrix)
 
-	//Prefix for indexing (less clutter on screen)
-	rsltIndex = result.(model.Matrix)
+		if result != nil {
+			var value int
+			for i := 0; i < result.(model.Matrix).Len(); i++ {
 
-	if result != nil {
-		var value int
-		for i := 0; i < result.(model.Matrix).Len(); i++ {
-
-			if len(result.(model.Matrix)[i].Values) == 0 {
-				value = 0
-			} else {
-				value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+				if len(result.(model.Matrix)[i].Values) == 0 {
+					value = 0
+				} else {
+					value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+				}
+				nodes[string(rsltIndex[i].Metric["node"])].capacity = value
 			}
-			_ = value
-			//fmt.Println(value)
-			fmt.Println(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
-			nodes[string(rsltIndex[i].Metric["node"])] = &node{capacity: value}
-			//nodes[result.(model.Matrix)[i].Metric[node]].capacity = int(value)
-		}
-	}
+		}*/
 
 	//Additonal config/attribute queries
 	query = `kube_node_labels`
@@ -103,6 +96,14 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	query = `max(max(label_replace(node_network_speed_bytes, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~"node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getNodeMetric(result, "namespace", "node", "netSpeedBytes")
+
+	query = `sum(kube_node_status_capacity) by (node)`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getNodeMetric(result, "namespace", "node", "capacity")
+
+	query = `sum(kube_node_status_allocatable) by (node)`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getNodeMetric(result, "namespace", "node", "allocatable")
 
 	//Write config and attribute files
 	writeConfig(promAddr)

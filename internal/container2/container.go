@@ -208,7 +208,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetricString(result, "namespace", "pod", "podInfo", "Pod")
 
-	query = `label_replace(kube_pod_labels, "node_instance", "$1", "instance", "(.*)")`
+	query = `kube_pod_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetricString(result, "namespace", "pod", "podLabel", "Pod")
 
@@ -344,43 +344,43 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetric(result, "namespace", "cronjob", "statusActive", "CronJob")
 
-	query = `kube_job_info * on (job_name) group_left (owner_name) kube_job_owner`
+	query = `kube_job_info * on (namespace,job_name) group_left (owner_name) kube_job_owner`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetricString(result, "namespace", "job_name", "jobInfo", "Job")
 
-	query = `kube_job_labels * on (job_name) group_left (owner_name) kube_job_owner`
+	query = `kube_job_labels * on (namespace,job_name) group_left (owner_name) kube_job_owner`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetricString(result, "namespace", "job_name", "jobLabel", "Job")
 
-	query = `kube_job_spec_completions * on (job_name) group_left (owner_name) kube_job_owner`
+	query = `kube_job_spec_completions * on (namespace,job_name) group_left (owner_name) kube_job_owner`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetric(result, "namespace", "job_name", "specCompletions", "Job")
 
-	query = `kube_job_spec_parallelism * on (job_name) group_left (owner_name) kube_job_owner`
+	query = `kube_job_spec_parallelism * on (namespace,job_name) group_left (owner_name) kube_job_owner`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetric(result, "namespace", "job_name", "specParallelism", "Job")
 
-	query = `kube_job_status_completion_time * on (job_name) group_left (owner_name) kube_job_owner`
+	query = `kube_job_status_completion_time * on (namespace,job_name) group_left (owner_name) kube_job_owner`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetric(result, "namespace", "job_name", "statusCompletionTime", "Job")
 
-	query = `kube_job_status_start_time * on (job_name) group_left (owner_name) kube_job_owner`
+	query = `kube_job_status_start_time * on (namespace,job_name) group_left (owner_name) kube_job_owner`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetric(result, "namespace", "job_name", "statusStartTime", "Job")
 	/*
-		query = `kube_job_status_active * on (job_name) group_left (owner_name) kube_job_owner`
+		query = `kube_job_status_active * on (namespace,job_name) group_left (owner_name) kube_job_owner`
 		result = prometheus.MetricCollect(promaddress, query, start, end)
 		getMidMetric(result, "namespace", "job", "statusActive", "Job")
 
-		query = `kube_job_status_failed * on (job_name) group_left (owner_name) kube_job_owner`
+		query = `kube_job_status_failed * on (namespace,job_name) group_left (owner_name) kube_job_owner`
 		result = prometheus.MetricCollect(promaddress, query, start, end)
 		getMidMetric(result, "namespace", "job", "statusFailed", "Job")
 
-		query = `kube_job_status_succeeded * on (job_name) group_left (owner_name) kube_job_owner`
+		query = `kube_job_status_succeeded * on (namespace,job_name) group_left (owner_name) kube_job_owner`
 		result = prometheus.MetricCollect(promaddress, query, start, end)
 		getMidMetric(result, "namespace", "job", "statusSucceeded", "Job")
 
-		query = `kube_job_complete * on (job_name) group_left (owner_name) kube_job_owner`
+		query = `kube_job_complete * on (namespace,job_name) group_left (owner_name) kube_job_owner`
 		result = prometheus.MetricCollect(promaddress, query, start, end)
 		getMidMetric(result, "namespace", "job", "complete", "Job")*/
 
@@ -416,12 +416,12 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	getMidMetric(result, "namespace", "job_name", "currentSize", "Job")
 	writeWorkloadMid(currentSizeWrite, result, "namespace", "job_name", clusterName, promAddr, "Job")
 
-	query = `sum(max(kube_job_spec_parallelism) by (job) * on (job) group_right kube_job_owner) by (owner_name, namespace)`
+	query = `sum(max(kube_job_spec_parallelism) by (job) * on (namespace,job) group_right kube_job_owner) by (owner_name, namespace)`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetric(result, "namespace", "owner_name", "currentSize", "CronJob")
 	writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", clusterName, promAddr, "CronJob")
 
-	query = `sum(max(kube_replicaset_spec_replicas) by (replicaset) * on (replicaset) group_right kube_replicaset_owner) by (owner_name, namespace)`
+	query = `sum(max(kube_replicaset_spec_replicas) by (replicaset) * on (namespace,replicaset) group_right kube_replicaset_owner) by (owner_name, namespace)`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetric(result, "namespace", "owner_name", "currentSize", "Deployment")
 	writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", clusterName, promAddr, "Deployment")

@@ -131,7 +131,7 @@ func writeAttributes(clusterName, promAddr string) {
 				} else {
 					fmt.Fprintf(attributeWrite, ",%d", vc.memRequest)
 				}
-				fmt.Fprintf(attributeWrite, ",%s,%s,%s,%s,%s", kc, vt.labelMap["node_instance"], cstate, vt.kind, vt.name)
+				fmt.Fprintf(attributeWrite, ",%s,%s,%s,%s,%s", kc, vt.labelMap["node"], cstate, vt.kind, vt.name)
 				if vt.currentSize == -1 {
 					fmt.Fprintf(attributeWrite, ",")
 				} else {

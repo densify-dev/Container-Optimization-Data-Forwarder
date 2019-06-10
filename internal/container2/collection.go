@@ -188,6 +188,7 @@ func getHPAMetricString(result model.Value, namespace model.LabelName, hpa model
 	}
 	if len(hpas) > 0 {
 		writeHPAAttributes(clusterName, promAddr, hpas)
+		writeHPAConfig(clusterName, promAddr, hpas) 
 	}
 }
 
@@ -315,7 +316,7 @@ func getDeploymentWorkload(promaddress, fileName, metricName, query, clusterName
 			if midVal.kind=="Deployment"{
 				for c := range systems[n].midLevels[m].containers{
 					for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
-						for _, val := range tempMap[int(historyInterval)][n][m[12:]] {
+						for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
 							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%f\n", cluster, n, midVal.name, midVal.kind, c, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
 						}
 					}
@@ -332,21 +333,77 @@ func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promA
 	var result model.Value
 	var start, end time.Time
 	//Open the files that will be used for the workload data types and write out there headers.
-	workloadWrite, err := os.Create("./data/container/hpa" + `_` + fileName + ".csv")
+	workloadWrite, err := os.Create("./data/container/hpa_" + fileName + ".csv")
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Fprintf(workloadWrite, "cluster,namespace,deployment,hpa,Datetime,%s\n", metricName)
+	fmt.Fprintf(workloadWrite, "cluster,namespace,top level,top kind,container,HPA Name,Datetime,%s\n", metricName)
 
-	//If the History parameter is set to anything but default 1 then will loop through the calls starting with the current day\hour\minute interval and work backwards.
-	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
-	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
+	tempMap := map[int]map[string]map[string][]model.SamplePair{}
+	
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
+		tempMap[int(historyInterval)]=map[string]map[string][]model.SamplePair{}
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
 		result = prometheus.MetricCollect(promaddress, query, start, end)
-		writeHPAWorkload(workloadWrite, result, "namespace", "hpa", "hpa", clusterName, promAddr)
+		for i := 0; i < result.(model.Matrix).Len(); i++ {
+			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
+				if _,ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]; !ok{
+					tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]=map[string][]model.SamplePair{}
+				}
+				if _,ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric["hpa"])]; !ok {
+					tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric["hpa"])] = []model.SamplePair{}
+				}
+				tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric["hpa"])] = append(tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric["hpa"])], result.(model.Matrix)[i].Values[j])
+			}
+		}
 	}
-	//Close the workload files.
+	var cluster string
+	if clusterName == "" {
+		cluster = promAddr
+	} else {
+		cluster = clusterName
+	}
+
+	
+	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
+		for n := range systems{
+			for m, midVal := range systems[n].pointers{
+				if midVal.kind=="Deployment"{
+					for c := range systems[n].pointers[m].containers{
+						for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
+							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", cluster, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+						}
+					}
+				}
+				if midVal.kind=="ReplicaSet"{
+					for c := range systems[n].pointers[m].containers{
+						for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
+							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", cluster, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+						}
+					}
+				}
+				if midVal.kind=="ReplicationController"{
+					for c := range systems[n].pointers[m].containers{
+						for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
+							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", cluster, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+						}
+					}
+				}
+				delete(tempMap[int(historyInterval)][n], midVal.name)
+			}
+		}
+	}
+	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
+		for i := range tempMap {
+			for n := range tempMap[i] {
+				for m := range tempMap[i][n] {
+					for _, val := range tempMap[int(historyInterval)][n][m] {
+						fmt.Fprintf(workloadWrite, "%s,,,,,%s,%s,%f\n", cluster, m, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+					}
+				}
+			}
+		}
+	}
 	workloadWrite.Close()
 }
 

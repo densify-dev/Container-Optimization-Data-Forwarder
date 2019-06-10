@@ -44,6 +44,31 @@ func writeConfig(clusterName, promAddr string) {
 	}
 }
 
+//writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
+func writeHPAConfig(clusterName, promAddr string, systems map[string]map[string]string) {
+	//Create the config file and open it for writing.
+	configWrite, err := os.Create("./data/container/hpa_extra_config.csv")
+	if err != nil {
+		log.Println(err)
+	}
+
+	//Write out the header.
+	fmt.Fprintln(configWrite, "cluster,namespace,top level,top kind,container,HPA Name,OS Name,HW Manufacturer,HW Model,HW Serial Number")
+	//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.
+	var cluster string
+	if clusterName == "" {
+		cluster = promAddr
+	} else {
+		cluster = clusterName
+	}
+	//Loop through the systems and write out the config data for each system.
+	for i := range systems {
+		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
+		fmt.Fprintf(configWrite, "%s,%s,,,,%s,Linux,HPA,%s,%s", cluster, systems[i]["namespace"], i, systems[i]["namespace"], systems[i]["namespace"])
+		fmt.Fprintf(configWrite, "\n")
+	}
+}
+
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
 func writeAttributes(clusterName, promAddr string) {
 	//Create the attributes file and open it for writing
@@ -53,7 +78,7 @@ func writeAttributes(clusterName, promAddr string) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,namespace,top level,top kind,container,pod name,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,All Container Labels,All Mid Level Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Current Nodes,Power State,Created By Kind,Created By Name,Current Size,Create Time,Container Restarts,Namespace Labels,Namespace CPU Request,Namespace CPU Limit,Namespace Memory Request,Namespace Memory Limit")
+	fmt.Fprintln(attributeWrite, "cluster,namespace,top level,top kind,container,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,All Container Labels,All Mid Level Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Current Nodes,Power State,Created By Kind,Created By Name,Current Size,Create Time,Container Restarts,Namespace Labels,Namespace CPU Request,Namespace CPU Limit,Namespace Memory Request,Namespace Memory Limit")
 
 	//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.
 	var cluster string
@@ -76,7 +101,7 @@ func writeAttributes(clusterName, promAddr string) {
 
 				//for wt, vt := range systems[kn].pods
 				//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-				fmt.Fprintf(attributeWrite, "%s,%s,%s,%s,%s,%s,Containers,%s,%s,%s,", cluster, kn, strings.Replace(vt.name, ";", ".", -1), vt.kind, strings.Replace(kc, ":", ".", -1), vc.labelMap["pod"], cluster, kn, vt.name)
+				fmt.Fprintf(attributeWrite, "%s,%s,%s,%s,%s,Containers,%s,%s,%s,", cluster, kn, strings.Replace(vt.name, ";", ".", -1), vt.kind, strings.Replace(kc, ":", ".", -1), cluster, kn, vt.name)
 				for key, value := range systems[kn].midLevels[kt].containers[kc].labelMap {
 					fmt.Fprintf(attributeWrite, key+" : "+value+"|")
 				}
@@ -155,17 +180,24 @@ func writeAttributes(clusterName, promAddr string) {
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
 func writeHPAAttributes(clusterName, promAddr string, systems map[string]map[string]string) {
 	//Create the attributes file and open it for writing
-	attributeWrite, err := os.Create("./data/container/unmatched_hpa_attributes.csv")
+	attributeWrite, err := os.Create("./data/container/hpa_extra_attributes.csv")
 	if err != nil {
 		log.Println(err)
 	}
 
+	var cluster string
+	if clusterName == "" {
+		cluster = promAddr
+	} else {
+		cluster = clusterName
+	}
+
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,namespace,top level,top kind,container,All Labels")
+	fmt.Fprintln(attributeWrite, "cluster,namespace,top level,top kind,container,HPA Name,All Labels")
 	//Loop through the systems and write out the attributes data for each system.
 	for i := range systems {
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-		fmt.Fprintf(attributeWrite, "%s,", i)
+		fmt.Fprintf(attributeWrite, "%s,%s,,,,%s,", cluster, systems[i]["namespace"], i)
 		for key, value := range systems[i] {
 			fmt.Fprintf(attributeWrite, key+" : "+value+"|")
 		}

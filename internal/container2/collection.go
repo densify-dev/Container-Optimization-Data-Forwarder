@@ -36,7 +36,9 @@ func getContainerMetric(result model.Value, namespace model.LabelName, pod, cont
 										value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
 									}
 									//Check which metric this is for and update the corresponding variable for this container in the system data structure
-									if metric == "cpuLimit" {
+									if metric == "memory" {
+										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memory = value
+									} else if metric == "cpuLimit" {
 										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuLimit = value
 									} else if metric == "cpuRequest" {
 										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuRequest = value
@@ -184,7 +186,7 @@ func getHPAMetricString(result model.Value, namespace model.LabelName, hpa model
 			}
 		}
 	}
-	if len(hpas)>0{
+	if len(hpas) > 0 {
 		writeHPAAttributes(clusterName, promAddr, hpas)
 	}
 }
@@ -246,13 +248,13 @@ func getNamespaceMetricString(result model.Value, namespace model.LabelName, met
 	}
 }
 
-func getWorkload(promaddress, fileName, metricName, query, aggregrator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) {
+func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
 	var start, end time.Time
 	//Open the files that will be used for the workload data types and write out there headers.
-	workloadWrite, err := os.Create("./data/container/" + aggregrator + `_` + fileName + ".csv")
+	workloadWrite, err := os.Create("./data/container/" + aggregator + `_` + fileName + ".csv")
 	if err != nil {
 		log.Println(err)
 	}
@@ -263,11 +265,64 @@ func getWorkload(promaddress, fileName, metricName, query, aggregrator, clusterN
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
-		query = aggregrator + `(` + query + `) by (pod_name,namespace,container_name)`
+		query = aggregator + `(` + query + `) by (pod_name,namespace,container_name)`
 		result = prometheus.MetricCollect(promaddress, query, start, end)
 		writeWorkload(workloadWrite, result, "namespace", "pod_name", "container_name", clusterName, promAddr)
 	}
 	//Close the workload files.
+	workloadWrite.Close()
+}
+
+func getDeploymentWorkload(promaddress, fileName, metricName, query, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) {
+	var historyInterval time.Duration
+	historyInterval = 0
+	var result model.Value
+	var start, end time.Time
+	//Open the files that will be used for the workload data types and write out there headers.
+	workloadWrite, err := os.Create("./data/container/deployment_" + fileName + ".csv")
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Fprintf(workloadWrite, "cluster,namespace,top level,top kind,container,Datetime,%s\n", metricName)
+
+	tempMap := map[int]map[string]map[string][]model.SamplePair{}
+	
+	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
+		tempMap[int(historyInterval)]=map[string]map[string][]model.SamplePair{}
+		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
+		result = prometheus.MetricCollect(promaddress, query, start, end)
+		for i := 0; i < result.(model.Matrix).Len(); i++ {
+			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
+				if _,ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]; !ok{
+					tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]=map[string][]model.SamplePair{}
+				}
+				if _,ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric["deployment"])]; !ok {
+					tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric["deployment"])] = []model.SamplePair{}
+				}
+				tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric["deployment"])] = append(tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric["deployment"])], result.(model.Matrix)[i].Values[j])
+			}
+		}
+	}
+	var cluster string
+	if clusterName == "" {
+		cluster = promAddr
+	} else {
+		cluster = clusterName
+	}
+
+	for n := range systems{
+		for m, midVal := range systems[n].midLevels{
+			if midVal.kind=="Deployment"{
+				for c := range systems[n].midLevels[m].containers{
+					for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
+						for _, val := range tempMap[int(historyInterval)][n][m[12:]] {
+							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%f\n", cluster, n, midVal.name, midVal.kind, c, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+						}
+					}
+				}
+			}
+		}
+	}
 	workloadWrite.Close()
 }
 

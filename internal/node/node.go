@@ -71,6 +71,23 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 		}
 	}
 
+	/*
+		//Prefix for indexing (less clutter on screen)
+		rsltIndex = result.(model.Matrix)
+
+		if result != nil {
+			var value int
+			for i := 0; i < result.(model.Matrix).Len(); i++ {
+
+				if len(result.(model.Matrix)[i].Values) == 0 {
+					value = 0
+				} else {
+					value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+				}
+				nodes[string(rsltIndex[i].Metric["node"])].capacity = value
+			}
+		}*/
+
 	//Additonal config/attribute queries
 	query = `kube_node_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
@@ -79,6 +96,14 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	query = `max(max(label_replace(node_network_speed_bytes, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~"node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getNodeMetric(result, "namespace", "node", "netSpeedBytes")
+
+	query = `sum(kube_node_status_capacity) by (node)`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getNodeMetric(result, "namespace", "node", "capacity")
+
+	query = `sum(kube_node_status_allocatable) by (node)`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getNodeMetric(result, "namespace", "node", "allocatable")
 
 	//Write config and attribute files
 	writeConfig(promAddr)

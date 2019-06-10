@@ -63,12 +63,12 @@ func writeAttributes(promAddr string) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "namespace, node, label_beta_kubernetes_io_arch, network_speed_bytes, labels")
+	fmt.Fprintln(attributeWrite, "namespace, node, label_beta_kubernetes_io_arch, network_speed_bytes, capacity, allocatable, labels")
 
 	//Loop through the nodes and write out the attributes data for each system.
 	for kn := range nodes {
 
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-		fmt.Fprintf(attributeWrite, "%s,%s,%s,%d,%s\n", nodes[kn].namespace, kn, nodes[kn].labelBetaKubernetesIoArch, nodes[kn].netSpeedBytes, nodes[kn].nodeLabel)
+		fmt.Fprintf(attributeWrite, "%s,%s,%s,%d,%d,%d,%s\n", nodes[kn].namespace, kn, nodes[kn].labelBetaKubernetesIoArch, nodes[kn].netSpeedBytes, nodes[kn].capacity, nodes[kn].allocatable, nodes[kn].nodeLabel)
 	}
 }

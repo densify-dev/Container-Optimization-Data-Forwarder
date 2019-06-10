@@ -168,6 +168,9 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 			}
 		} */
 
+	query = `container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}/1024/1024`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getContainerMetric(result, "namespace", "pod", "container", "memory")
 	query = `sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "pod", "container", "cpuLimit")
@@ -310,14 +313,15 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	query = `kube_deployment_metadata_generation`
 	getMidMetric(result, "namespace", "deployment", "metadataGeneration", "Deployment")
 
+	//fmt.Println(currentTime)
 	query = `kube_deployment_status_replicas_available`
-	getWorkload(promaddress, "status_replicas_available", "Status Replicas Available", query, "deployment", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	getDeploymentWorkload(promaddress, "status_replicas_available", "Status Replicas Available", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	query = `kube_deployment_status_replicas`
-	getWorkload(promaddress, "status_replicas", "Status Replicas", query, "deployment", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	getDeploymentWorkload(promaddress, "status_replicas", "Status Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	query = `kube_deployment_spec_replicas`
-	getWorkload(promaddress, "spec_replicas", "Spec Replicas", query, "deployment", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	getDeploymentWorkload(promaddress, "spec_replicas", "Spec Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//CronJob & Job metrics
 	query = `kube_cronjob_labels`
@@ -384,7 +388,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Fprintf(currentSizeWrite, "cluster,namespace,pod,container,Datetime,currentSize\n")
+	fmt.Fprintf(currentSizeWrite, "cluster,namespace,top level,top kind,container,Datetime,currentSize\n")
 
 	//Get the current size of the controller will query each of the differnt types of controller
 	query = `kube_replicaset_spec_replicas`

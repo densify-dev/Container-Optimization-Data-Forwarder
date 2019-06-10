@@ -21,7 +21,7 @@ func writeConfig(clusterName, promAddr string) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "cluster,namespace,pod,container,HW Total Memory,OS Name,HW Manufacturer,HW Model,HW Serial Number")
+	fmt.Fprintln(configWrite, "cluster,namespace,top level,top kind,container,HW Total Memory,OS Name,HW Manufacturer,HW Model,HW Serial Number")
 	//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.
 	var cluster string
 	if clusterName == "" {
@@ -31,13 +31,13 @@ func writeConfig(clusterName, promAddr string) {
 	}
 	//Loop through the systems and write out the config data for each system.
 	for kn := range systems {
-		for kt := range systems[kn].midLevels {
+		for kt, vt := range systems[kn].midLevels {
 			for kc, vc := range systems[kn].midLevels[kt].containers {
 				//If memory is not set then use first write that will leave it blank otherwise use the second that sets the value.
 				if vc.memory == -1 {
-					fmt.Fprintf(configWrite, "%s,%s,%s,%s,,Linux,CONTAINERS,%s,%s\n", cluster, kn, strings.Replace(kt, ";", ".", -1), strings.Replace(kc, ":", ".", -1), kn, kn)
+					fmt.Fprintf(configWrite, "%s,%s,%s,%s,%s,,Linux,CONTAINERS,%s,%s\n", cluster, kn, vt.name, vt.kind, strings.Replace(kc, ":", ".", -1), kn, kn)
 				} else {
-					fmt.Fprintf(configWrite, "%s,%s,%s,%s,%d,Linux,CONTAINERS,%s,%s\n", cluster, kn, strings.Replace(kt, ";", ".", -1), strings.Replace(kc, ":", ".", -1), vc.memory, kn, kn)
+					fmt.Fprintf(configWrite, "%s,%s,%s,%s,%s,%d,Linux,CONTAINERS,%s,%s\n", cluster, kn, vt.name, vt.kind, strings.Replace(kc, ":", ".", -1), vc.memory, kn, kn)
 				}
 			}
 		}
@@ -126,6 +126,11 @@ func writeAttributes(clusterName, promAddr string) {
 				for key, value := range vn.labelMap {
 					fmt.Fprintf(attributeWrite, key+" : "+value+"|")
 				}
+				if vn.cpuRequest == -1 {
+					fmt.Fprintf(attributeWrite, ",")
+				} else {
+					fmt.Fprintf(attributeWrite, ",%d", vn.cpuRequest)
+				}
 				if vn.cpuLimit == -1 {
 					fmt.Fprintf(attributeWrite, ",")
 				} else {
@@ -156,7 +161,7 @@ func writeHPAAttributes(clusterName, promAddr string, systems map[string]map[str
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "HPA,All Labels")
+	fmt.Fprintln(attributeWrite, "cluster,namespace,top level,top kind,container,All Labels")
 	//Loop through the systems and write out the attributes data for each system.
 	for i := range systems {
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
@@ -188,7 +193,7 @@ func writeWorkload(file io.Writer, result model.Value, namespace, pod, container
 								if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)]; ok {
 									//Loop through the different values over the interval and write out each one to the workload file.
 									for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-										fmt.Fprintf(file, "%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(podValue), ";", ".", -1), strings.Replace(string(containerValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
+										fmt.Fprintf(file, "%s,%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].name, systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].kind, strings.Replace(string(containerValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
 									}
 								}
 							}
@@ -261,7 +266,7 @@ func writeWorkloadMid(file io.Writer, result model.Value, namespace, mid model.L
 							for kc := range systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].containers {
 								//Loop through the different values over the interval and write out each one to the workload file.
 								for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-									fmt.Fprintf(file, "%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(midValue), ";", ".", -1), strings.Replace(string(kc), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
+									fmt.Fprintf(file, "%s,%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].name, systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].kind, strings.Replace(string(kc), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
 								}
 							}
 						}

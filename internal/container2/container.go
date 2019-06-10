@@ -315,13 +315,13 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//fmt.Println(currentTime)
 	query = `kube_deployment_status_replicas_available`
-	getDeploymentWorkload(promaddress, "deployment_status_replicas_available", "Status Replicas Available", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	getDeploymentWorkload(promaddress, "status_replicas_available", "Status Replicas Available", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	query = `kube_deployment_status_replicas`
-	getDeploymentWorkload(promaddress, "deployment_status_replicas", "Status Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	getDeploymentWorkload(promaddress, "status_replicas", "Status Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	query = `kube_deployment_spec_replicas`
-	getDeploymentWorkload(promaddress, "deployment_spec_replicas", "Spec Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	getDeploymentWorkload(promaddress, "spec_replicas", "Spec Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//CronJob & Job metrics
 	query = `kube_cronjob_labels`

@@ -30,9 +30,11 @@ type node struct {
 	labelBetaKubernetesIoArch, labelBetaKubernetesIoOs, labelKubernetesIoHostname string
 
 	//Value fields
-	taint, allocatable, capacity                                                    int
-	diskReadBytes, diskWriteBytes, activeMemBytes, memTotalBytes, netReceiveBytes   int
-	netReceivePackets, netSpeedBytes, netTransmitBytes, netTransmitPackets, cpuSecs int
+	taint                                                                                                 int
+	diskReadBytes, diskWriteBytes, activeMemBytes, memTotalBytes, netReceiveBytes                         int
+	netReceivePackets, netSpeedBytes, netTransmitBytes, netTransmitPackets, cpuSecs                       int
+	cpuCapacity, memCapacity, ephemeralStorageCapacity, podsCapacity, hugepages2MiCapacity                int
+	cpuAllocatable, memAllocatable, ephemeralStorageAllocatable, podsAllocatable, hugepages2MiAllocatable int
 }
 
 //Map that labels and values will be stored in
@@ -80,11 +82,11 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getNodeMetric(result, "namespace", "node", "netSpeedBytes")
 
-	query = `sum(kube_node_status_capacity) by (node)`
+	query = `kube_node_status_capacity`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getNodeMetric(result, "namespace", "node", "capacity")
 
-	query = `sum(kube_node_status_allocatable) by (node)`
+	query = `kube_node_status_allocatable`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getNodeMetric(result, "namespace", "node", "allocatable")
 
@@ -135,6 +137,16 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	query = `avg(avg(label_replace(irate(node_disk_read_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~"node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getWorkload(promaddress, "disk_read_ops", "Disk Read Operations", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	//Query and store prometheus total disk write uptime as a percentage (max)
+	query = `max(max(label_replace(irate(node_disk_read_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~"node-exporter.*"}) by (node)`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getWorkload(promaddress, "disk_write_ops", "Disk Write Operations", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	//Query and store prometheus total disk write uptime as a percentage (avg)
+	query = `avg(avg(label_replace(irate(node_disk_read_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~"node-exporter.*"}) by (node)`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getWorkload(promaddress, "disk_write_ops", "Disk Write Operations", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	/*
 		==========END OF DISK METRICS==========

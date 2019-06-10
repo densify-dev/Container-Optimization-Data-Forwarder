@@ -33,11 +33,38 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 						value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
 					}
 					//Check which metric this is for and update the corresponding variable for this container in the system data structure
+
+					var capacityType = result.(model.Matrix)[i].Metric["resource"]
+					if metric == "capacity" {
+
+						switch capacityType {
+						case "cpu":
+							nodes[string(nodeValue)].cpuCapacity = int(value)
+						case "memory":
+							nodes[string(nodeValue)].memCapacity = int(value)
+						case "pods":
+							nodes[string(nodeValue)].podsCapacity = int(value)
+						case "ephemeral_storage":
+							nodes[string(nodeValue)].ephemeralStorageCapacity = int(value)
+						case "hugepages_2Mi":
+							nodes[string(nodeValue)].hugepages2MiCapacity = int(value)
+						}
+					} else if metric == "allocatable" {
+						switch capacityType {
+						case "cpu":
+							nodes[string(nodeValue)].cpuAllocatable = int(value)
+						case "memory":
+							nodes[string(nodeValue)].memAllocatable = int(value)
+						case "pods":
+							nodes[string(nodeValue)].podsAllocatable = int(value)
+						case "ephemeral_storage":
+							nodes[string(nodeValue)].ephemeralStorageAllocatable = int(value)
+						case "hugepages_2Mi":
+							nodes[string(nodeValue)].hugepages2MiAllocatable = int(value)
+						}
+					}
+
 					switch metric {
-					case "capacity":
-						nodes[string(nodeValue)].capacity = int(value)
-					case "allocatable":
-						nodes[string(nodeValue)].allocatable = int(value)
 					case "diskReadBytes":
 						nodes[string(nodeValue)].diskReadBytes = int(value)
 					case "diskWriteBytes":

@@ -18,7 +18,6 @@ The skeleton query to group metrics by node and their values is (query made by J
 package node
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
@@ -69,29 +68,6 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 					labelBetaKubernetesIoArch: string(rsltIndex[i].Metric["label_beta_kubernetes_io_arch"]),
 					labelBetaKubernetesIoOs:   string(rsltIndex[i].Metric["label_beta_kubernetes_io_os"]),
 					labelKubernetesIoHostname: string(rsltIndex[i].Metric["label_kubernetes_io_hostname"])}
-		}
-	}
-
-	query = `sum(kube_node_status_capacity) by (node)`
-	result = prometheus.MetricCollect(promaddress, query, start, end)
-
-	//Prefix for indexing (less clutter on screen)
-	rsltIndex = result.(model.Matrix)
-
-	if result != nil {
-		var value int
-		for i := 0; i < result.(model.Matrix).Len(); i++ {
-
-			if len(result.(model.Matrix)[i].Values) == 0 {
-				value = 0
-			} else {
-				value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
-			}
-			_ = value
-			//fmt.Println(value)
-			fmt.Println(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
-			nodes[string(rsltIndex[i].Metric["node"])] = &node{capacity: value}
-			//nodes[result.(model.Matrix)[i].Metric[node]].capacity = int(value)
 		}
 	}
 

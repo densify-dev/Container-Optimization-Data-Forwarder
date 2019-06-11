@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -25,10 +26,18 @@ func writeWorkload(file io.Writer, result model.Value, node model.LabelName, pro
 				if _, ok := nodes[string(nodeValue)]; ok {
 					//Loop through the different values over the interval and write out each one to the workload file.
 					for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
+						var val model.SampleValue
+						//fmt.Println(result.(model.Matrix)[i].Values[j].Value)
+
+						if math.IsNaN(float64(result.(model.Matrix)[i].Values[j].Value)) {
+							val = 0
+						} else {
+							val = result.(model.Matrix)[i].Values[j].Value
+						}
 						fmt.Fprintf(file, "%s,%s,%f\n",
 							strings.Replace(string(nodeValue), ";", ".", -1),
 							time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"),
-							result.(model.Matrix)[i].Values[j].Value)
+							val)
 					}
 				}
 			}

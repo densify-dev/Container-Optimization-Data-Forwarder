@@ -2,9 +2,9 @@
 package container2
 
 import (
-	"os"
-	"log"
 	"fmt"
+	"log"
+	"os"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
@@ -17,23 +17,23 @@ type namespace struct {
 	pointers                                   map[string]*midLevel
 	midLevels                                  map[string]*midLevel
 	cpuLimit, cpuRequest, memLimit, memRequest int
-	labelMap map[string]string
+	labelMap                                   map[string]string
 }
 
 //midLevel is used to hold information related to the highest owner of any containers
 type midLevel struct {
-	name, kind              string
-	containers                          map[string]*container
-	currentSize, restarts  int
-	creationTime  int64
-	labelMap                            map[string]string
+	name, kind            string
+	containers            map[string]*container
+	currentSize, restarts int
+	creationTime          int64
+	labelMap              map[string]string
 }
 
 //container is used to hold information related to containers
 type container struct {
-	memory, cpuLimit, cpuRequest, memLimit, memRequest, restarts, powerState        int
-	name                                                                    string
-	labelMap                                                                        map[string]string
+	memory, cpuLimit, cpuRequest, memLimit, memRequest, restarts, powerState int
+	name                                                                     string
+	labelMap                                                                 map[string]string
 }
 
 //Metrics function to collect data related to containers.
@@ -78,11 +78,10 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 		jobOwners[string(rslt[i].Metric["job_name"])] = string(rslt[i].Metric["owner_name"])
 	}
 
-	
 	query = `max(kube_pod_container_info) by (container, pod, namespace)`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	rslt = result.(model.Matrix)
-	for i := 0; i <rslt.Len(); i++ {
+	for i := 0; i < rslt.Len(); i++ {
 		podNamespaces[string(rslt[i].Metric["pod"])] = string(rslt[i].Metric["namespace"])
 	}
 
@@ -286,9 +285,9 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetric(result, "namespace", "replicationcontroller", "creationTime", "ReplicationController")
 
-	query = `kube_statefulset_created`                                                     
-	result = prometheus.MetricCollect(promaddress, query, start, end)                     
-	getMidMetric(result, "namespace", "statefulset", "creationTime", "StatefulSet")        
+	query = `kube_statefulset_created`
+	result = prometheus.MetricCollect(promaddress, query, start, end)
+	getMidMetric(result, "namespace", "statefulset", "creationTime", "StatefulSet")
 
 	query = `kube_job_created`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
@@ -389,7 +388,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity name,entity type,container,Datetime,currentSize\n")
+	fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,currentSize\n")
 
 	//Get the current size of the controller will query each of the differnt types of controller
 	query = `kube_replicaset_spec_replicas`
@@ -428,23 +427,23 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", clusterName, promAddr, "Deployment")
 
 	currentSizeWrite.Close()
-	
-	query = `round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1)`
+
+	query = `label_replace(round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1), "pod", "$1", "pod_name", "(.*)")`
 	getWorkload(promaddress, "cpu_mCores_workload", "CPU Utilization in mCores", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	query = `sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
+	query = `label_replace(sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind), "pod", "$1", "pod_name", "(.*)")`
 	getWorkload(promaddress, "mem_workload", "Raw Mem Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	query = `sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
+	query = `label_replace(sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind), "pod", "$1", "pod_name", "(.*)")`
 	getWorkload(promaddress, "rss_workload", "Actual Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	query = `sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
+	query = `label_replace(sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind), "pod", "$1", "pod_name", "(.*)")`
 	getWorkload(promaddress, "disk_workload", "Raw Disk Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
-	query = `round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1)`
+	query = `label_replace(round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1), "pod", "$1", "pod_name", "(.*)")`
 	getWorkload(promaddress, "cpu_mCores_workload", "CPU Utilization in mCores", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	query = `sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
+	query = `label_replace(sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind), "pod", "$1", "pod_name", "(.*)")`
 	getWorkload(promaddress, "mem_workload", "Raw Mem Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	query = `sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
+	query = `label_replace(sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind), "pod", "$1", "pod_name", "(.*)")`
 	getWorkload(promaddress, "rss_workload", "Actual Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	query = `sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)`
+	query = `label_replace(sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind), "pod", "$1", "pod_name", "(.*)")`
 	getWorkload(promaddress, "disk_workload", "Raw Disk Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//HPA metrics

@@ -21,7 +21,7 @@ func writeConfig(clusterName, promAddr string) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "cluster,namespace,entity name,entity type,container,HW Total Memory,OS Name,HW Manufacturer")
+	fmt.Fprintln(configWrite, "cluster,namespace,entity_name,entity_type,container,HW Total Memory,OS Name,HW Manufacturer")
 	//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.
 	var cluster string
 	if clusterName == "" {
@@ -47,13 +47,13 @@ func writeConfig(clusterName, promAddr string) {
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
 func writeHPAConfig(clusterName, promAddr string, systems map[string]map[string]string) {
 	//Create the config file and open it for writing.
-	configWrite, err := os.Create("./data/container/hpa_extra_config.csv")
+	configWrite, err := os.Create("./data/hpa/hpa_extra_config.csv")
 	if err != nil {
 		log.Println(err)
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "cluster,namespace,entity name,entity type,container,HPA Name,OS Name,HW Manufacturer,HW Model,HW Serial Number")
+	fmt.Fprintln(configWrite, "cluster,namespace,entity_name,entity_type,container,HPA Name,OS Name,HW Manufacturer")
 	//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.
 	var cluster string
 	if clusterName == "" {
@@ -78,7 +78,7 @@ func writeAttributes(clusterName, promAddr string) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,namespace,entity name,entity type,container,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Current Nodes,Power State,Created By Kind,Created By Name,Current Size,Create Time,Container Restarts,Namespace Labels,Namespace CPU Request,Namespace CPU Limit,Namespace Memory Request,Namespace Memory Limit")
+	fmt.Fprintln(attributeWrite, "cluster,namespace,entity_name,entity_type,container,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Current Nodes,Power State,Created By Kind,Created By Name,Current Size,Create Time,Container Restarts,Namespace Labels,Namespace CPU Request,Namespace CPU Limit,Namespace Memory Request,Namespace Memory Limit")
 
 	//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.
 	var cluster string
@@ -180,7 +180,7 @@ func writeAttributes(clusterName, promAddr string) {
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
 func writeHPAAttributes(clusterName, promAddr string, systems map[string]map[string]string) {
 	//Create the attributes file and open it for writing
-	attributeWrite, err := os.Create("./data/container/hpa_extra_attributes.csv")
+	attributeWrite, err := os.Create("./data/hpa/hpa_extra_attributes.csv")
 	if err != nil {
 		log.Println(err)
 	}
@@ -193,7 +193,7 @@ func writeHPAAttributes(clusterName, promAddr string, systems map[string]map[str
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,namespace,entity name,entity type,container,HPA Name,Labels")
+	fmt.Fprintln(attributeWrite, "cluster,namespace,entity_name,entity_type,container,HPA Name,Labels")
 	//Loop through the systems and write out the attributes data for each system.
 	for i := range systems {
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
@@ -206,8 +206,12 @@ func writeHPAAttributes(clusterName, promAddr string, systems map[string]map[str
 }
 
 //writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
-func writeWorkload(file io.Writer, result model.Value, namespace, pod, container model.LabelName, clusterName, promAddr string) {
+func writeWorkload(file io.Writer, result model.Value, namespace, pod, container model.LabelName, clusterName, promAddr string, kind string) {
+	var tempKind bool
 	if result != nil {
+		if kind == "" {
+			tempKind = true
+		}
 		//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.
 		var cluster string
 		if clusterName == "" {
@@ -217,15 +221,18 @@ func writeWorkload(file io.Writer, result model.Value, namespace, pod, container
 		}
 		//Loop through the results for the workload and validate that contains the required labels and that the entity exists in the systems data structure once validated will write out the workload for the system.
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
+			if tempKind {
+				kind = string(result.(model.Matrix)[i].Metric["owner_kind"])
+			}
 			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
 				if _, ok := systems[string(namespaceValue)]; ok {
 					if podValue, ok := result.(model.Matrix)[i].Metric[pod]; ok {
-						if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)]; ok {
+						if _, ok := systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)]; ok {
 							if containerValue, ok := result.(model.Matrix)[i].Metric[container]; ok {
-								if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)]; ok {
+								if _, ok := systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].containers[string(containerValue)]; ok {
 									//Loop through the different values over the interval and write out each one to the workload file.
 									for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-										fmt.Fprintf(file, "%s,%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].name, systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].kind, strings.Replace(string(containerValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
+										fmt.Fprintf(file, "%s,%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].name, systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].kind, strings.Replace(string(containerValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
 									}
 								}
 							}

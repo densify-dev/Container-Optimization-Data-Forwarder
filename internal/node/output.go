@@ -45,11 +45,11 @@ func writeConfig(promAddr string) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "node,label_beta_kubernetes_io_os,label_kubernetes_io_hostname")
+	fmt.Fprintln(configWrite, "node,label_beta_kubernetes_io_os,label_kubernetes_io_hostname,cpu_capacity,memory_capacity")
 
 	//Loop through the nodes and write out the config data for each system.
 	for kn := range nodes {
-		fmt.Fprintf(configWrite, "%s,%s,%s\n", kn, nodes[kn].labelBetaKubernetesIoOs, nodes[kn].labelKubernetesIoHostname)
+		fmt.Fprintf(configWrite, "%s,%s,%s,%d,%d\n", kn, nodes[kn].labelBetaKubernetesIoOs, nodes[kn].labelKubernetesIoHostname, nodes[kn].cpuCapacity, nodes[kn].memCapacity)
 	}
 }
 

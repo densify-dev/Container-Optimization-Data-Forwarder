@@ -18,7 +18,6 @@ The skeleton query to group metrics by node and their values is (query made by J
 package node
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
@@ -43,7 +42,6 @@ var nodes = map[string]*node{}
 
 //Metrics a global func for collecting node level metrics in prometheus
 func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, intervalSize, history int, debug bool, currentTime time.Time) {
-	fmt.Println(clusterName)
 	//Setup variables used in the code.
 	var historyInterval time.Duration
 	historyInterval = 0

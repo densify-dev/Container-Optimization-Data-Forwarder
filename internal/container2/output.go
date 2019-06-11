@@ -206,8 +206,12 @@ func writeHPAAttributes(clusterName, promAddr string, systems map[string]map[str
 }
 
 //writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
-func writeWorkload(file io.Writer, result model.Value, namespace, pod, container model.LabelName, clusterName, promAddr string) {
+func writeWorkload(file io.Writer, result model.Value, namespace, pod, container model.LabelName, clusterName, promAddr string, kind string) {
+	var tempKind bool
 	if result != nil {
+		if kind == "" {
+			tempKind = true
+		}
 		//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.
 		var cluster string
 		if clusterName == "" {
@@ -217,15 +221,18 @@ func writeWorkload(file io.Writer, result model.Value, namespace, pod, container
 		}
 		//Loop through the results for the workload and validate that contains the required labels and that the entity exists in the systems data structure once validated will write out the workload for the system.
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
+			if tempKind {
+				kind = string(result.(model.Matrix)[i].Metric["owner_kind"])
+			}
 			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
 				if _, ok := systems[string(namespaceValue)]; ok {
 					if podValue, ok := result.(model.Matrix)[i].Metric[pod]; ok {
-						if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)]; ok {
+						if _, ok := systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)]; ok {
 							if containerValue, ok := result.(model.Matrix)[i].Metric[container]; ok {
-								if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)]; ok {
+								if _, ok := systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].containers[string(containerValue)]; ok {
 									//Loop through the different values over the interval and write out each one to the workload file.
 									for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-										fmt.Fprintf(file, "%s,%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].name, systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].kind, strings.Replace(string(containerValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
+										fmt.Fprintf(file, "%s,%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].name, systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].kind, strings.Replace(string(containerValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
 									}
 								}
 							}

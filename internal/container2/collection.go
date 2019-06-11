@@ -254,6 +254,7 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 	historyInterval = 0
 	var result model.Value
 	var start, end time.Time
+	var query2 string
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/" + aggregator + `_` + fileName + ".csv")
 	if err != nil {
@@ -266,9 +267,26 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
-		query = aggregator + `(` + query + `) by (pod_name,namespace,container_name)`
-		result = prometheus.MetricCollect(promaddress, query, start, end)
-		writeWorkload(workloadWrite, result, "namespace", "pod_name", "container_name", clusterName, promAddr)
+
+		//query containers under a pod with no owner
+		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left kube_pod_owner{owner_name="<none>"}) by (pod,namespace,container_name)`
+		result = prometheus.MetricCollect(promaddress, query2, start, end)
+		writeWorkload(workloadWrite, result, "namespace", "pod", "container_name", clusterName, promAddr, "Pod")
+
+		//query containers under a controller with no owner
+		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (owner_name,owner_kind) kube_pod_owner) by (owner_kind,owner_name,namespace,container_name)`
+		result = prometheus.MetricCollect(promaddress, query2, start, end)
+		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "")
+
+		//query containers under a deployment
+		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)") * on (replicaset, namespace) group_left (owner_name) kube_replicaset_owner{owner_kind="Deployment"}) by (owner_name,namespace,container_name)`
+		result = prometheus.MetricCollect(promaddress, query2, start, end)
+		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "Deployment")
+
+		//query containers under a cron job
+		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)") * on (job, namespace) group_left (owner_name) label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (owner_name,namespace,container_name)`
+		result = prometheus.MetricCollect(promaddress, query2, start, end)
+		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "CronJob")
 	}
 	//Close the workload files.
 	workloadWrite.Close()

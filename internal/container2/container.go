@@ -170,7 +170,8 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	query = `container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}/1024/1024`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
-	getContainerMetric(result, "namespace", "pod", "container", "memory")
+	getContainerMetric(result, "namespace", "pod_name", "container_name", "memory")
+
 	query = `sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getContainerMetric(result, "namespace", "pod", "container", "cpuLimit")
@@ -388,7 +389,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Fprintf(currentSizeWrite, "cluster,namespace,top level,top kind,container,Datetime,currentSize\n")
+	fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity name,entity type,container,Datetime,currentSize\n")
 
 	//Get the current size of the controller will query each of the differnt types of controller
 	query = `kube_replicaset_spec_replicas`

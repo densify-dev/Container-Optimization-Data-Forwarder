@@ -19,6 +19,7 @@ import (
 
 //Gets node metrics from prometheus (and checks to see if they are valid)
 func getNodeMetric(result model.Value, namespace, node model.LabelName, metric string) {
+
 	if result != nil {
 		//Loop through the different entities in the results.
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
@@ -32,8 +33,8 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 					} else {
 						value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
 					}
-					//Check which metric this is for and update the corresponding variable for this container in the system data structure
 
+					//Check which metric this is for and update the corresponding variable for this container in the system data structure
 					var capacityType = result.(model.Matrix)[i].Metric["resource"]
 					if metric == "capacity" {
 
@@ -63,7 +64,6 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 							nodes[string(nodeValue)].hugepages2MiAllocatable = int(value)
 						}
 					}
-
 					switch metric {
 					case "diskReadBytes":
 						nodes[string(nodeValue)].diskReadBytes = int(value)

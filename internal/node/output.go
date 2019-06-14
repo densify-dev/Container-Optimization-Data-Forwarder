@@ -27,8 +27,6 @@ func writeWorkload(file io.Writer, result model.Value, node model.LabelName, pro
 					//Loop through the different values over the interval and write out each one to the workload file.
 					for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
 						var val model.SampleValue
-						//fmt.Println(result.(model.Matrix)[i].Values[j].Value)
-
 						if math.IsNaN(float64(result.(model.Matrix)[i].Values[j].Value)) {
 							val = 0
 						} else {

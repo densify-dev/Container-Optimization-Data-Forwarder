@@ -81,13 +81,49 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getNodeMetric(result, "namespace", "node", "netSpeedBytes")
 
+	//Queries capacity of nodes
 	query = `kube_node_status_capacity`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
-	getNodeMetric(result, "namespace", "node", "capacity")
 
+	//If the regular capacity query returns nothing then fall back on the older queries
+	if result.(model.Matrix).Len() == 0 {
+		query = `kube_node_status_capacity_cpu_cores`
+		result = prometheus.MetricCollect(promaddress, query, start, end)
+		getNodeMetric(result, "namespace", "node", "capacity_cpu")
+
+		query = `kube_node_status_capacity_memory_bytes`
+		result = prometheus.MetricCollect(promaddress, query, start, end)
+		getNodeMetric(result, "namespace", "node", "capacity_mem")
+
+		query = `kube_node_status_capacity_pods`
+		result = prometheus.MetricCollect(promaddress, query, start, end)
+		getNodeMetric(result, "namespace", "node", "capacity_pod")
+
+	} else {
+		getNodeMetric(result, "namespace", "node", "capacity")
+	}
+
+	//Queries allocatable metrics of the nodes
 	query = `kube_node_status_allocatable`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
-	getNodeMetric(result, "namespace", "node", "allocatable")
+
+	//If the regular allocatable query returns nothing then fall back on the older queries
+	if result.(model.Matrix).Len() == 0 {
+		query = `kube_node_status_allocatable_cpu_cores`
+		result = prometheus.MetricCollect(promaddress, query, start, end)
+		getNodeMetric(result, "namespace", "node", "allocatable_cpu")
+
+		query = `kube_node_status_allocatable_memory_bytes`
+		result = prometheus.MetricCollect(promaddress, query, start, end)
+		getNodeMetric(result, "namespace", "node", "allocatable_mem")
+
+		query = `kube_node_status_allocatable_pods`
+		result = prometheus.MetricCollect(promaddress, query, start, end)
+		getNodeMetric(result, "namespace", "node", "allocatable_pod")
+
+	} else {
+		getNodeMetric(result, "namespace", "node", "allocatable")
+	}
 
 	//Write config and attribute files
 	writeConfig(clusterName, promAddr)

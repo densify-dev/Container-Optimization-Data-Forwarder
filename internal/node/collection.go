@@ -35,9 +35,8 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 					}
 
 					//Check which metric this is for and update the corresponding variable for this container in the system data structure
-					var capacityType = result.(model.Matrix)[i].Metric["resource"]
 					if metric == "capacity" {
-
+						capacityType := result.(model.Matrix)[i].Metric["resource"]
 						switch capacityType {
 						case "cpu":
 							nodes[string(nodeValue)].cpuCapacity = int(value)
@@ -51,6 +50,7 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 							nodes[string(nodeValue)].hugepages2MiCapacity = int(value)
 						}
 					} else if metric == "allocatable" {
+						capacityType := result.(model.Matrix)[i].Metric["resource"]
 						switch capacityType {
 						case "cpu":
 							nodes[string(nodeValue)].cpuAllocatable = int(value)
@@ -63,30 +63,44 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 						case "hugepages_2Mi":
 							nodes[string(nodeValue)].hugepages2MiAllocatable = int(value)
 						}
-					}
-					switch metric {
-					case "diskReadBytes":
-						nodes[string(nodeValue)].diskReadBytes = int(value)
-					case "diskWriteBytes":
-						nodes[string(nodeValue)].diskWriteBytes = int(value)
-					case "memTotalBytes":
-						nodes[string(nodeValue)].memTotalBytes = int(value)
-					case "activeMemBytes":
-						nodes[string(nodeValue)].activeMemBytes = int(value)
-					case "netReceiveBytes":
-						nodes[string(nodeValue)].netReceiveBytes = int(value)
-					case "netReceivedPackets":
-						nodes[string(nodeValue)].netReceivePackets = int(value)
-					case "netSpeedBytes":
-						nodes[string(nodeValue)].netSpeedBytes = int(value)
-					case "netTransmitBytes":
-						nodes[string(nodeValue)].netTransmitBytes = int(value)
-					case "netTransmitPackets":
-						nodes[string(nodeValue)].netTransmitPackets = int(value)
-					case "cpuSecs":
-						nodes[string(nodeValue)].cpuSecs = int(value)
-					case "taint":
-						nodes[string(node)].taint = int(value)
+					} else {
+
+						switch metric {
+						case "capacity_cpu":
+							nodes[string(nodeValue)].cpuCapacity = int(value)
+						case "capacity_mem":
+							nodes[string(nodeValue)].memCapacity = int(value)
+						case "capacity_pod":
+							nodes[string(nodeValue)].podsCapacity = int(value)
+						case "allocatable_cpu":
+							nodes[string(nodeValue)].cpuAllocatable = int(value)
+						case "allocatable_mem":
+							nodes[string(nodeValue)].memAllocatable = int(value)
+						case "allocatable_pod":
+							nodes[string(nodeValue)].podsAllocatable = int(value)
+						case "diskReadBytes":
+							nodes[string(nodeValue)].diskReadBytes = int(value)
+						case "diskWriteBytes":
+							nodes[string(nodeValue)].diskWriteBytes = int(value)
+						case "memTotalBytes":
+							nodes[string(nodeValue)].memTotalBytes = int(value)
+						case "activeMemBytes":
+							nodes[string(nodeValue)].activeMemBytes = int(value)
+						case "netReceiveBytes":
+							nodes[string(nodeValue)].netReceiveBytes = int(value)
+						case "netReceivedPackets":
+							nodes[string(nodeValue)].netReceivePackets = int(value)
+						case "netSpeedBytes":
+							nodes[string(nodeValue)].netSpeedBytes = int(value)
+						case "netTransmitBytes":
+							nodes[string(nodeValue)].netTransmitBytes = int(value)
+						case "netTransmitPackets":
+							nodes[string(nodeValue)].netTransmitPackets = int(value)
+						case "cpuSecs":
+							nodes[string(nodeValue)].cpuSecs = int(value)
+						case "taint":
+							nodes[string(node)].taint = int(value)
+						}
 					}
 				}
 			}

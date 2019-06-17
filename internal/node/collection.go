@@ -109,6 +109,12 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 }
 
 func getWorkload(promaddress, fileName, metricName, query2, aggregrator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) {
+	var cluster string
+	if clusterName == "" {
+		cluster = promAddr
+	} else {
+		cluster = clusterName
+	}
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
@@ -119,7 +125,7 @@ func getWorkload(promaddress, fileName, metricName, query2, aggregrator, cluster
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Fprintf(workloadWrite, "node,Datetime,%s\n", metricName)
+	fmt.Fprintf(workloadWrite, "node,cluster,Datetime,%s\n", metricName)
 
 	//If the History parameter is set to anything but default 1 then will loop through the calls starting with the current day\hour\minute interval and work backwards.
 	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
@@ -127,7 +133,7 @@ func getWorkload(promaddress, fileName, metricName, query2, aggregrator, cluster
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
 		result = prometheus.MetricCollect(promaddress, query2, start, end)
-		writeWorkload(workloadWrite, result, "node", promAddr)
+		writeWorkload(workloadWrite, result, "node", promAddr, cluster)
 	}
 	//Close the workload files.
 	workloadWrite.Close()

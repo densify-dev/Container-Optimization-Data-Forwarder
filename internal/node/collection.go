@@ -19,6 +19,7 @@ import (
 
 //Gets node metrics from prometheus (and checks to see if they are valid)
 func getNodeMetric(result model.Value, namespace, node model.LabelName, metric string) {
+
 	if result != nil {
 		//Loop through the different entities in the results.
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
@@ -32,11 +33,10 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 					} else {
 						value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
 					}
+
 					//Check which metric this is for and update the corresponding variable for this container in the system data structure
-
-					var capacityType = result.(model.Matrix)[i].Metric["resource"]
 					if metric == "capacity" {
-
+						capacityType := result.(model.Matrix)[i].Metric["resource"]
 						switch capacityType {
 						case "cpu":
 							nodes[string(nodeValue)].cpuCapacity = int(value)
@@ -50,6 +50,7 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 							nodes[string(nodeValue)].hugepages2MiCapacity = int(value)
 						}
 					} else if metric == "allocatable" {
+						capacityType := result.(model.Matrix)[i].Metric["resource"]
 						switch capacityType {
 						case "cpu":
 							nodes[string(nodeValue)].cpuAllocatable = int(value)
@@ -62,31 +63,44 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 						case "hugepages_2Mi":
 							nodes[string(nodeValue)].hugepages2MiAllocatable = int(value)
 						}
-					}
+					} else {
 
-					switch metric {
-					case "diskReadBytes":
-						nodes[string(nodeValue)].diskReadBytes = int(value)
-					case "diskWriteBytes":
-						nodes[string(nodeValue)].diskWriteBytes = int(value)
-					case "memTotalBytes":
-						nodes[string(nodeValue)].memTotalBytes = int(value)
-					case "activeMemBytes":
-						nodes[string(nodeValue)].activeMemBytes = int(value)
-					case "netReceiveBytes":
-						nodes[string(nodeValue)].netReceiveBytes = int(value)
-					case "netReceivedPackets":
-						nodes[string(nodeValue)].netReceivePackets = int(value)
-					case "netSpeedBytes":
-						nodes[string(nodeValue)].netSpeedBytes = int(value)
-					case "netTransmitBytes":
-						nodes[string(nodeValue)].netTransmitBytes = int(value)
-					case "netTransmitPackets":
-						nodes[string(nodeValue)].netTransmitPackets = int(value)
-					case "cpuSecs":
-						nodes[string(nodeValue)].cpuSecs = int(value)
-					case "taint":
-						nodes[string(node)].taint = int(value)
+						switch metric {
+						case "capacity_cpu":
+							nodes[string(nodeValue)].cpuCapacity = int(value)
+						case "capacity_mem":
+							nodes[string(nodeValue)].memCapacity = int(value)
+						case "capacity_pod":
+							nodes[string(nodeValue)].podsCapacity = int(value)
+						case "allocatable_cpu":
+							nodes[string(nodeValue)].cpuAllocatable = int(value)
+						case "allocatable_mem":
+							nodes[string(nodeValue)].memAllocatable = int(value)
+						case "allocatable_pod":
+							nodes[string(nodeValue)].podsAllocatable = int(value)
+						case "diskReadBytes":
+							nodes[string(nodeValue)].diskReadBytes = int(value)
+						case "diskWriteBytes":
+							nodes[string(nodeValue)].diskWriteBytes = int(value)
+						case "memTotalBytes":
+							nodes[string(nodeValue)].memTotalBytes = int(value)
+						case "activeMemBytes":
+							nodes[string(nodeValue)].activeMemBytes = int(value)
+						case "netReceiveBytes":
+							nodes[string(nodeValue)].netReceiveBytes = int(value)
+						case "netReceivedPackets":
+							nodes[string(nodeValue)].netReceivePackets = int(value)
+						case "netSpeedBytes":
+							nodes[string(nodeValue)].netSpeedBytes = int(value)
+						case "netTransmitBytes":
+							nodes[string(nodeValue)].netTransmitBytes = int(value)
+						case "netTransmitPackets":
+							nodes[string(nodeValue)].netTransmitPackets = int(value)
+						case "cpuSecs":
+							nodes[string(nodeValue)].cpuSecs = int(value)
+						case "taint":
+							nodes[string(node)].taint = int(value)
+						}
 					}
 				}
 			}
@@ -95,6 +109,12 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 }
 
 func getWorkload(promaddress, fileName, metricName, query2, aggregrator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) {
+	var cluster string
+	if clusterName == "" {
+		cluster = promAddr
+	} else {
+		cluster = clusterName
+	}
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
@@ -105,7 +125,7 @@ func getWorkload(promaddress, fileName, metricName, query2, aggregrator, cluster
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Fprintf(workloadWrite, "node,Datetime,%s\n", metricName)
+	fmt.Fprintf(workloadWrite, "node,cluster,Datetime,%s\n", metricName)
 
 	//If the History parameter is set to anything but default 1 then will loop through the calls starting with the current day\hour\minute interval and work backwards.
 	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
@@ -113,7 +133,7 @@ func getWorkload(promaddress, fileName, metricName, query2, aggregrator, cluster
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
 		result = prometheus.MetricCollect(promaddress, query2, start, end)
-		writeWorkload(workloadWrite, result, "node", promAddr)
+		writeWorkload(workloadWrite, result, "node", promAddr, cluster)
 	}
 	//Close the workload files.
 	workloadWrite.Close()

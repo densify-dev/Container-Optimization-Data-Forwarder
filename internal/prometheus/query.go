@@ -29,7 +29,7 @@ func MetricCollect(promaddress, query string, start, end time.Time) (value model
 
 	//Query prometheus with the values defined above as well as the query that was passed into the function.
 	q := v1.NewAPI(client)
-	value, err = q.QueryRange(ctx, query, v1.Range{Start: start, End: end, Step: step})
+	value, _, err = q.QueryRange(ctx, query, v1.Range{Start: start, End: end, Step: step})
 	if err != nil {
 		log.Println(err)
 	}

@@ -1,5 +1,6 @@
 A list of all prometheus metrics and their uses
 
+## Container Metrics
 | Metric | Description | 
 |--------|-------------|
 | container_spec_cpu_shares | Container labels |
@@ -18,10 +19,12 @@ A list of all prometheus metrics and their uses
 | kube_pod_labels | Pod labels |
 | kube_pod_info | Pod information |
 | kube_pod_created | Pod creation time |
+| kube_pod_owner | Pod owner |
 | kube_namespace_labels | Namespace labels |
 | kube_limitrange | Namespace limit |
 | kube_replicaset_labels | ReplicaSet labels |
 | kube_replicaset_created | ReplicaSet creation time |
+| kube_replicaset_owner | ReplicaSet owner |
 | kube_replicaset_spec_replicas | Replicaset current size & Deployment current size|
 | kube_deployment_labels | Deployment labels |
 | kube_deployment_created | Deployment creation time |
@@ -34,6 +37,7 @@ A list of all prometheus metrics and their uses
 | kube_job_labels | Job labels |
 | kube_job_info | Job information |
 | kube_job_created | Job creation time |
+| kube_job_owner | Job owner |
 | kube_job_spec_completions | Job spec completions | 
 | kube_job_spec_parallelism | Job spec parallelism & Job current size & CronJob curent size |
 | kube_job_status_completion_time | Job status completion time |
@@ -58,3 +62,31 @@ A list of all prometheus metrics and their uses
 | kube_hpa_status_condition | HPA scaling limited |
 | kube_hpa_status_current_replicas | HPA current replicas |
 | kube_hpa_status_desired_replicas | HPA desired replicas |
+
+## Node Metrics
+| Metric | Description |
+|--------|-------------|
+| kube_node_labels | Node labels |
+| node_network_speed_bytes | Network speed |
+| kube_node_status_capacity | Node capacity |
+| kube_node_status_capacity_cpu_cores | Node capcity CPU cores |
+| kube_node_status_capacity_memory_bytes | Node capacity memory bytes |
+| kube_node_status_capacity_pods | Node capacity pods |
+| kube_node_status_allocatable | Node allocatable |
+| kube_node_status_allocatable_cpu_cores | Node allocatable CPU cores |
+| kube_node_status_allocatable_memory_bytes | Node allocatable memory bytes |
+| kube_node_status_allocatable_pods | Node allocatable pods |
+| node_disk_written_bytes_total | Disk write bytes total (avg & max) |
+| node_disk_read_bytes_total | Disk read bytes total (avg & max) |
+| node_disk_read_time_seconds_total | Disk read operations (avg & max) |
+| node_disk_io_time_seconds_total | Disk read operations (avg & max) |
+| node_memory_MemTotal_bytes | Total memory bytes (avg & max) & Raw memory utilization (avg & max) & Actual memory utilization (avg & max) |
+| node_memory_MemFree_bytes | Raw memory utilization (avg & max) & Actual memory utilization (avg & max) |
+| node_memory_Cached_bytes | Actual memory utilization (avg & max) |
+| node_memory_Buffrees_bytes | Actual memory utilization (avg & max) |
+| node_memory_Active_bytes | Actual memory bytes (avg & max) |
+| node_network_recieve_bytes_total | Recieved network bytes (avg & max) |
+| node_network_recieve_packets_total | Recieved network packets (avg & max) |
+| node_network_transmit_bytes_total | Raw net sent utilization (avg & max) |
+| node_network_transmit_packets_total | Network packets sent (avg & max) |
+| node_cpu_seconds_total | CPU utilization (avg & max) |

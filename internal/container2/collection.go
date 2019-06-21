@@ -432,7 +432,11 @@ func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promA
 
 func addToLabelMap(key string, value string, labelPath map[string]string) {
 	if _, ok := labelPath[key]; !ok {
-		labelPath[key] = value
+		if len(value)>255 {
+			labelPath[key] = value[:255]
+		} else {
+			labelPath[key] = value
+		}
 	} else {
 		if strings.Contains(value, ";") {
 			currValue := ""
@@ -458,7 +462,11 @@ func addToLabelMap(key string, value string, labelPath map[string]string) {
 				}
 			}
 			if currValue != value && notPresent {
-				labelPath[key] = labelPath[key] + ";" + value
+				if len(value)>255 {
+					labelPath[key] = labelPath[key] + ";" + value[:255]
+				} else {
+					labelPath[key] = labelPath[key] + ";" + value
+				}
 			}
 		}
 	}

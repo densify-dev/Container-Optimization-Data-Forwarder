@@ -103,12 +103,26 @@ func writeAttributes(clusterName, promAddr string) {
 				//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
 				fmt.Fprintf(attributeWrite, "%s,%s,%s,%s,%s,Containers,%s,%s,%s,", cluster, kn, strings.Replace(vt.name, ";", ".", -1), vt.kind, strings.Replace(kc, ":", ".", -1), cluster, kn, vt.name)
 				for key, value := range systems[kn].midLevels[kt].containers[kc].labelMap {
-					fmt.Fprintf(attributeWrite, key+" : "+value+"|")
+					if len(key) < 250 {
+						if len(value)+3+len(key) < 256 {
+							fmt.Fprintf(attributeWrite, key + " : " + value + "|")
+						} else {
+							templength := 256 - 3 - len(key)
+							fmt.Fprintf(attributeWrite, key + " : " + value[:templength] + "|")
+						}
+					}
 				}
 				fmt.Fprintf(attributeWrite, ",")
 
 				for key, value := range vt.labelMap {
-					fmt.Fprintf(attributeWrite, key+" : "+value+"|")
+					if len(key) < 250 {
+						if len(value)+3+len(key) < 256 {
+							fmt.Fprintf(attributeWrite, key + " : " + value + "|")
+						} else {
+							templength := 256 - 3 - len(key)
+							fmt.Fprintf(attributeWrite, key + " : " + value[:templength] + "|")
+						}
+					}
 				}
 
 				if vc.cpuLimit == -1 {
@@ -131,7 +145,7 @@ func writeAttributes(clusterName, promAddr string) {
 				} else {
 					fmt.Fprintf(attributeWrite, ",%d", vc.memRequest)
 				}
-				fmt.Fprintf(attributeWrite, ",%s,%s,%s,%s,%s", kc, vt.labelMap["node"], cstate, vt.kind, vt.name)
+				fmt.Fprintf(attributeWrite, ",%s,%s,%s,%s,%s", kc, strings.Replace(vt.labelMap["node"], ";", "|", -1), cstate, vt.kind, vt.name)
 				if vt.currentSize == -1 {
 					fmt.Fprintf(attributeWrite, ",")
 				} else {
@@ -149,7 +163,14 @@ func writeAttributes(clusterName, promAddr string) {
 					fmt.Fprintf(attributeWrite, ",%d,", vc.restarts)
 				}
 				for key, value := range vn.labelMap {
-					fmt.Fprintf(attributeWrite, key+" : "+value+"|")
+					if len(key) < 250 {
+						if len(value)+3+len(key) < 256 {
+							fmt.Fprintf(attributeWrite, key + " : " + value + "|")
+						} else {
+							templength := 256 - 3 - len(key)
+							fmt.Fprintf(attributeWrite, key + " : " + value[:templength] + "|")
+						}
+					}
 				}
 				if vn.cpuRequest == -1 {
 					fmt.Fprintf(attributeWrite, ",")

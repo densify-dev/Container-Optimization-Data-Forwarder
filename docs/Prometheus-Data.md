@@ -1,8 +1,8 @@
 A list of all prometheus metrics and their uses
 
 ## Container Metrics
-| Metric | Description | 
-|--------|-------------|
+| Metric | Usage | 
+|--------|-------|
 | container_spec_cpu_shares | Container labels |
 | kube_pod_container_info | Container information |
 | container_cpu_usage_seconds_total | Container CPU utilization in mCores |
@@ -64,8 +64,8 @@ A list of all prometheus metrics and their uses
 | kube_hpa_status_desired_replicas | HPA desired replicas |
 
 ## Node Metrics
-| Metric | Description |
-|--------|-------------|
+| Metric | Usage |
+|--------|-------|
 | kube_node_labels | Node labels |
 | node_network_speed_bytes | Network speed |
 | kube_node_status_capacity | Node capacity |

@@ -106,13 +106,13 @@ func writeAttributes(clusterName, promAddr string) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,node,OS Architecture,Network Speed,Capacity Pods,Capacity CPU,Capacity Memory,Capacity Ephemeral Storage,Capacity Huge Pages,Allocatable Pods,Allocatable CPU,Allocatable Memory,Allocatable Ephemeral Storage,Allocatable Huge Pages,Node Labels")
+	fmt.Fprintln(attributeWrite, "cluster,node,Virtual Technology,Virtual Domain,OS Architecture,Network Speed,Capacity Pods,Capacity CPU,Capacity Memory,Capacity Ephemeral Storage,Capacity Huge Pages,Allocatable Pods,Allocatable CPU,Allocatable Memory,Allocatable Ephemeral Storage,Allocatable Huge Pages,Node Labels")
 
 	//Loop through the nodes and write out the attributes data for each system.
 	for kn := range nodes {
 
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-		fmt.Fprintf(attributeWrite, "%s,%s,%s", cluster, kn, nodes[kn].labelBetaKubernetesIoArch)
+		fmt.Fprintf(attributeWrite, "%s,%s,Nodes,%s,%s", cluster, kn, cluster, nodes[kn].labelBetaKubernetesIoArch)
 
 		if nodes[kn].netSpeedBytes == -1 {
 			fmt.Fprintf(attributeWrite, ",")

@@ -416,12 +416,12 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	getMidMetric(result, "namespace", "job_name", "currentSize", "Job")
 	writeWorkloadMid(currentSizeWrite, result, "namespace", "job_name", clusterName, promAddr, "Job")
 
-	query = `sum(max(kube_job_spec_parallelism) by (job) * on (namespace,job) group_right kube_job_owner) by (owner_name, namespace)`
+	query = `sum(max(kube_job_spec_parallelism) by (namespace,job) * on (namespace,job) group_right kube_job_owner) by (owner_name, namespace)`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetric(result, "namespace", "owner_name", "currentSize", "CronJob")
 	writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", clusterName, promAddr, "CronJob")
 
-	query = `sum(max(kube_replicaset_spec_replicas) by (replicaset) * on (namespace,replicaset) group_right kube_replicaset_owner) by (owner_name, namespace)`
+	query = `sum(max(kube_replicaset_spec_replicas) by (namespace,replicaset) * on (namespace,replicaset) group_right kube_replicaset_owner) by (owner_name, namespace)`
 	result = prometheus.MetricCollect(promaddress, query, start, end)
 	getMidMetric(result, "namespace", "owner_name", "currentSize", "Deployment")
 	writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", clusterName, promAddr, "Deployment")

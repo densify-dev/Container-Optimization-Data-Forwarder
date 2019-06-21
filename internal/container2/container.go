@@ -107,9 +107,9 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 				//Create deployment as top owner and add container
 				if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+deploymentName]; !ok {
 					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName] = &midLevel{name: deploymentName, kind: "Deployment", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
-					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
+					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 1}
 				} else if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName]; !ok {
-					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
+					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 1}
 				}
 				if _, ok := systems[namespaceName].pointers[ownerKind+"__"+deploymentName]; !ok {
 					systems[namespaceName].pointers[ownerKind+"__"+deploymentName] = systems[namespaceName].midLevels[ownerKind+"__"+currentOwner]
@@ -120,9 +120,9 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 				//Create deployment as top owner and add container
 				if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+cronJobName]; !ok {
 					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName] = &midLevel{name: cronJobName, kind: "CronJob", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
-					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
+					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 1}
 				} else if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName]; !ok {
-					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
+					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 1}
 				}
 				if _, ok := systems[namespaceName].pointers[ownerKind+"__"+cronJobName]; !ok {
 					systems[namespaceName].pointers[ownerKind+"__"+cronJobName] = systems[namespaceName].midLevels[ownerKind+"__"+currentOwner]
@@ -133,9 +133,9 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 				//Create controller as top owner and add container
 				if _, ok := systems[namespaceName].midLevels[podOwnersKind[podName]+"__"+controllerName]; !ok {
 					systems[namespaceName].midLevels[podOwnersKind[podName]+"__"+controllerName] = &midLevel{name: controllerName, kind: podOwnersKind[podName], containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
-					systems[namespaceName].midLevels[podOwnersKind[podName]+"__"+controllerName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
+					systems[namespaceName].midLevels[podOwnersKind[podName]+"__"+controllerName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 1}
 				} else if _, ok := systems[namespaceName].midLevels[podOwnersKind[podName]+"__"+controllerName].containers[containerName]; !ok {
-					systems[namespaceName].midLevels[podOwnersKind[podName]+"__"+controllerName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
+					systems[namespaceName].midLevels[podOwnersKind[podName]+"__"+controllerName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 1}
 				}
 			}
 			if _, ok := systems[namespaceName].pointers[podOwnersKind[podName]+"__"+controllerName]; !ok {
@@ -148,7 +148,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 			if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+podName]; !ok {
 				systems[namespaceName].midLevels[ownerKind+"__"+podName] = &midLevel{name: podName, kind: "Pod", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
 			}
-			systems[namespaceName].midLevels[ownerKind+"__"+podName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
+			systems[namespaceName].midLevels[ownerKind+"__"+podName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 1}
 		}
 		if _, ok := systems[namespaceName].pointers["Pod__"+podName]; !ok {
 			systems[namespaceName].pointers["Pod__"+podName] = systems[namespaceName].midLevels[ownerKind+"__"+currentOwner]

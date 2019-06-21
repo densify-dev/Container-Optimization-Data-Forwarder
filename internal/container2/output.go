@@ -34,7 +34,7 @@ func writeConfig(clusterName, promAddr string) {
 		for kt, vt := range systems[kn].midLevels {
 			for kc, vc := range systems[kn].midLevels[kt].containers {
 				//If memory is not set then use first write that will leave it blank otherwise use the second that sets the value.
-				if vc.memory == -1 {
+				if vc.memory == -1 || vc.memory == 0 {
 					fmt.Fprintf(configWrite, "%s,%s,%s,%s,%s,,Linux,CONTAINERS\n", cluster, kn, vt.name, vt.kind, strings.Replace(kc, ":", ".", -1))
 				} else {
 					fmt.Fprintf(configWrite, "%s,%s,%s,%s,%s,%d,Linux,CONTAINERS\n", cluster, kn, vt.name, vt.kind, strings.Replace(kc, ":", ".", -1), vc.memory)

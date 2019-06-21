@@ -63,8 +63,31 @@ func writeConfig(clusterName, promAddr string) {
 
 	//Loop through the nodes and write out the config data for each system.
 	for kn := range nodes {
-		fmt.Fprintf(configWrite, "%s,%s,%s,%d,%d,1,1,%d\n", cluster, kn, nodes[kn].labelBetaKubernetesIoOs, nodes[kn].cpuCapacity, nodes[kn].cpuCapacity, nodes[kn].memCapacity, nodes[kn].netSpeedBytes)
+		fmt.Fprintf(configWrite, "%s,%s,%s", cluster, kn, nodes[kn].labelBetaKubernetesIoOs)
+
+		if nodes[kn].cpuCapacity == -1 {
+			fmt.Fprintf(configWrite, ",,")
+		} else {
+			fmt.Fprintf(configWrite, ",%d,%d", nodes[kn].cpuCapacity, nodes[kn].cpuCapacity)
+		}
+
+		fmt.Fprintf(configWrite, ",1,1")
+
+		if nodes[kn].memCapacity == -1 {
+			fmt.Fprintf(configWrite, ",")
+		} else {
+			fmt.Fprintf(configWrite, ",%d", nodes[kn].memCapacity)
+		}
+
+		if nodes[kn].netSpeedBytes == -1 {
+			fmt.Fprintf(configWrite, ",")
+		} else {
+			fmt.Fprintf(configWrite, ",%d", nodes[kn].netSpeedBytes)
+		}
+
+		fmt.Fprintf(configWrite, "\n")
 	}
+
 }
 
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
@@ -89,9 +112,81 @@ func writeAttributes(clusterName, promAddr string) {
 	for kn := range nodes {
 
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-		fmt.Fprintf(attributeWrite, "%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s\n", cluster, kn, nodes[kn].labelBetaKubernetesIoArch, nodes[kn].netSpeedBytes,
-			nodes[kn].podsCapacity, nodes[kn].cpuCapacity, nodes[kn].memCapacity, nodes[kn].ephemeralStorageCapacity, nodes[kn].hugepages2MiCapacity,
-			nodes[kn].podsAllocatable, nodes[kn].cpuAllocatable, nodes[kn].memAllocatable, nodes[kn].ephemeralStorageAllocatable, nodes[kn].hugepages2MiAllocatable,
-			nodes[kn].nodeLabel)
+		fmt.Fprintf(attributeWrite, "%s,%s,%s", cluster, kn, nodes[kn].labelBetaKubernetesIoArch)
+
+		if nodes[kn].netSpeedBytes == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].netSpeedBytes)
+		}
+
+		if nodes[kn].podsCapacity == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].podsCapacity)
+		}
+
+		if nodes[kn].cpuCapacity == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].cpuCapacity)
+		}
+
+		if nodes[kn].memCapacity == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].memCapacity)
+		}
+
+		if nodes[kn].ephemeralStorageCapacity == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].ephemeralStorageCapacity)
+		}
+
+		if nodes[kn].hugepages2MiCapacity == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].hugepages2MiCapacity)
+		}
+
+		if nodes[kn].podsAllocatable == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].podsAllocatable)
+		}
+
+		if nodes[kn].cpuAllocatable == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].cpuAllocatable)
+		}
+
+		if nodes[kn].memAllocatable == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].memAllocatable)
+		}
+
+		if nodes[kn].ephemeralStorageAllocatable == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].ephemeralStorageAllocatable)
+		}
+
+		if nodes[kn].hugepages2MiAllocatable == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].hugepages2MiAllocatable)
+		}
+
+		if nodes[kn].nodeLabel == "" {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%s", nodes[kn].nodeLabel)
+		}
+		fmt.Fprintf(attributeWrite, "\n")
+
 	}
+
 }

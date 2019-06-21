@@ -78,28 +78,8 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 							nodes[string(nodeValue)].memAllocatable = int(value)
 						case "allocatable_pod":
 							nodes[string(nodeValue)].podsAllocatable = int(value)
-						case "diskReadBytes":
-							nodes[string(nodeValue)].diskReadBytes = int(value)
-						case "diskWriteBytes":
-							nodes[string(nodeValue)].diskWriteBytes = int(value)
-						case "memTotalBytes":
-							nodes[string(nodeValue)].memTotalBytes = int(value)
-						case "activeMemBytes":
-							nodes[string(nodeValue)].activeMemBytes = int(value)
-						case "netReceiveBytes":
-							nodes[string(nodeValue)].netReceiveBytes = int(value)
-						case "netReceivedPackets":
-							nodes[string(nodeValue)].netReceivePackets = int(value)
 						case "netSpeedBytes":
 							nodes[string(nodeValue)].netSpeedBytes = int(value)
-						case "netTransmitBytes":
-							nodes[string(nodeValue)].netTransmitBytes = int(value)
-						case "netTransmitPackets":
-							nodes[string(nodeValue)].netTransmitPackets = int(value)
-						case "cpuSecs":
-							nodes[string(nodeValue)].cpuSecs = int(value)
-						case "taint":
-							nodes[string(node)].taint = int(value)
 						}
 					}
 				}

@@ -30,10 +30,7 @@ type node struct {
 	labelBetaKubernetesIoArch, labelBetaKubernetesIoOs, labelKubernetesIoHostname string
 
 	//Value fields
-	taint                                                                                                 int
-	diskReadBytes, diskWriteBytes, activeMemBytes, memTotalBytes, netReceiveBytes                         int
-	netReceivePackets, netSpeedBytes, netTransmitBytes, netTransmitPackets, cpuSecs                       int
-	cpuCapacity, memCapacity, ephemeralStorageCapacity, podsCapacity, hugepages2MiCapacity                int
+	netSpeedBytes, cpuCapacity, memCapacity, ephemeralStorageCapacity, podsCapacity, hugepages2MiCapacity int
 	cpuAllocatable, memAllocatable, ephemeralStorageAllocatable, podsAllocatable, hugepages2MiAllocatable int
 }
 
@@ -68,7 +65,13 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 					node:                      string(rsltIndex[i].Metric["node"]),
 					labelBetaKubernetesIoArch: string(rsltIndex[i].Metric["label_beta_kubernetes_io_arch"]),
 					labelBetaKubernetesIoOs:   string(rsltIndex[i].Metric["label_beta_kubernetes_io_os"]),
-					labelKubernetesIoHostname: string(rsltIndex[i].Metric["label_kubernetes_io_hostname"])}
+					labelKubernetesIoHostname: string(rsltIndex[i].Metric["label_kubernetes_io_hostname"]),
+					nodeLabel:                 "",
+					netSpeedBytes:             -1,
+
+					cpuCapacity: -1, memCapacity: -1, ephemeralStorageCapacity: -1, podsCapacity: -1, hugepages2MiCapacity: -1,
+					cpuAllocatable: -1, memAllocatable: -1, ephemeralStorageAllocatable: -1, podsAllocatable: -1,
+					hugepages2MiAllocatable: -1}
 		}
 	}
 

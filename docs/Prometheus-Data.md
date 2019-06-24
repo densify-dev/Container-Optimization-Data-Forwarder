@@ -86,8 +86,8 @@ A list of all prometheus metrics and their uses
 | node_memory_Cached_bytes | Actual memory utilization (avg & max) |
 | node_memory_Buffrees_bytes | Actual memory utilization (avg & max) |
 | node_memory_Active_bytes | Actual memory bytes (avg & max) |
-| node_network_recieve_bytes_total | Recieved network bytes (avg & max) |
-| node_network_recieve_packets_total | Recieved network packets (avg & max) |
+| node_network_recieve_bytes_total | Raw net received utilization (avg & max) |
+| node_network_recieve_packets_total | Network packets received (avg & max) |
 | node_network_transmit_bytes_total | Raw net sent utilization (avg & max) |
 | node_network_transmit_packets_total | Network packets sent (avg & max) |
 | node_cpu_seconds_total | CPU utilization (avg & max) |

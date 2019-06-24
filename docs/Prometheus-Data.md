@@ -78,8 +78,9 @@ A list of all prometheus metrics and their uses
 | kube_node_status_allocatable_pods | Node allocatable pods |
 | node_disk_written_bytes_total | Disk write bytes total (avg & max) |
 | node_disk_read_bytes_total | Disk read bytes total (avg & max) |
+| node_disk_write_time_seconds_total | Disk write operations (avg & max) |
 | node_disk_read_time_seconds_total | Disk read operations (avg & max) |
-| node_disk_io_time_seconds_total | Disk read operations (avg & max) |
+| node_disk_io_time_seconds_total | Disk write operations (avg & max) & Disk read operations (avg & max) |
 | node_memory_MemTotal_bytes | Total memory bytes (avg & max) & Raw memory utilization (avg & max) & Actual memory utilization (avg & max) |
 | node_memory_MemFree_bytes | Raw memory utilization (avg & max) & Actual memory utilization (avg & max) |
 | node_memory_Cached_bytes | Actual memory utilization (avg & max) |

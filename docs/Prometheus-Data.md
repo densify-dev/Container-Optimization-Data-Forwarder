@@ -69,7 +69,7 @@ A list of all prometheus metrics and their uses
 | kube_node_labels | Node labels |
 | node_network_speed_bytes | Network speed |
 | kube_node_status_capacity | Node capacity |
-| kube_node_status_capacity_cpu_cores | Node capcity CPU cores |
+| kube_node_status_capacity_cpu_cores | Node capacity CPU cores |
 | kube_node_status_capacity_memory_bytes | Node capacity memory bytes |
 | kube_node_status_capacity_pods | Node capacity pods |
 | kube_node_status_allocatable | Node allocatable |

@@ -77,7 +77,7 @@ func main() {
 	log.SetOutput(debugLog)
 
 	//Version number used for tracking which version of the code the client is using if there is an issue with data collection.
-	log.Println("Version 1.0.2")
+	log.Println("Version 2.0.0")
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()

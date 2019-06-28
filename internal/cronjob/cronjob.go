@@ -8,9 +8,6 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-//"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
-//"github.com/prometheus/common/model"
-
 //namespace is used to hold information related to the namespaces defined in Kubernetes
 type namespace struct {
 	namespace string
@@ -78,10 +75,6 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 					jobs:    map[string]*job{}}
 		}
 	}
-	/*
-		//Query and store kubernetes job information/labels
-		query = `kube_job_owner`
-		result = prometheus.MetricCollect(promaddress, query, start, end)*/
 
 	//Prefix for indexing (less clutter on screen)
 	rsltIndex = result.(model.Matrix)
@@ -91,14 +84,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 				&job{
 					job: string(rsltIndex[i].Metric["job_name"])}
 		}
-	} /*
-		for i := range namespaces {
-			for j := range namespaces[i].cronjobs {
-				for k := range namespaces[i].cronjobs[j].jobs {
-					fmt.Println(i + " --- " + j + " --- " + k)
-				}
-			}
-		}*/
+	}
 
 	query = `kube_cronjob_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end)

@@ -4,14 +4,7 @@ package cronjob
 import (
 	"github.com/prometheus/common/model"
 
-	/*
-		"fmt"
-		"log"
-		"os"
-		"time"
-
-		"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
-		"github.com/prometheus/common/model"*/"strings"
+	"strings"
 )
 
 //getJobMetric is used to parse the results from Prometheus related to Job Entities and store them in the namespaces data structure.

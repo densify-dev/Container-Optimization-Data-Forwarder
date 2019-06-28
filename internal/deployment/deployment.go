@@ -8,9 +8,6 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-//"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
-//"github.com/prometheus/common/model"
-
 //namespace is used to hold information related to the namespaces defined in Kubernetes
 type namespace struct {
 	namespace string

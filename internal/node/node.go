@@ -1,19 +1,3 @@
-/*
-This code is a prototype for node collection data for containers.
-
-The skeleton query to group metrics by node and their values is (query made by Jack, H with help from Stephen, N):
-	==============================
-	max(max(label_replace(<METRIC GOES HERE>, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)
-	==============================
-
-	Things to look into:
-		-See if you can calculate a min for workload
-		-Update the CSV file names
-		-Add taint query
-
-	Last updated 10/06/2019
-*/
-
 //Package node collects data related to containers and formats into csv files to send to Densify.
 package node
 

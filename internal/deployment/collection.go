@@ -10,14 +10,7 @@ import (
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 
-	/*
-		"fmt"
-		"log"
-		"os"
-		"time"
-
-		"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
-		"github.com/prometheus/common/model"*/"strings"
+	"strings"
 )
 
 //getDeploymentMetric is used to parse the results from Prometheus related to Deployment Entities and store them in the systems data structure.

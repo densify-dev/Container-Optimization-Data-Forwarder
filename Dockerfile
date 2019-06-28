@@ -1,6 +1,12 @@
-FROM openjdk:8u191-jdk-alpine3.9
-RUN apk add --update python3 py-pip \
- && pip install requests \
- && rm -rf /var/cache/apk/*
-COPY ./densify .
-CMD ["java", "-jar", "IngestionClient.jar", "-c", "-n", "k8s_transfer_v2", "-l", "k8s_transfer_v2", "-o", "upload", "-r", "-C", "config"]
+FROM golang:alpine as builder
+RUN apk update && apk upgrade && \
+    apk add --no-cache bash git
+ADD . /github.com/densify-dev/Container-Optimization-Data-Forwarder
+WORKDIR /github.com/densify-dev/Container-Optimization-Data-Forwarder/cmd/dataCollection
+RUN go build -o dataCollection .
+FROM alpine
+CMD ["./Forwarder", "-c", "-n", "k8s_transfer_v3", "-l", "k8s_transfer_v3", "-o", "upload", "-r", "-C", "config"]
+RUN mkdir data data/node data/container data/hpa
+COPY ./config config
+COPY ./tools .
+COPY --from=builder /github.com/densify-dev/Container-Optimization-Data-Forwarder/cmd/dataCollection .

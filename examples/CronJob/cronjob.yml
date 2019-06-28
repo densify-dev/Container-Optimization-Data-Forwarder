@@ -1,0 +1,25 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: densify-job
+spec:
+  schedule: "0 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - image: densify/container-optimization-data-forwarder
+            imagePullPolicy: Always
+            name: data-forwarder
+            volumeMounts:
+            - mountPath: /config
+              name: config
+          volumes:
+          - name: config
+            configMap:
+              name: densifyconf
+              items:
+                - key: config.properties
+                  path: config.properties
+          restartPolicy: Never

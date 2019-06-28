@@ -20,6 +20,6 @@ spec:
             configMap:
               name: densifyconf
               items:
-                - key: config.cfg
-                  path: config.cfg
+                - key: config.properties
+                  path: config.properties
           restartPolicy: Never

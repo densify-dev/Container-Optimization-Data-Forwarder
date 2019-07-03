@@ -1,6 +1,6 @@
-This section describes the candidate environment for the Container Optimization Data Collection.
+This section describes the candidate environment for the Container Optimization data collection.
 
-The following required configurations are necessary for Densify container optimization.
+The following, is required for Densify Container Optimization data collection.
 - Densify account, which is provided with a Densify subscription or through a free trial. See www.densify.com/service/signup. 
 - Kubernetes or OpenShift 
   - Running cAdvisor as part of the kubelet that by default, provides the workload and configuration data required by Densify. 

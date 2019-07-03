@@ -1,4 +1,4 @@
-A list of all prometheus metrics and their uses
+The following table lists Prometheus metrics and their usage.
 
 ## Container Metrics
 | Metric | Usage | 

@@ -269,22 +269,22 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
 
 		//query containers under a pod with no owner
-		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left kube_pod_owner{owner_name="<none>"}) by (pod,namespace,container_name)`
+		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left max(kube_pod_owner{owner_name="<none>"}) by (namespace, pod, container_name)) by (pod,namespace,container_name)`
 		result = prometheus.MetricCollect(promaddress, query2, start, end)
 		writeWorkload(workloadWrite, result, "namespace", "pod", "container_name", clusterName, promAddr, "Pod")
 
 		//query containers under a controller with no owner
-		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (owner_name,owner_kind) kube_pod_owner) by (owner_kind,owner_name,namespace,container_name)`
+		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (owner_name,owner_kind) max(kube_pod_owner) by (namespace, pod, owner_name, owner_kind)) by (owner_kind,owner_name,namespace,container_name)`
 		result = prometheus.MetricCollect(promaddress, query2, start, end)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "")
 
 		//query containers under a deployment
-		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)") * on (replicaset, namespace) group_left (owner_name) kube_replicaset_owner{owner_kind="Deployment"}) by (owner_name,namespace,container_name)`
+		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) max(label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)")) by (namespace, pod, replicaset) * on (replicaset, namespace) group_left (owner_name) max(kube_replicaset_owner{owner_kind="Deployment"}) by (namespace, replicaset, owner_name)) by (owner_name,namespace,container_name)`
 		result = prometheus.MetricCollect(promaddress, query2, start, end)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "Deployment")
 
 		//query containers under a cron job
-		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)") * on (job, namespace) group_left (owner_name) label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (owner_name,namespace,container_name)`
+		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) max(label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)")) by (namespace, pod, job) * on (job, namespace) group_left (owner_name) max(label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (namespace, job, owner_name)) by (owner_name,namespace,container_name)`
 		result = prometheus.MetricCollect(promaddress, query2, start, end)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "CronJob")
 	}

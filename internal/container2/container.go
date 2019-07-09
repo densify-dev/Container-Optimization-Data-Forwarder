@@ -97,7 +97,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 		//systems[namespaceName].pods[podName] = &pod{labelMap: map[string]string{}}
 		if controllerName, ok := podOwners[podName+"__"+namespaceName]; ok {
-			if deploymentName, ok := replicaSetOwners[controllerName]; ok && podOwnersKind[podName+"__"+namespaceName] == "ReplicaSet" {
+			if deploymentName, ok := replicaSetOwners[controllerName+"__"+namespaceName]; ok && podOwnersKind[podName+"__"+namespaceName] == "ReplicaSet" {
 				currentOwner = deploymentName
 				ownerKind = "Deployment"
 				//Create deployment as top owner and add container

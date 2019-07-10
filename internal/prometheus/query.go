@@ -16,7 +16,7 @@ import (
 const step = 300000000000
 
 //MetricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
-func MetricCollect(promaddress, query string, start, end time.Time) (value model.Value) {
+func MetricCollect(promaddress, query string, start, end time.Time, entityKind, metric string) (value model.Value) {
 	//setup the context to use for the API calls
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -37,7 +37,7 @@ func MetricCollect(promaddress, query string, start, end time.Time) (value model
 	//If the values from the query return no data (length of 0) then give a warning
 
 	if value.(model.Matrix).Len() == 0 {
-		log.Println("Warning: no data returned from query: ", query)
+		log.Println("Warning ", "PromAddress: ", promaddress, " ", entityKind, " ", metric, " ", query)
 	}
 
 	//Return the data that was received from Prometheus.

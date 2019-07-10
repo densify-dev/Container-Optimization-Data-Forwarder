@@ -112,7 +112,7 @@ func getWorkload(promaddress, fileName, metricName, query2, aggregrator, cluster
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
-		result = prometheus.MetricCollect(promaddress, query2, start, end)
+		result = prometheus.MetricCollect(promaddress, query2, start, end, "Node", metricName)
 		writeWorkload(workloadWrite, result, "node", promAddr, cluster)
 	}
 	//Close the workload files.

@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	//"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
 	"github.com/spf13/viper"
@@ -78,7 +77,7 @@ func main() {
 	log.SetOutput(debugLog)
 
 	//Version number used for tracking which version of the code the client is using if there is an issue with data collection.
-	log.Println("Version 1.0.2")
+	log.Println("Version 2.0.0")
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
@@ -94,11 +93,6 @@ func main() {
 		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), 0, 0, t.Location())
 	}
 
-	//container.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	//deployment.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	//hpa.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	//cronjob.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, false, currentTime)
-	//new_container_test.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, true, currentTime)
 	container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+	node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, false, currentTime)
 }

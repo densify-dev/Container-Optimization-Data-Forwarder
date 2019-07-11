@@ -35,9 +35,8 @@ func MetricCollect(promaddress, query string, start, end time.Time, entityKind, 
 	}
 
 	//If the values from the query return no data (length of 0) then give a warning
-
 	if value.(model.Matrix).Len() == 0 {
-		log.Println("Warning ", "PromAddress: ", promaddress, " ", entityKind, " ", metric, " ", query)
+		log.Println("Warning!", "PromAddress: ", promaddress, " ", "Entity kind: "+entityKind+",", metric, " ", "\t\t"+"Message: No data returned from query", query)
 	}
 
 	//Return the data that was received from Prometheus.

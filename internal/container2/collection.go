@@ -270,22 +270,22 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 
 		//query containers under a pod with no owner
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left max(kube_pod_owner{owner_name="<none>"}) by (namespace, pod, container_name)) by (pod,namespace,container_name)`
-		result = prometheus.MetricCollect(promaddress, query2, start, end)
+		result = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "pod_"+metricName)
 		writeWorkload(workloadWrite, result, "namespace", "pod", "container_name", clusterName, promAddr, "Pod")
 
 		//query containers under a controller with no owner
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (owner_name,owner_kind) max(kube_pod_owner) by (namespace, pod, owner_name, owner_kind)) by (owner_kind,owner_name,namespace,container_name)`
-		result = prometheus.MetricCollect(promaddress, query2, start, end)
+		result = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "controller_"+metricName)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "")
 
 		//query containers under a deployment
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) max(label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)")) by (namespace, pod, replicaset) * on (replicaset, namespace) group_left (owner_name) max(kube_replicaset_owner{owner_kind="Deployment"}) by (namespace, replicaset, owner_name)) by (owner_name,namespace,container_name)`
-		result = prometheus.MetricCollect(promaddress, query2, start, end)
+		result = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "deployment_"+metricName)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "Deployment")
 
 		//query containers under a cron job
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) max(label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)")) by (namespace, pod, job) * on (job, namespace) group_left (owner_name) max(label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (namespace, job, owner_name)) by (owner_name,namespace,container_name)`
-		result = prometheus.MetricCollect(promaddress, query2, start, end)
+		result = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "cronJob_"+metricName)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "CronJob")
 	}
 	//Close the workload files.
@@ -309,7 +309,7 @@ func getDeploymentWorkload(promaddress, fileName, metricName, query, clusterName
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		tempMap[int(historyInterval)] = map[string]map[string][]model.SamplePair{}
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
-		result = prometheus.MetricCollect(promaddress, query, start, end)
+		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, metricName)
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
 				if _, ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]; !ok {
@@ -367,7 +367,7 @@ func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promA
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		tempMap[int(historyInterval)] = map[string]map[string][]model.SamplePair{}
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
-		result = prometheus.MetricCollect(promaddress, query, start, end)
+		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, metricName)
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
 				if _, ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]; !ok {
@@ -432,7 +432,7 @@ func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promA
 
 func addToLabelMap(key string, value string, labelPath map[string]string) {
 	if _, ok := labelPath[key]; !ok {
-		if len(value)>255 {
+		if len(value) > 255 {
 			labelPath[key] = value[:255]
 		} else {
 			labelPath[key] = value
@@ -462,7 +462,7 @@ func addToLabelMap(key string, value string, labelPath map[string]string) {
 				}
 			}
 			if currValue != value && notPresent {
-				if len(value)>255 {
+				if len(value) > 255 {
 					labelPath[key] = labelPath[key] + ";" + value[:255]
 				} else {
 					labelPath[key] = labelPath[key] + ";" + value

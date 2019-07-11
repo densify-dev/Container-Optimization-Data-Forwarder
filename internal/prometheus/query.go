@@ -36,7 +36,7 @@ func MetricCollect(promaddress, query string, start, end time.Time, entityKind, 
 
 	//If the values from the query return no data (length of 0) then give a warning
 	if value.(model.Matrix).Len() == 0 {
-		log.Println("Warning!", "PromAddress: ", promaddress, " ", "Entity kind: "+entityKind+",", metric, " ", "\t\t"+"Message: No data returned from query", query)
+		log.Println(logMessage("Warning!", promaddress, entityKind, metric, "No data returned from query", query))
 	}
 
 	//Return the data that was received from Prometheus.
@@ -59,4 +59,9 @@ func TimeRange(interval string, intervalSize int, currentTime time.Time, history
 		end = currentTime.Add(time.Minute * -1 * time.Duration(intervalSize) * historyInterval)
 	}
 	return start, end
+}
+
+func logMessage(logType, promaddress, entityKind, metric, message, query string) string {
+	var returnString = logType + " PromAddress: " + promaddress + " Entity kind: " + entityKind + ", " + metric + "\t\t Message: " + message + " " + query
+	return returnString
 }

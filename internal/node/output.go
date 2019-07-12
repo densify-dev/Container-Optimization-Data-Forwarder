@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 )
 
@@ -55,7 +56,7 @@ func writeConfig(clusterName, promAddr string) {
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/node/config.csv")
 	if err != nil {
-		log.Println(err)
+		log.Println(prometheus.LogMessage("Error!", promAddr, entityKind, "N/A", err.Error(), "N/A"))
 	}
 
 	//Write out the header.
@@ -102,7 +103,7 @@ func writeAttributes(clusterName, promAddr string) {
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/node/attributes.csv")
 	if err != nil {
-		log.Println(err)
+		log.Println(prometheus.LogMessage("Error!", promAddr, entityKind, "N/A", err.Error(), "N/A"))
 	}
 
 	//Write out the header.

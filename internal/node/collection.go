@@ -103,7 +103,7 @@ func getWorkload(promaddress, fileName, metricName, query2, aggregrator, cluster
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/node/" + aggregrator + `_` + fileName + ".csv")
 	if err != nil {
-		log.Println(err)
+		log.Println(prometheus.LogMessage("Error!", promAddr, entityKind, metricName, err.Error(), query2))
 	}
 	fmt.Fprintf(workloadWrite, "cluster,node,Datetime,%s\n", metricName)
 

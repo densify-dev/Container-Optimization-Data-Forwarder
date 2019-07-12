@@ -258,7 +258,7 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/" + aggregator + `_` + fileName + ".csv")
 	if err != nil {
-		log.Println(err)
+		log.Println(prometheus.LogMessage("Error!", promAddr, entityKind, metricName, err.Error(), query))
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,%s\n", metricName)
 
@@ -300,7 +300,7 @@ func getDeploymentWorkload(promaddress, fileName, metricName, query, clusterName
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/deployment_" + fileName + ".csv")
 	if err != nil {
-		log.Println(err)
+		log.Println(prometheus.LogMessage("Error!", promAddr, entityKind, metricName, err.Error(), query))
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,%s\n", metricName)
 
@@ -353,11 +353,11 @@ func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promA
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/hpa_" + fileName + ".csv")
 	if err != nil {
-		log.Println(err)
+		log.Println(prometheus.LogMessage("Error!", promAddr, entityKind, metricName, err.Error(), query))
 	}
 	workloadWriteExtra, err := os.Create("./data/hpa/hpa_extra_" + fileName + ".csv")
 	if err != nil {
-		log.Println(err)
+		log.Println(prometheus.LogMessage("Error!", promAddr, entityKind, metricName, err.Error(), query))
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,HPA Name,Datetime,%s\n", metricName)
 	fmt.Fprintf(workloadWriteExtra, "cluster,namespace,entity_name,entity_type,container,HPA Name,Datetime,%s\n", metricName)

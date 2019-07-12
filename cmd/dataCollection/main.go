@@ -10,6 +10,7 @@ import (
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/spf13/viper"
 )
 
@@ -70,7 +71,7 @@ func main() {
 	//Open the debug log file for writing.
 	debugLog, err := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(prometheus.LogMessage("Error!", promAddr, "Main", "N/A", err.Error(), "N/A"))
 	}
 	defer debugLog.Close()
 	//Set log to use the debug log for writing output.

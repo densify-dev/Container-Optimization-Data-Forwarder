@@ -18,6 +18,7 @@ The skeleton query to group metrics by node and their values is (query made by J
 package node
 
 import (
+	"log"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
@@ -50,6 +51,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	var promaddress, query string
 	var result model.Value
 	var start, end time.Time
+	var haveNodeExport = true
 
 	//Start and end time + the prometheus address used for querying
 	start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
@@ -92,6 +94,10 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	query = `max(max(label_replace(node_network_speed_bytes, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "network_speed_bytes")
 	getNodeMetric(result, "namespace", "node", "netSpeedBytes")
+
+	if result.(model.Matrix).Len() == 0 {
+		haveNodeExport = false
+	}
 
 	//Queries the capacity fields of all nodes
 	query = `kube_node_status_capacity`
@@ -160,6 +166,12 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	writeConfig(clusterName, promAddr)
 	writeAttributes(clusterName, promAddr)
 
+	//Checks to see if Node Exporter is installed. Based off if anything is returned from network speed bytes
+	if haveNodeExport == false {
+		log.Println(prometheus.LogMessage("Error!", promaddress, entityKind, "N/A", "It appears you do not have Node Exporter installed.", "N/A"))
+		return
+	}
+
 	/*
 		==========START OF DISK METRICS========
 		-node_disk_written_bytes_total 		(MAX)
@@ -172,7 +184,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 		-irate(node_disk_read_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m])    		(AVG)
 
 		-irate(node_disk_write_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]			(MAX)
-		irate(node_disk_write_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]			(AVG)
+		-irate(node_disk_write_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]			(AVG)
 	*/
 
 	//Query and store prometheus node disk write in bytes (max)

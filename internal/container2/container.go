@@ -219,6 +219,10 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "namespaceLabels")
 	getNamespaceMetricString(result, "namespace", "namespaceLabel")
 
+	query = `kube_namespace_annotations`
+	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "namespaceAnnotations")
+	getNamespaceMetricString(result, "namespace", "namespaceAnnotations")
+
 	//Get the CPU and Memory Limit and Request quotes for the namespace.
 	query = `kube_limitrange`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "nameSpaceLimitrange")
@@ -417,6 +421,12 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	getWorkload(promaddress, "rss_workload", "Actual Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 	query = `label_replace(sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind), "pod", "$1", "pod_name", "(.*)")`
 	getWorkload(promaddress, "disk_workload", "Raw Disk Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	query = `label_replace(sum(container_fs_read_seconds_total{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind), "pod", "$1", "pod_name", "(.*)")`
+	getWorkload(promaddress, "fs_read_seconds_workload", "FS Read Seconds", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	query = `label_replace(sum(container_fs_write_seconds_total{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind), "pod", "$1", "pod_name", "(.*)")`
+	getWorkload(promaddress, "fs_write_seconds_workload", "FS Write Seconds", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	query = `label_replace(sum( container_fs_io_time_seconds_total{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind), "pod", "$1", "pod_name", "(.*)")`
+	getWorkload(promaddress, "fs_time_seconds_workload", "FS Time Seconds", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	query = `label_replace(round(sum(rate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name,owner_name,owner_kind)*1000,1), "pod", "$1", "pod_name", "(.*)")`
 	getWorkload(promaddress, "cpu_mCores_workload", "CPU Utilization in mCores", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
@@ -426,6 +436,12 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	getWorkload(promaddress, "rss_workload", "Actual Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 	query = `label_replace(sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind), "pod", "$1", "pod_name", "(.*)")`
 	getWorkload(promaddress, "disk_workload", "Raw Disk Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	query = `label_replace(sum(container_fs_read_seconds_total{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind), "pod", "$1", "pod_name", "(.*)")`
+	getWorkload(promaddress, "fs_read_seconds_workload", "FS Read Seconds", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	query = `label_replace(sum(container_fs_write_seconds_total{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind), "pod", "$1", "pod_name", "(.*)")`
+	getWorkload(promaddress, "fs_write_seconds_workload", "FS Write Seconds", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	query = `label_replace(sum( container_fs_io_time_seconds_total{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name,owner_name,owner_kind), "pod", "$1", "pod_name", "(.*)")`
+	getWorkload(promaddress, "fs_time_seconds_workload", "FS Time Seconds", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//HPA metrics
 	query = `kube_hpa_labels`

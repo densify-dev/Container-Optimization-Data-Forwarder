@@ -219,9 +219,10 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "namespaceLabels")
 	getNamespaceMetricString(result, "namespace", "namespaceLabel")
 
+	/**
 	query = `kube_namespace_annotations`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "namespaceAnnotations")
-	getNamespaceMetricString(result, "namespace", "namespaceAnnotations")
+	getNamespaceMetricString(result, "namespace", "namespaceAnnotations")*/
 
 	//Get the CPU and Memory Limit and Request quotes for the namespace.
 	query = `kube_limitrange`

@@ -71,11 +71,13 @@ func main() {
 	//Open the debug log file for writing.
 	debugLog, err := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		log.Fatal(prometheus.LogMessage("Error!", promAddr, "Main", "N/A", err.Error(), "N/A"))
+		log.Fatal(prometheus.LogMessage("[ERROR]", promAddr, "Main", "N/A", err.Error(), "N/A"))
 	}
 	defer debugLog.Close()
 	//Set log to use the debug log for writing output.
 	log.SetOutput(debugLog)
+	log.SetFlags(0)
+	log.SetPrefix(time.Now().UTC().Format(time.RFC3339Nano + " "))
 
 	//Version number used for tracking which version of the code the client is using if there is an issue with data collection.
 	log.Println("Version 2.0.0")
@@ -86,6 +88,7 @@ func main() {
 	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
 	var t time.Time
 	t = time.Now().UTC()
+
 	if interval == "days" {
 		currentTime = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 	} else if interval == "hours" {
@@ -95,5 +98,5 @@ func main() {
 	}
 
 	container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, false, currentTime)
+	node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
 }

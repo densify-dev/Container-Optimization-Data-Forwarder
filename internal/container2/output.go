@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/prometheus/common/model"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
+	"github.com/prometheus/common/model"
 )
 
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
@@ -18,7 +18,7 @@ func writeConfig(clusterName, promAddr string) {
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/container/config.csv")
 	if err != nil {
-		log.Println(prometheus.LogMessage("Error!", promAddr, entityKind, "N/A", err.Error(), "N/A"))
+		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
 	}
 
 	//Write out the header.
@@ -50,7 +50,7 @@ func writeHPAConfig(clusterName, promAddr string, systems map[string]map[string]
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/hpa/hpa_extra_config.csv")
 	if err != nil {
-		log.Println(prometheus.LogMessage("Error!", promAddr, entityKind, "N/A", err.Error(), "N/A"))
+		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
 	}
 
 	//Write out the header.
@@ -75,7 +75,7 @@ func writeAttributes(clusterName, promAddr string) {
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/container/attributes.csv")
 	if err != nil {
-		log.Println(prometheus.LogMessage("Error!", promAddr, entityKind, "N/A", err.Error(), "N/A"))
+		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
 	}
 
 	//Write out the header.
@@ -105,11 +105,12 @@ func writeAttributes(clusterName, promAddr string) {
 				fmt.Fprintf(attributeWrite, "%s,%s,%s,%s,%s,Containers,%s,%s,%s,", cluster, kn, strings.Replace(vt.name, ";", ".", -1), vt.kind, strings.Replace(kc, ":", ".", -1), cluster, kn, vt.name)
 				for key, value := range systems[kn].midLevels[kt].containers[kc].labelMap {
 					if len(key) < 250 {
+						value = strings.Replace(value, ",", " ", -1)
 						if len(value)+3+len(key) < 256 {
-							fmt.Fprintf(attributeWrite, key + " : " + value + "|")
+							fmt.Fprintf(attributeWrite, key+" : "+value+"|")
 						} else {
 							templength := 256 - 3 - len(key)
-							fmt.Fprintf(attributeWrite, key + " : " + value[:templength] + "|")
+							fmt.Fprintf(attributeWrite, key+" : "+value[:templength]+"|")
 						}
 					}
 				}
@@ -117,11 +118,12 @@ func writeAttributes(clusterName, promAddr string) {
 
 				for key, value := range vt.labelMap {
 					if len(key) < 250 {
+						value = strings.Replace(value, ",", " ", -1)
 						if len(value)+3+len(key) < 256 {
-							fmt.Fprintf(attributeWrite, key + " : " + value + "|")
+							fmt.Fprintf(attributeWrite, key+" : "+value+"|")
 						} else {
 							templength := 256 - 3 - len(key)
-							fmt.Fprintf(attributeWrite, key + " : " + value[:templength] + "|")
+							fmt.Fprintf(attributeWrite, key+" : "+value[:templength]+"|")
 						}
 					}
 				}
@@ -165,11 +167,12 @@ func writeAttributes(clusterName, promAddr string) {
 				}
 				for key, value := range vn.labelMap {
 					if len(key) < 250 {
+						value = strings.Replace(value, ",", " ", -1)
 						if len(value)+3+len(key) < 256 {
-							fmt.Fprintf(attributeWrite, key + " : " + value + "|")
+							fmt.Fprintf(attributeWrite, key+" : "+value+"|")
 						} else {
 							templength := 256 - 3 - len(key)
-							fmt.Fprintf(attributeWrite, key + " : " + value[:templength] + "|")
+							fmt.Fprintf(attributeWrite, key+" : "+value[:templength]+"|")
 						}
 					}
 				}
@@ -204,7 +207,7 @@ func writeHPAAttributes(clusterName, promAddr string, systems map[string]map[str
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/hpa/hpa_extra_attributes.csv")
 	if err != nil {
-		log.Println(prometheus.LogMessage("Error!", promAddr, entityKind, "N/A", err.Error(), "N/A"))
+		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
 	}
 
 	var cluster string
@@ -221,7 +224,13 @@ func writeHPAAttributes(clusterName, promAddr string, systems map[string]map[str
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
 		fmt.Fprintf(attributeWrite, "%s,%s,,,,%s,", cluster, systems[i]["namespace"], i)
 		for key, value := range systems[i] {
-			fmt.Fprintf(attributeWrite, key+" : "+value+"|")
+			value = strings.Replace(value, ",", " ", -1)
+			if len(value)+3+len(key) < 256 {
+				fmt.Fprintf(attributeWrite, key+" : "+value+"|")
+			} else {
+				templength := 256 - 3 - len(key)
+				fmt.Fprintf(attributeWrite, key+" : "+value[:templength]+"|")
+			}
 		}
 		fmt.Fprintf(attributeWrite, "\n")
 	}
@@ -254,7 +263,7 @@ func writeWorkload(file io.Writer, result model.Value, namespace, pod, container
 								if _, ok := systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].containers[string(containerValue)]; ok {
 									//Loop through the different values over the interval and write out each one to the workload file.
 									for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-										fmt.Fprintf(file, "%s,%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].name, systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].kind, strings.Replace(string(containerValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
+										fmt.Fprintf(file, "%s,%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].name, systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].kind, strings.Replace(string(containerValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02T15:04:05.999Z"), result.(model.Matrix)[i].Values[j].Value)
 									}
 								}
 							}

@@ -168,7 +168,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Checks to see if Node Exporter is installed. Based off if anything is returned from network speed bytes
 	if haveNodeExport == false {
-		log.Println(prometheus.LogMessage("Error!", promaddress, entityKind, "N/A", "It appears you do not have Node Exporter installed.", "N/A"))
+		log.Println(prometheus.LogMessage("[ERROR]", promaddress, entityKind, "N/A", "It appears you do not have Node Exporter installed.", "N/A"))
 		return
 	}
 

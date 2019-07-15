@@ -14,8 +14,6 @@ import (
 
 //step is set to be 5minutes as it is defined in microseconds.
 const step = 300000000000
-const typeSpaces = 7
-const entitySpaces = 72
 
 //MetricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
 func MetricCollect(promaddress, query string, start, end time.Time, entityKind, metric string) (value model.Value) {
@@ -26,19 +24,19 @@ func MetricCollect(promaddress, query string, start, end time.Time, entityKind, 
 	//Setup the API client connection
 	client, err := api.NewClient(api.Config{Address: promaddress})
 	if err != nil {
-		log.Fatalln(LogMessage("Error!", promaddress, entityKind, metric, err.Error(), query))
+		log.Fatalln(LogMessage("[ERROR]", promaddress, entityKind, metric, err.Error(), query))
 	}
 
 	//Query prometheus with the values defined above as well as the query that was passed into the function.
 	q := v1.NewAPI(client)
 	value, _, err = q.QueryRange(ctx, query, v1.Range{Start: start, End: end, Step: step})
 	if err != nil {
-		log.Println(LogMessage("Error!", promaddress, entityKind, metric, err.Error(), query))
+		log.Println(LogMessage("[ERROR]", promaddress, entityKind, metric, err.Error(), query))
 	}
 
 	//If the values from the query return no data (length of 0) then give a warning
 	if value.(model.Matrix).Len() == 0 {
-		log.Println(LogMessage("Warning!", promaddress, entityKind, metric, "No data returned ", query))
+		log.Println(LogMessage("[WARN]", promaddress, entityKind, metric, "No data returned", query))
 	}
 
 	//Return the data that was received from Prometheus.
@@ -65,18 +63,5 @@ func TimeRange(interval string, intervalSize int, currentTime time.Time, history
 
 //LogMessage formats and logs errors, warnings and debug messages
 func LogMessage(logType, promaddress, entityKind, metric, message, query string) string {
-	return writeSpaces(logType, 8) + " PromAddress: " + promaddress + " Entity kind: " + writeSpaces(entityKind+",", 11) + writeSpaces(metric, 40) + " Message: " + message + "\t" + "Query:\t" + query
-}
-
-func writeSpaces(inputString string, numSpaces int) string {
-	var spaces = ""
-
-	if len(inputString) > 0 {
-		numSpaces = numSpaces - len(inputString)
-	}
-
-	for i := 0; i < numSpaces; i++ {
-		spaces += " "
-	}
-	return inputString + spaces
+	return logType + " address=" + promaddress + " " + "entity=" + `"` + entityKind + ", " + metric + `"` + " " + "message=" + `"` + message + `"` + " " + "query=" + `"` + query + `"`
 }

@@ -371,7 +371,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	currentSizeWrite, err := os.Create("./data/container/currentSize.csv")
 	if err != nil {
-		log.Println(prometheus.LogMessage("Error!", promAddr, entityKind, "N/A", err.Error(), "N/A"))
+		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
 	}
 	fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,currentSize\n")
 

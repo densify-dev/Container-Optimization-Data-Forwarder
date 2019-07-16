@@ -263,7 +263,7 @@ func writeWorkload(file io.Writer, result model.Value, namespace, pod, container
 								if _, ok := systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].containers[string(containerValue)]; ok {
 									//Loop through the different values over the interval and write out each one to the workload file.
 									for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-										fmt.Fprintf(file, "%s,%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].name, systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].kind, strings.Replace(string(containerValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02T15:04:05.999Z"), result.(model.Matrix)[i].Values[j].Value)
+										fmt.Fprintf(file, "%s,%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].name, systems[string(namespaceValue)].midLevels[kind+"__"+string(podValue)].kind, strings.Replace(string(containerValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
 									}
 								}
 							}

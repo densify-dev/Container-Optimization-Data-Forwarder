@@ -77,7 +77,7 @@ func main() {
 	//Set log to use the debug log for writing output.
 	log.SetOutput(debugLog)
 	log.SetFlags(0)
-	log.SetPrefix(time.Now().UTC().Format(time.RFC3339Nano + " "))
+	log.SetPrefix(time.Now().Format(time.RFC3339Nano + " "))
 
 	//Version number used for tracking which version of the code the client is using if there is an issue with data collection.
 	log.Println("Version 2.0.0")

@@ -107,7 +107,7 @@ func writeAttributes(clusterName, promAddr string) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,node,Virtual Technology,Virtual Domain,OS Architecture,Network Speed,Capacity Pods,Capacity CPU,Capacity Memory,Capacity Ephemeral Storage,Capacity Huge Pages,Allocatable Pods,Allocatable CPU,Allocatable Memory,Allocatable Ephemeral Storage,Allocatable Huge Pages,Node Labels")
+	fmt.Fprintln(attributeWrite, "cluster,node,Virtual Technology,Virtual Domain,OS Architecture,Network Speed,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Capacity Pods,Capacity CPU,Capacity Memory,Capacity Ephemeral Storage,Capacity Huge Pages,Allocatable Pods,Allocatable CPU,Allocatable Memory,Allocatable Ephemeral Storage,Allocatable Huge Pages,Node Labels")
 
 	//Loop through the nodes and write out the attributes data for each system.
 	for kn := range nodes {
@@ -119,6 +119,30 @@ func writeAttributes(clusterName, promAddr string) {
 			fmt.Fprintf(attributeWrite, ",")
 		} else {
 			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].netSpeedBytes)
+		}
+
+		if nodes[kn].cpuLimit == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].cpuLimit)
+		}
+
+		if nodes[kn].cpuRequest == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].cpuRequest)
+		}
+
+		if nodes[kn].memLimit == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].memLimit)
+		}
+
+		if nodes[kn].memRequest == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].memRequest)
 		}
 
 		if nodes[kn].podsCapacity == -1 {

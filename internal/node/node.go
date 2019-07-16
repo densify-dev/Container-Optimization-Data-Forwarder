@@ -19,6 +19,7 @@ type node struct {
 	//Value fields
 	netSpeedBytes, cpuCapacity, memCapacity, ephemeralStorageCapacity, podsCapacity, hugepages2MiCapacity int
 	cpuAllocatable, memAllocatable, ephemeralStorageAllocatable, podsAllocatable, hugepages2MiAllocatable int
+	cpuLimit, cpuRequest, memLimit, memRequest                                                            int
 }
 
 //Map that labels and values will be stored in
@@ -65,7 +66,9 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 					//Capacity and allocatable fields (set to -1 by default to make error checking more easy)
 					cpuCapacity: -1, memCapacity: -1, ephemeralStorageCapacity: -1, podsCapacity: -1, hugepages2MiCapacity: -1,
-					cpuAllocatable: -1, memAllocatable: -1, ephemeralStorageAllocatable: -1, podsAllocatable: -1, hugepages2MiAllocatable: -1}
+					cpuAllocatable: -1, memAllocatable: -1, ephemeralStorageAllocatable: -1, podsAllocatable: -1, hugepages2MiAllocatable: -1,
+
+					cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
 		}
 	}
 
@@ -77,7 +80,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	//Gets the network speed in bytes as an attribute/config value for each node
 	query = `max(max(label_replace(node_network_speed_bytes, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "networkSpeedBytes")
-	getNodeMetric(result, "namespace", "node", "netSpeedBytes")
+	getNodeMetric(result, "node", "netSpeedBytes")
 
 	if result.(model.Matrix).Len() == 0 {
 		haveNodeExport = false
@@ -100,20 +103,20 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 		//capacity_cpu_cores query
 		query = `kube_node_status_capacity_cpu_cores`
 		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusCapacityCpuCores")
-		getNodeMetric(result, "namespace", "node", "capacity_cpu")
+		getNodeMetric(result, "node", "capacity_cpu")
 
 		//capacity_memory_bytes query
 		query = `kube_node_status_capacity_memory_bytes`
 		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusCapacityMemoryBytes")
-		getNodeMetric(result, "namespace", "node", "capacity_mem")
+		getNodeMetric(result, "node", "capacity_mem")
 
 		//capacity_pods query
 		query = `kube_node_status_capacity_pods`
 		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusCapacityPods")
-		getNodeMetric(result, "namespace", "node", "capacity_pod")
+		getNodeMetric(result, "node", "capacity_pod")
 
 	} else {
-		getNodeMetric(result, "namespace", "node", "capacity")
+		getNodeMetric(result, "node", "capacity")
 	}
 
 	//Queries the allocatable metric fields of all the nodes
@@ -132,19 +135,51 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	if result.(model.Matrix).Len() == 0 {
 		query = `kube_node_status_allocatable_cpu_cores`
 		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusAllocatableCpuCores")
-		getNodeMetric(result, "namespace", "node", "allocatable_cpu")
+		getNodeMetric(result, "node", "allocatable_cpu")
 
 		query = `kube_node_status_allocatable_memory_bytes`
 		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusAllocatableMemoryBytes")
-		getNodeMetric(result, "namespace", "node", "allocatable_mem")
+		getNodeMetric(result, "node", "allocatable_mem")
 
 		query = `kube_node_status_allocatable_pods`
 		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusAllocatablePods")
-		getNodeMetric(result, "namespace", "node", "allocatable_pod")
+		getNodeMetric(result, "node", "allocatable_pod")
 
 	} else {
-		getNodeMetric(result, "namespace", "node", "allocatable")
+		getNodeMetric(result, "node", "allocatable")
 	}
+
+	//**************************************************************************************************************
+	//**************************************************************************************************************
+
+	/*
+		==========START OF NODE REQUEST/LIMIT METRICS==========
+		-sum(kube_pod_container_resource_limits_cpu_cores) by (node)*1000
+		-sum(kube_pod_container_resource_requests_cpu_cores) by (node)*1000
+
+		-sum(kube_pod_container_resource_limits_memory_bytes) by (node)/1024/1024
+		-sum(kube_pod_container_resource_requests_memory_bytes) by (node)/1024/1024
+	*/
+
+	query = `sum(kube_pod_container_resource_limits_cpu_cores) by (node)*1000`
+	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "cpuLimit")
+	getNodeMetric(result, "node", "cpuLimit")
+
+	query = `sum(kube_pod_container_resource_requests_cpu_cores) by (node)*1000`
+	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "cpuRequest")
+	getNodeMetric(result, "node", "cpuRequest")
+
+	query = `sum(kube_pod_container_resource_limits_memory_bytes) by (node)/1024/1024`
+	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "memLimit")
+	getNodeMetric(result, "node", "memLimit")
+
+	query = `sum(kube_pod_container_resource_requests_memory_bytes) by (node)/1024/1024`
+	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "memRequest")
+	getNodeMetric(result, "node", "memRequest")
+
+	/*
+		==========NODE REQUEST/LIMIT METRICS============
+	*/
 
 	//Writes the config and attribute files
 	writeConfig(clusterName, promAddr)
@@ -361,4 +396,5 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	/*
 		==========END OF CPU METRICS============
 	*/
+
 }

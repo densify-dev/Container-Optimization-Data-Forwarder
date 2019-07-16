@@ -1,6 +1,6 @@
 /*
 Used for collecting metric data. Mostly the same as the container collection but less checks.
-(namespace, pods and containers)
+(pods and containers)
 */
 
 //Package node used for collecting node metric data
@@ -18,12 +18,11 @@ import (
 )
 
 //Gets node metrics from prometheus (and checks to see if they are valid)
-func getNodeMetric(result model.Value, namespace, node model.LabelName, metric string) {
+func getNodeMetric(result model.Value, node model.LabelName, metric string) {
 
 	if result != nil {
 		//Loop through the different entities in the results.
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
-			//Validate that the data contains the namespace label with value and check it exists in our systems structure.
 			if nodeValue, ok := result.(model.Matrix)[i].Metric[node]; ok {
 				if _, ok := nodes[string(nodeValue)]; ok {
 					//validates that the value of the entity is set and if not will default to 0
@@ -80,6 +79,14 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 							nodes[string(nodeValue)].podsAllocatable = int(value)
 						case "netSpeedBytes":
 							nodes[string(nodeValue)].netSpeedBytes = int(value)
+						case "cpuLimit":
+							nodes[string(nodeValue)].cpuLimit = int(value)
+						case "cpuRequest":
+							nodes[string(nodeValue)].cpuRequest = int(value)
+						case "memLimit":
+							nodes[string(nodeValue)].memLimit = int(value)
+						case "memRequest":
+							nodes[string(nodeValue)].memRequest = int(value)
 						}
 					}
 				}
@@ -126,7 +133,6 @@ func getNodeMetricString(result model.Value, node model.LabelName, metric string
 	if result != nil {
 		//Loop through the different entities in the results.
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
-			//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
 			if nodeValue, ok := result.(model.Matrix)[i].Metric[node]; ok {
 				if _, ok := nodes[string(nodeValue)]; ok {
 					if _, ok := tempSystems[string(nodeValue)]; ok == false {

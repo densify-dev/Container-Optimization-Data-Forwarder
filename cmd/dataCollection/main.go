@@ -16,7 +16,7 @@ import (
 
 //Global variables used for Storing system info, command line\config file parameters.
 var clusterName, promAddr, promPort, promProtocol, interval, configFile, configPath string
-var intervalSize, history int
+var intervalSize, history, offset int
 var debug bool
 var currentTime time.Time
 
@@ -31,6 +31,7 @@ func initParameters() {
 	flag.StringVar(&interval, "interval", "hours", "Interval to use for data collection. Can be days, hours or minutes")
 	flag.IntVar(&intervalSize, "intervalSize", 1, "Interval size to be used for querying. eg. default of 1 with default interval of hours queries 1 last hour of info")
 	flag.IntVar(&history, "history", 1, "Amount of time to go back for data collection works with the interval and intervalSize settings")
+	flag.IntVar(&offset, "offset", 0, "Amount of units (based on interval value) to offset the data collection backwards in time")
 	flag.BoolVar(&debug, "debug", false, "Enable debug logging")
 	flag.StringVar(&configFile, "file", "config", "Name of the config file without extention. Default config")
 	flag.StringVar(&configPath, "path", "./config", "Path to where the config file is stored")
@@ -44,6 +45,7 @@ func initParameters() {
 	viper.SetDefault("interval", interval)
 	viper.SetDefault("interval_size", intervalSize)
 	viper.SetDefault("history", history)
+	viper.SetDefault("offset", offset)
 	viper.SetDefault("debug", debug)
 	// Config import setup.
 	viper.SetConfigName(configFile)
@@ -61,6 +63,7 @@ func initParameters() {
 	interval = viper.GetString("interval")
 	intervalSize = viper.GetInt("interval_size")
 	history = viper.GetInt("history")
+	offset = viper.GetInt("offset")
 	debug = viper.GetBool("debug")
 
 }
@@ -90,11 +93,11 @@ func main() {
 	t = time.Now().UTC()
 
 	if interval == "days" {
-		currentTime = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+		currentTime = time.Date(t.Year(), t.Month(), t.Day()-offset, 0, 0, 0, 0, t.Location())
 	} else if interval == "hours" {
-		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location())
+		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour()-offset, 0, 0, 0, t.Location())
 	} else {
-		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), 0, 0, t.Location())
+		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute()-offset, 0, 0, t.Location())
 	}
 
 	container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)

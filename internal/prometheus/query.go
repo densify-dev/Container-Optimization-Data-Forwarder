@@ -4,6 +4,8 @@ package prometheus
 import (
 	"context"
 	"log"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/prometheus/common/model"
@@ -15,8 +17,26 @@ import (
 //step is set to be 5minutes as it is defined in microseconds.
 const step = 300000000000
 
+var promAddLog string
+var hasClusterName = false
+
 //MetricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
 func MetricCollect(promaddress, query string, start, end time.Time, entityKind, metric string) (value model.Value) {
+
+	//Checks to see if the cluster name for log printing has been made. If not then run
+	if hasClusterName == false {
+		//Cuts everthing off before the ://
+		delimiter := "://"
+		rightOf := strings.Join(strings.Split(promaddress, delimiter)[1:], delimiter)
+
+		//Removes the colon and port number
+		delimiter1 := regexp.MustCompile(`[:\d+]`)
+		promAddLog = delimiter1.ReplaceAllString(rightOf, "")
+
+		//Sets to true to ensure this is not run again when cluster name is aqquired
+		hasClusterName = true
+	}
+
 	//setup the context to use for the API calls
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -24,19 +44,19 @@ func MetricCollect(promaddress, query string, start, end time.Time, entityKind, 
 	//Setup the API client connection
 	client, err := api.NewClient(api.Config{Address: promaddress})
 	if err != nil {
-		log.Fatalln(LogMessage("[ERROR]", promaddress, entityKind, metric, err.Error(), query))
+		log.Fatalln(LogMessage("[ERROR]", promAddLog, entityKind, metric, err.Error(), query))
 	}
 
 	//Query prometheus with the values defined above as well as the query that was passed into the function.
 	q := v1.NewAPI(client)
 	value, _, err = q.QueryRange(ctx, query, v1.Range{Start: start, End: end, Step: step})
 	if err != nil {
-		log.Println(LogMessage("[ERROR]", promaddress, entityKind, metric, err.Error(), query))
+		log.Println(LogMessage("[ERROR]", promAddLog, entityKind, metric, err.Error(), query))
 	}
 
 	//If the values from the query return no data (length of 0) then give a warning
 	if value.(model.Matrix).Len() == 0 {
-		log.Println(LogMessage("[WARN]", promaddress, entityKind, metric, "No data returned", query))
+		log.Println(LogMessage("[WARN]", promAddLog, entityKind, metric, "No data returned", query))
 	}
 
 	//Return the data that was received from Prometheus.
@@ -62,6 +82,6 @@ func TimeRange(interval string, intervalSize int, currentTime time.Time, history
 }
 
 //LogMessage formats and logs errors, warnings and debug messages
-func LogMessage(logType, promaddress, entityKind, metric, message, query string) string {
-	return logType + " address=" + promaddress + " " + "entity=" + `"` + entityKind + ", " + metric + `"` + " " + "message=" + `"` + message + `"` + " " + "query=" + `"` + query + `"`
+func LogMessage(logType, promA, entityKind, metric, message, query string) string {
+	return logType + " address=" + promA + " " + "entity=" + `"` + entityKind + ", " + metric + `"` + " " + "message=" + `"` + message + `"` + " " + "query=" + `"` + query + `"`
 }

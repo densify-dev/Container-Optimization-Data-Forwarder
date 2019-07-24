@@ -207,22 +207,22 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	*/
 
 	//Query and store prometheus node disk write in bytes (max)
-	query = `max(max(label_replace(node_disk_written_bytes_total, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `max(max(label_replace(irate(node_disk_written_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Max diskWrittenBytesTotal")
 	getWorkload(promaddress, "disk_write_bytes", "Raw Disk Write Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node disk write in bytes (avg)
-	query = `avg(avg(label_replace(node_disk_written_bytes_total, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `avg(avg(label_replace(irate(node_disk_written_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Avg diskWrittenBytesTotal")
 	getWorkload(promaddress, "disk_write_bytes", "Raw Disk Write Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node disk read in bytes (max)
-	query = `max(max(label_replace(node_disk_read_bytes_total, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `max(max(label_replace(irate(node_disk_read_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Max diskReadBytes")
 	getWorkload(promaddress, "disk_read_bytes", "Raw Disk Read Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node disk read in bytes (avg)
-	query = `avg(avg(label_replace(node_disk_read_bytes_total, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `avg(avg(label_replace(irate(node_disk_read_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Avg diskReadBytes")
 	getWorkload(promaddress, "disk_read_bytes", "Raw Disk Read Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
@@ -269,42 +269,42 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	*/
 
 	//Query and store prometheus node memory total in bytes (MAX)
-	query = `max(max(label_replace(node_memory_MemTotal_bytes, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `max(max(label_replace(irate(node_memory_MemTotal_bytes[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Max memoryTotalBytes")
 	getWorkload(promaddress, "memory_total_bytes", "Total Memory Bytes", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory total in bytes (AVG)
-	query = `avg(avg(label_replace(node_memory_MemTotal_bytes, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `avg(avg(label_replace(irate(node_memory_MemTotal_bytes[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Avg memoryTotalBytes")
 	getWorkload(promaddress, "memory_total_bytes", "Total Memory Bytes", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory active bytes (MAX)
-	query = `max(max(label_replace(node_memory_Active_bytes, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `max(max(label_replace(irate(node_memory_Active_bytes[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Max memoryActiveBytes")
 	getWorkload(promaddress, "memory_active_bytes", "Active Memory Bytes", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory active bytes (AVG)
-	query = `avg(avg(label_replace(node_memory_Active_bytes, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `avg(avg(label_replace(irate(node_memory_Active_bytes[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Avg memoryActiveBytes")
 	getWorkload(promaddress, "memory_active_bytes", "Active Memory Bytes", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory total in bytes (MAX)
-	query = `max(max(label_replace(node_memory_MemTotal_bytes - node_memory_MemFree_bytes, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `max(max(label_replace(irate(node_memory_MemTotal_bytes[5m]) - irate(node_memory_MemFree_bytes[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Max memoryRawUtilization")
 	getWorkload(promaddress, "memory_raw_bytes", "Raw Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory total in bytes (AVG)
-	query = `avg(avg(label_replace(node_memory_MemTotal_bytes - node_memory_MemFree_bytes, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `avg(avg(label_replace(irate(node_memory_MemTotal_bytes[5m]) - irate(node_memory_MemFree_bytes[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Avg memoryRawUtilization")
 	getWorkload(promaddress, "memory_raw_bytes", "Raw Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory total free in bytes (MAX)
-	query = `max(max(label_replace(node_memory_MemTotal_bytes - (node_memory_MemFree_bytes + node_memory_Cached_bytes + node_memory_Buffers_bytes), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `max(max(label_replace(irate(node_memory_MemTotal_bytes[5m]) - (irate(node_memory_MemFree_bytes[5m]) + irate(node_memory_Cached_bytes[5m]) + irate(node_memory_Buffers_bytes[5m])), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Max memoryActualWorkload")
 	getWorkload(promaddress, "memory_actual_workload", "Actual Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory total free in bytes (AVG)
-	query = `avg(avg(label_replace(node_memory_MemTotal_bytes - (node_memory_MemFree_bytes + node_memory_Cached_bytes + node_memory_Buffers_bytes), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `avg(avg(label_replace(irate(node_memory_MemTotal_bytes[5m]) - (irate(node_memory_MemFree_bytes[5m]) + irate(node_memory_Cached_bytes[5m]) + irate(node_memory_Buffers_bytes[5m])), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Avg memoryActualWorkload")
 	getWorkload(promaddress, "memory_actual_workload", "Actual Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
@@ -331,42 +331,42 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	*/
 
 	//Query and store prometheus node recieved network data in bytes (MAX)
-	query = `max(max(label_replace(node_network_receive_bytes_total, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `max(max(label_replace(irate(node_network_receive_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Max networkReceivedBytesTotal")
 	getWorkload(promaddress, "net_received_bytes", "Raw Net Received Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node recieved network data in bytes (AVG)
-	query = `avg(avg(label_replace(node_network_receive_bytes_total, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `avg(avg(label_replace(irate(node_network_receive_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Avg networkReceivedBytesTotal")
 	getWorkload(promaddress, "net_received_bytes", "Raw Net Received Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus recieved network data in packets (MAX)
-	query = `max(max(label_replace(node_network_receive_packets_total, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `max(max(label_replace(irate(node_network_receive_packets_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Max networkReceivePacketsTotal")
 	getWorkload(promaddress, "net_received_packets", "Network Packets Received", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus recieved network data in packets (AVG)
-	query = `avg(avg(label_replace(node_network_receive_packets_total, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `avg(avg(label_replace(irate(node_network_receive_packets_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Avg networkReceivePacketsTotal")
 	getWorkload(promaddress, "net_received_packets", "Network Packets Received", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus total transmitted network data in bytes (MAX)
-	query = `max(max(label_replace(node_network_transmit_bytes_total, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `max(max(label_replace(irate(node_network_transmit_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Max networkTransmitBytesTotal")
 	getWorkload(promaddress, "net_sent_bytes", "Raw Net Sent Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus total transmitted network data in bytes (AVG)
-	query = `avg(avg(label_replace(node_network_transmit_bytes_total, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `avg(avg(label_replace(irate(node_network_transmit_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Avg networkTransmitBytesTotal")
 	getWorkload(promaddress, "net_sent_bytes", "Raw Net Sent Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus total transmitted network data in packets (MAX)
-	query = `max(max(label_replace(node_network_transmit_packets_total, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `max(max(label_replace(irate(node_network_transmit_packets_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Max networkTransmitPacketsTotal")
 	getWorkload(promaddress, "net_sent_packets", "Network Packets Sent", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus total transmitted network data in packets (AVG)
-	query = `avg(avg(label_replace(node_network_transmit_packets_total, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `avg(avg(label_replace(irate(node_network_transmit_packets_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Avg networkTransmitPacketsTotal")
 	getWorkload(promaddress, "net_sent_packets", "Network Packets Sent", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
@@ -379,17 +379,17 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	/*
 		==========START OF CPU METRICS==========
-		-rate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100	(MAX)
-		-rate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100	(AVG)
+		-irate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100	(MAX)
+		-irate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100	(AVG)
 	*/
 
 	//Query and store prometheus total cpu uptime in seconds (MAX)
-	query = `max(max(label_replace(sum(rate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `max(max(label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Max cpuSecondsTotal")
 	getWorkload(promaddress, "cpu_utilization", "CPU Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus total cpu uptime in seconds (AVG)
-	query = `avg(avg(label_replace(sum(rate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	query = `avg(avg(label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "Avg cpuSecondsTotal")
 	getWorkload(promaddress, "cpu_utilization", "CPU Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 

@@ -161,7 +161,7 @@ func writeAttributes(clusterName, promAddr string) {
 					fmt.Fprintf(attributeWrite, ",%s", time.Unix(int64(vt.creationTime), 0).Format("2006-01-02 15:04:05.000"))
 				}
 				if vc.restarts == -1 {
-					fmt.Fprintf(attributeWrite, ",")
+					fmt.Fprintf(attributeWrite, ",,")
 				} else {
 					fmt.Fprintf(attributeWrite, ",%d,", vc.restarts)
 				}

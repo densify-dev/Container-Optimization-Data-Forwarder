@@ -4,6 +4,8 @@ package prometheus
 import (
 	"context"
 	"log"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/prometheus/common/model"
@@ -15,8 +17,12 @@ import (
 //step is set to be 5minutes as it is defined in microseconds.
 const step = 300000000000
 
+var promAddLog string
+var hasClusterName = false
+
 //MetricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
 func MetricCollect(promaddress, query string, start, end time.Time, entityKind, metric string) (value model.Value) {
+
 	//setup the context to use for the API calls
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -62,6 +68,19 @@ func TimeRange(interval string, intervalSize int, currentTime time.Time, history
 }
 
 //LogMessage formats and logs errors, warnings and debug messages
-func LogMessage(logType, promaddress, entityKind, metric, message, query string) string {
-	return logType + " address=" + promaddress + " " + "entity=" + `"` + entityKind + ", " + metric + `"` + " " + "message=" + `"` + message + `"` + " " + "query=" + `"` + query + `"`
+func LogMessage(logType, promA, entityKind, metric, message, query string) string {
+	//Checks to see if the cluster name for log printing has been made. If not then run
+	if hasClusterName == false {
+		//Cuts everthing off before the ://
+		delimiter := "://"
+		rightOf := strings.Join(strings.Split(promA, delimiter)[1:], delimiter)
+
+		//Removes the colon and port number
+		delimiter1 := regexp.MustCompile(`[:]\d+`)
+		promAddLog = delimiter1.ReplaceAllString(rightOf, "")
+
+		//Sets to true to ensure this is not run again when cluster name is aqquired
+		hasClusterName = true
+	}
+	return logType + " address=" + promAddLog + " " + "entity=" + `"` + entityKind + ", " + metric + `"` + " " + "message=" + `"` + message + `"` + " " + "query=" + `"` + query + `"`
 }

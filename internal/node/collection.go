@@ -95,7 +95,8 @@ func getNodeMetric(result model.Value, node model.LabelName, metric string) {
 	}
 }
 
-func getWorkload(promaddress, fileName, metricName, query2, aggregrator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) {
+func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) {
+	var query2 string
 	var cluster string
 	if clusterName == "" {
 		cluster = promAddr
@@ -108,7 +109,7 @@ func getWorkload(promaddress, fileName, metricName, query2, aggregrator, cluster
 	//var query string
 	var start, end time.Time
 	//Open the files that will be used for the workload data types and write out there headers.
-	workloadWrite, err := os.Create("./data/node/" + aggregrator + `_` + fileName + ".csv")
+	workloadWrite, err := os.Create("./data/node/" + aggregator + `_` + fileName + ".csv")
 	if err != nil {
 		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, metricName, err.Error(), query2))
 	}
@@ -119,6 +120,8 @@ func getWorkload(promaddress, fileName, metricName, query2, aggregrator, cluster
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
+
+		query2 = aggregator + "(" + aggregator + "(" + query + `) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 		result = prometheus.MetricCollect(promaddress, query2, start, end, "Node", metricName)
 		writeWorkload(workloadWrite, result, "node", promAddr, cluster)
 	}

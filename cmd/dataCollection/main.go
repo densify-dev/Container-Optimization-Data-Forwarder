@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/cluster"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
@@ -23,19 +25,79 @@ var currentTime time.Time
 //initParamters will look for settings defined on the command line or in config.properties file and update accordingly. Also defines the default values for these variables.
 //Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
 func initParameters() {
-	//Get the settings passed in from the command line and update the variables as required.
-	flag.StringVar(&clusterName, "clusterName", "", "Name of the cluster to show in Densify")
-	flag.StringVar(&promProtocol, "protocol", "http", "Which protocol to use http|https")
-	flag.StringVar(&promAddr, "address", "", "Name of the Prometheus Server")
-	flag.StringVar(&promPort, "port", "9090", "Prometheus Port")
-	flag.StringVar(&interval, "interval", "hours", "Interval to use for data collection. Can be days, hours or minutes")
-	flag.IntVar(&intervalSize, "intervalSize", 1, "Interval size to be used for querying. eg. default of 1 with default interval of hours queries 1 last hour of info")
-	flag.IntVar(&history, "history", 1, "Amount of time to go back for data collection works with the interval and intervalSize settings")
-	flag.IntVar(&offset, "offset", 0, "Amount of units (based on interval value) to offset the data collection backwards in time")
-	flag.BoolVar(&debug, "debug", false, "Enable debug logging")
-	flag.StringVar(&configFile, "file", "config", "Name of the config file without extention. Default config")
-	flag.StringVar(&configPath, "path", "./config", "Path to where the config file is stored")
-	flag.Parse()
+	//Set default settings
+	clusterName = ""
+	promProtocol = "http"
+	promAddr = ""
+	promPort = "9090"
+	interval = "hours"
+	intervalSize = 1
+	history = 1
+	offset = 0
+	debug = false
+	configFile = "config"
+	configPath = "./config"
+
+	//Set settings using environment variables
+	exists := false
+	tempEnvVar := ""
+
+	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_CLUSTER")
+	if exists {
+		clusterName = tempEnvVar
+	}
+	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_PROTOCOL")
+	if exists {
+		promProtocol = tempEnvVar
+	}
+	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_ADDRESS")
+	if exists {
+		promAddr = tempEnvVar
+	}
+	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_PORT")
+	if exists {
+		promPort = tempEnvVar
+	}
+	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_INTERVAL")
+	if exists {
+		interval = tempEnvVar
+	}
+	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_INTERVALSIZE")
+	if exists {
+		intervalSizeTemp, err := strconv.ParseInt(tempEnvVar, 10, 64)
+		if err == nil {
+			intervalSize = int(intervalSizeTemp)
+		}
+	}
+	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_HISTORY")
+	if exists {
+		historyTemp, err := strconv.ParseInt(tempEnvVar, 10, 64)
+		if err == nil {
+			history = int(historyTemp)
+		}
+	}
+	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_OFFSET")
+	if exists {
+		offsetTemp, err := strconv.ParseInt(tempEnvVar, 10, 64)
+		if err == nil {
+			offset = int(offsetTemp)
+		}
+	}
+	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_DEBUG")
+	if exists {
+		debugTemp, err := strconv.ParseBool(tempEnvVar)
+		if err == nil {
+			debug = debugTemp
+		}
+	}
+	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_CONFIGFILE")
+	if exists {
+		configFile = tempEnvVar
+	}
+	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_CONFIGPATH")
+	if exists {
+		configPath = tempEnvVar
+	}
 
 	//Set defaults for viper to use if setting not found in the config.properties file.
 	viper.SetDefault("cluster_name", clusterName)
@@ -65,6 +127,20 @@ func initParameters() {
 	history = viper.GetInt("history")
 	offset = viper.GetInt("offset")
 	debug = viper.GetBool("debug")
+
+	//Get the settings passed in from the command line and update the variables as required.
+	flag.StringVar(&clusterName, "clusterName", clusterName, "Name of the cluster to show in Densify")
+	flag.StringVar(&promProtocol, "protocol", promProtocol, "Which protocol to use http|https")
+	flag.StringVar(&promAddr, "address", promAddr, "Name of the Prometheus Server")
+	flag.StringVar(&promPort, "port", promPort, "Prometheus Port")
+	flag.StringVar(&interval, "interval", interval, "Interval to use for data collection. Can be days, hours or minutes")
+	flag.IntVar(&intervalSize, "intervalSize", intervalSize, "Interval size to be used for querying. eg. default of 1 with default interval of hours queries 1 last hour of info")
+	flag.IntVar(&history, "history", history, "Amount of time to go back for data collection works with the interval and intervalSize settings")
+	flag.IntVar(&offset, "offset", offset, "Amount of units (based on interval value) to offset the data collection backwards in time")
+	flag.BoolVar(&debug, "debug", debug, "Enable debug logging")
+	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
+	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
+	flag.Parse()
 
 }
 
@@ -102,4 +178,5 @@ func main() {
 
 	container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
 	node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+	cluster.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
 }

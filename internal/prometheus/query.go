@@ -41,7 +41,11 @@ func MetricCollect(promaddress, query string, start, end time.Time, entityKind, 
 	}
 
 	//If the values from the query return no data (length of 0) then give a warning
-	if value.(model.Matrix).Len() == 0 {
+	if value == nil {
+		log.Println(LogMessage("[WARN]", promaddress, entityKind, metric, "No data returned", query))
+	} else if value.(model.Matrix) == nil {
+		log.Println(LogMessage("[WARN]", promaddress, entityKind, metric, "No data returned", query))
+	} else if value.(model.Matrix).Len() == 0 {
 		log.Println(LogMessage("[WARN]", promaddress, entityKind, metric, "No data returned", query))
 	}
 

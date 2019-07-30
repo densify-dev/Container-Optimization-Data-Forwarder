@@ -119,33 +119,35 @@ func initParameters() {
 	flag.Parse()
 
 	//Set defaults for viper to use if setting not found in the config.properties file.
-	viper.SetDefault("cluster_name", clusterName)
-	viper.SetDefault("prometheus_protocol", promProtocol)
-	viper.SetDefault("prometheus_address", promAddr)
-	viper.SetDefault("prometheus_port", promPort)
-	viper.SetDefault("interval", interval)
-	viper.SetDefault("interval_size", intervalSize)
-	viper.SetDefault("history", history)
-	viper.SetDefault("offset", offset)
-	viper.SetDefault("debug", debug)
-	// Config import setup.
-	viper.SetConfigName(configFile)
-	viper.AddConfigPath(configPath)
-	err := viper.ReadInConfig()
-	if err != nil {
-		panic(fmt.Errorf("Fatal error config file: %s ", err))
-	}
+	if configFile != "" {
+		viper.SetDefault("cluster_name", clusterName)
+		viper.SetDefault("prometheus_protocol", promProtocol)
+		viper.SetDefault("prometheus_address", promAddr)
+		viper.SetDefault("prometheus_port", promPort)
+		viper.SetDefault("interval", interval)
+		viper.SetDefault("interval_size", intervalSize)
+		viper.SetDefault("history", history)
+		viper.SetDefault("offset", offset)
+		viper.SetDefault("debug", debug)
+		// Config import setup.
+		viper.SetConfigName(configFile)
+		viper.AddConfigPath(configPath)
+		err := viper.ReadInConfig()
+		if err != nil {
+			panic(fmt.Errorf("Fatal error config file: %s ", err))
+		}
 
-	//Process the config.properties file update the variables as required.
-	clusterName = viper.GetString("cluster_name")
-	promProtocol = viper.GetString("prometheus_protocol")
-	promAddr = viper.GetString("prometheus_address")
-	promPort = viper.GetString("prometheus_port")
-	interval = viper.GetString("interval")
-	intervalSize = viper.GetInt("interval_size")
-	history = viper.GetInt("history")
-	offset = viper.GetInt("offset")
-	debug = viper.GetBool("debug")
+		//Process the config.properties file update the variables as required.
+		clusterName = viper.GetString("cluster_name")
+		promProtocol = viper.GetString("prometheus_protocol")
+		promAddr = viper.GetString("prometheus_address")
+		promPort = viper.GetString("prometheus_port")
+		interval = viper.GetString("interval")
+		intervalSize = viper.GetInt("interval_size")
+		history = viper.GetInt("history")
+		offset = viper.GetInt("offset")
+		debug = viper.GetBool("debug")
+	}
 
 	visitor := func(a *flag.Flag) {
 		switch a.Name {

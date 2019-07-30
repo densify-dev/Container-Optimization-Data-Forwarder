@@ -22,6 +22,11 @@ var intervalSize, history, offset int
 var debug bool
 var currentTime time.Time
 
+//Temps
+var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp string
+var intervalSizeTemp, historyTemp, offsetTemp int
+var debugTemp bool
+
 //initParamters will look for settings defined on the command line or in config.properties file and update accordingly. Also defines the default values for these variables.
 //Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
 func initParameters() {
@@ -99,6 +104,20 @@ func initParameters() {
 		configPath = tempEnvVar
 	}
 
+	//Get the settings passed in from the command line and update the variables as required.
+	flag.StringVar(&clusterNameTemp, "clusterName", clusterName, "Name of the cluster to show in Densify")
+	flag.StringVar(&promProtocolTemp, "protocol", promProtocol, "Which protocol to use http|https")
+	flag.StringVar(&promAddrTemp, "address", promAddr, "Name of the Prometheus Server")
+	flag.StringVar(&promPortTemp, "port", promPort, "Prometheus Port")
+	flag.StringVar(&intervalTemp, "interval", interval, "Interval to use for data collection. Can be days, hours or minutes")
+	flag.IntVar(&intervalSizeTemp, "intervalSize", intervalSize, "Interval size to be used for querying. eg. default of 1 with default interval of hours queries 1 last hour of info")
+	flag.IntVar(&historyTemp, "history", history, "Amount of time to go back for data collection works with the interval and intervalSize settings")
+	flag.IntVar(&offsetTemp, "offset", offset, "Amount of units (based on interval value) to offset the data collection backwards in time")
+	flag.BoolVar(&debugTemp, "debug", debug, "Enable debug logging")
+	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
+	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
+	flag.Parse()
+
 	//Set defaults for viper to use if setting not found in the config.properties file.
 	viper.SetDefault("cluster_name", clusterName)
 	viper.SetDefault("prometheus_protocol", promProtocol)
@@ -128,19 +147,30 @@ func initParameters() {
 	offset = viper.GetInt("offset")
 	debug = viper.GetBool("debug")
 
-	//Get the settings passed in from the command line and update the variables as required.
-	flag.StringVar(&clusterName, "clusterName", clusterName, "Name of the cluster to show in Densify")
-	flag.StringVar(&promProtocol, "protocol", promProtocol, "Which protocol to use http|https")
-	flag.StringVar(&promAddr, "address", promAddr, "Name of the Prometheus Server")
-	flag.StringVar(&promPort, "port", promPort, "Prometheus Port")
-	flag.StringVar(&interval, "interval", interval, "Interval to use for data collection. Can be days, hours or minutes")
-	flag.IntVar(&intervalSize, "intervalSize", intervalSize, "Interval size to be used for querying. eg. default of 1 with default interval of hours queries 1 last hour of info")
-	flag.IntVar(&history, "history", history, "Amount of time to go back for data collection works with the interval and intervalSize settings")
-	flag.IntVar(&offset, "offset", offset, "Amount of units (based on interval value) to offset the data collection backwards in time")
-	flag.BoolVar(&debug, "debug", debug, "Enable debug logging")
-	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
-	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
-	flag.Parse()
+	visitor := func(a *flag.Flag) {
+		switch a.Name {
+		case "clusterName":
+			clusterName = clusterNameTemp
+		case "protocol":
+			promProtocol = promProtocolTemp
+		case "address":
+			promAddr = promAddrTemp
+		case "port":
+			promPort = promPortTemp
+		case "interval":
+			interval = intervalTemp
+		case "intervalSize":
+			intervalSize = intervalSizeTemp
+		case "history":
+			history = historyTemp
+		case "offset":
+			offset = offsetTemp
+		case "debug":
+			debug = debugTemp
+		}
+	}
+
+	flag.Visit(visitor)
 
 }
 

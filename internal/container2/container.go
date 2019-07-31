@@ -157,7 +157,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 		for i := range systems {
 			fmt.Println("\nnamespace: " + i)
 			for j, v := range systems[i].midLevels {
-				fmt.Println("- entity name: " + j + "\n  entity kind: " + v.kind + "\n  namespace: " + i + "\n  containers:")
+				fmt.Println("- entity name: " + v.name + "\n  entity kind: " + v.kind + "\n  namespace: " + i + "\n  containers:")
 				for k := range systems[i].midLevels[j].containers {
 					fmt.Println("  - " + k)
 				}
@@ -215,7 +215,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "podCreationTime")
 	getMidMetric(result, "namespace", "pod", "creationTime", "Pod")
 
-	//Namespace Metrics
+	//Namespace metrics
 	query = `kube_namespace_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "namespaceLabels")
 	getNamespaceMetricString(result, "namespace")
@@ -404,13 +404,13 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	getWorkload(promaddress, "restarts", "Restarts", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 	getWorkload(promaddress, "restarts", "Restarts", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
+	//Current size workloads
 	currentSizeWrite, err := os.Create("./data/container/currentSize.csv")
 	if err != nil {
 		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
 	}
 	fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,currentSize\n")
 
-	//Get the current size of the controller will query each of the differnt types of controller
 	query = `kube_replicaset_spec_replicas`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "replicaSetSpecReplicas")
 	getMidMetric(result, "namespace", "replicaset", "currentSize", "ReplicaSet")

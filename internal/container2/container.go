@@ -179,11 +179,11 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	query = `container_spec_cpu_shares{name!~"k8s_POD_.*"}`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "conLabel")
-	getContainerMetricString(result, "namespace", "pod_name", "container_name", "conLabel")
+	getContainerMetricString(result, "namespace", "pod_name", "container_name")
 
 	query = `kube_pod_container_info`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "conInfo")
-	getContainerMetricString(result, "namespace", "pod", "container", "conInfo")
+	getContainerMetricString(result, "namespace", "pod", "container")
 
 	query = `sum(kube_pod_container_resource_limits_memory_bytes) by (pod,namespace,container)/1024/1024`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "memLimit")
@@ -203,11 +203,11 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	query = `kube_pod_info`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "podInfo")
-	getMidMetricString(result, "namespace", "pod", "podInfo", "Pod")
+	getMidMetricString(result, "namespace", "pod", "Pod")
 
 	query = `kube_pod_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "podLabels")
-	getMidMetricString(result, "namespace", "pod", "podLabel", "Pod")
+	getMidMetricString(result, "namespace", "pod", "Pod")
 
 	query = `kube_pod_created`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "podCreationTime")
@@ -217,11 +217,11 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	//Get the namespace labels
 	query = `kube_namespace_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "namespaceLabels")
-	getNamespaceMetricString(result, "namespace", "namespaceLabel")
+	getNamespaceMetricString(result, "namespace")
 
 	query = `kube_namespace_annotations`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "namespaceAnnotations")
-	getNamespaceMetricString(result, "namespace", "namespaceAnnotations")
+	getNamespaceMetricString(result, "namespace")
 
 	//Get the CPU and Memory Limit and Request quotes for the namespace.
 	query = `kube_limitrange`
@@ -231,35 +231,35 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	//Get the controller labels
 	query = `kube_statefulset_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statefulSetLabels")
-	getMidMetricString(result, "namespace", "statefulset", "label", "StatefulSet")
+	getMidMetricString(result, "namespace", "statefulset", "StatefulSet")
 
 	query = `kube_job_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "jobLabels")
-	getMidMetricString(result, "namespace", "job_name", "label", "Job")
+	getMidMetricString(result, "namespace", "job_name", "Job")
 
 	query = `kube_job_info`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "jobInfo")
-	getMidMetricString(result, "namespace", "job_name", "info", "Job")
+	getMidMetricString(result, "namespace", "job_name", "Job")
 
 	query = `kube_daemonset_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "daemonSetLabels")
-	getMidMetricString(result, "namespace", "daemonset", "label", "DaemonSet")
+	getMidMetricString(result, "namespace", "daemonset", "DaemonSet")
 
 	query = `kube_replicaset_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "replicaSetLabels")
-	getMidMetricString(result, "namespace", "replicaset", "label", "ReplicaSet")
+	getMidMetricString(result, "namespace", "replicaset", "ReplicaSet")
 
 	query = `kube_deployment_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "deploymentLabels")
-	getMidMetricString(result, "namespace", "deployment", "label", "Deployment")
+	getMidMetricString(result, "namespace", "deployment", "Deployment")
 
 	query = `kube_cronjob_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "cronJobLabels")
-	getMidMetricString(result, "namespace", "cronjob", "label", "CronJob")
+	getMidMetricString(result, "namespace", "cronjob", "CronJob")
 
 	query = `kube_cronjob_info`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "cronJobInfo")
-	getMidMetricString(result, "namespace", "cronjob", "info", "CronJob")
+	getMidMetricString(result, "namespace", "cronjob", "CronJob")
 
 	//get creation time
 	query = `kube_cronjob_created`
@@ -293,7 +293,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	//Deployment metrics
 	query = `kube_deployment_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "deploymentLabels")
-	getMidMetricString(result, "namespace", "deployment", "deploymentLabel", "Deployment")
+	getMidMetricString(result, "namespace", "deployment", "Deployment")
 
 	query = `kube_deployment_spec_strategy_rollingupdate_max_surge`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "maxSurge")
@@ -322,11 +322,11 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	query = `kube_job_info * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "jobInfo")
-	getMidMetricString(result, "namespace", "job_name", "jobInfo", "Job")
+	getMidMetricString(result, "namespace", "job_name", "Job")
 
 	query = `kube_job_labels * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "jobLabel")
-	getMidMetricString(result, "namespace", "job_name", "jobLabel", "Job")
+	getMidMetricString(result, "namespace", "job_name", "Job")
 
 	query = `kube_job_spec_completions * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "jobSpecCompletions")
@@ -364,7 +364,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	//HPA metrics
 	query = `kube_hpa_labels`
 	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "hpaLabels")
-	getHPAMetricString(result, "namespace", "hpa", "hpaLabel", clusterName, promAddr)
+	getHPAMetricString(result, "namespace", "hpa", clusterName, promAddr)
 
 	/*
 		query = `kube_hpa_status_condition{status="AbleToScale",condition="true"}`

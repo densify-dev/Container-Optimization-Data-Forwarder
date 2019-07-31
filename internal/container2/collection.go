@@ -62,7 +62,7 @@ func getContainerMetric(result model.Value, namespace model.LabelName, pod, cont
 }
 
 //getContainerMetricString is used to parse the label based results from Prometheus related to Container Entities and store them in the systems data structure.
-func getContainerMetricString(result model.Value, namespace model.LabelName, pod, container model.LabelName, metric string) {
+func getContainerMetricString(result model.Value, namespace model.LabelName, pod, container model.LabelName) {
 	//Validate there is data in the results.
 	if result != nil {
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
@@ -129,7 +129,7 @@ func getMidMetric(result model.Value, namespace model.LabelName, mid model.Label
 }
 
 //getmidMetricString is used to parse the label based results from Prometheus related to mid Entities and store them in the systems data structure.
-func getMidMetricString(result model.Value, namespace model.LabelName, mid model.LabelName, metric string, prefix string) {
+func getMidMetricString(result model.Value, namespace model.LabelName, mid model.LabelName, prefix string) {
 	//temp structure used to store data while working with it. As we are combining the labels into a formatted string for loading.
 	//Validate there is data in the results.
 	if result != nil {
@@ -152,8 +152,8 @@ func getMidMetricString(result model.Value, namespace model.LabelName, mid model
 	}
 }
 
-//getmidMetricString is used to parse the label based results from Prometheus related to mid Entities and store them in the systems data structure.
-func getHPAMetricString(result model.Value, namespace model.LabelName, hpa model.LabelName, metric string, clusterName string, promAddr string) {
+//getHPAMetricString is used to parse the label based results from Prometheus related to mid Entities and store them in the systems data structure.
+func getHPAMetricString(result model.Value, namespace model.LabelName, hpa model.LabelName, clusterName string, promAddr string) {
 	hpas := map[string]map[string]string{}
 	//Validate there is data in the results.
 	if result != nil {
@@ -231,7 +231,7 @@ func getNamespacelimits(result model.Value, namespace model.LabelName) {
 }
 
 //getNamespaceMetricString is used to parse the label based results from Prometheus related to Namespace Entities and store them in the systems data structure.
-func getNamespaceMetricString(result model.Value, namespace model.LabelName, metric string) {
+func getNamespaceMetricString(result model.Value, namespace model.LabelName) {
 	//Validate there is data in the results.
 	if result != nil {
 		//Loop through the different entities in the results.

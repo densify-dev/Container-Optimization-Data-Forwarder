@@ -276,45 +276,6 @@ func writeWorkload(file io.Writer, result model.Value, namespace, pod, container
 }
 
 //writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
-func writeHPAWorkload(file io.Writer, result model.Value, namespace, hpa, container model.LabelName, clusterName, promAddr string) {
-	if result != nil {
-		//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.
-		var cluster string
-		if clusterName == "" {
-			cluster = promAddr
-		} else {
-			cluster = clusterName
-		}
-		//Loop through the results for the workload and validate that contains the required labels and that the entity exists in the systems data structure once validated will write out the workload for the system.
-		for i := 0; i < result.(model.Matrix).Len(); i++ {
-			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := systems[string(namespaceValue)]; ok {
-					if hpaValue, ok := result.(model.Matrix)[i].Metric[hpa]; ok {
-						if _, ok := systems[string(namespaceValue)].pointers["Deployment__"+string(hpaValue)]; ok {
-							for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-								fmt.Fprintf(file, "%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(hpaValue), ";", ".", -1), strings.Replace(string(hpaValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
-							}
-						} else if _, ok := systems[string(namespaceValue)].pointers["ReplicaSet__"+string(hpaValue)]; ok {
-							for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-								fmt.Fprintf(file, "%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(hpaValue), ";", ".", -1), strings.Replace(string(hpaValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
-							}
-						} else if _, ok := systems[string(namespaceValue)].pointers["ReplicationController__"+string(hpaValue)]; ok {
-							for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-								fmt.Fprintf(file, "%s,%s,%s,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(hpaValue), ";", ".", -1), strings.Replace(string(hpaValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
-							}
-						} else {
-							for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-								fmt.Fprintf(file, "%s,%s,,%s,%s,%f\n", cluster, namespaceValue, strings.Replace(string(hpaValue), ":", ".", -1), time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), result.(model.Matrix)[i].Values[j].Value)
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-//writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
 func writeWorkloadMid(file io.Writer, result model.Value, namespace, mid model.LabelName, clusterName, promAddr string, prefix string) {
 	if result != nil {
 		//Check if the cluster parameter is set and if it is then use it for the name of the cluster if not use the prometheus address as the cluster name.

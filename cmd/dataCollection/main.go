@@ -43,63 +43,59 @@ func initParameters() {
 	configPath = "./config"
 
 	//Set settings using environment variables
-	exists := false
-	tempEnvVar := ""
-
-	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_CLUSTER")
-	if exists {
+	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_CLUSTER"); ok {
 		clusterName = tempEnvVar
 	}
-	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_PROTOCOL")
-	if exists {
+
+	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_PROTOCOL"); ok {
 		promProtocol = tempEnvVar
 	}
-	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_ADDRESS")
-	if exists {
+
+	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_ADDRESS"); ok {
 		promAddr = tempEnvVar
 	}
-	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_PORT")
-	if exists {
+
+	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_PORT"); ok {
 		promPort = tempEnvVar
 	}
-	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_INTERVAL")
-	if exists {
+
+	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_INTERVAL"); ok {
 		interval = tempEnvVar
 	}
-	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_INTERVALSIZE")
-	if exists {
+
+	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_INTERVALSIZE"); ok {
 		intervalSizeTemp, err := strconv.ParseInt(tempEnvVar, 10, 64)
 		if err == nil {
 			intervalSize = int(intervalSizeTemp)
 		}
 	}
-	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_HISTORY")
-	if exists {
+
+	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_HISTORY"); ok {
 		historyTemp, err := strconv.ParseInt(tempEnvVar, 10, 64)
 		if err == nil {
 			history = int(historyTemp)
 		}
 	}
-	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_OFFSET")
-	if exists {
+
+	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_OFFSET"); ok {
 		offsetTemp, err := strconv.ParseInt(tempEnvVar, 10, 64)
 		if err == nil {
 			offset = int(offsetTemp)
 		}
 	}
-	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_DEBUG")
-	if exists {
+
+	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_DEBUG"); ok {
 		debugTemp, err := strconv.ParseBool(tempEnvVar)
 		if err == nil {
 			debug = debugTemp
 		}
 	}
-	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_CONFIGFILE")
-	if exists {
+
+	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_CONFIGFILE"); ok {
 		configFile = tempEnvVar
 	}
-	tempEnvVar, exists = os.LookupEnv("PROMETHEUS_CONFIGPATH")
-	if exists {
+
+	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_CONFIGPATH"); ok {
 		configPath = tempEnvVar
 	}
 

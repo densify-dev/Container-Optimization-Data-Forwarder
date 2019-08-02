@@ -9,16 +9,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 )
 
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
-func writeConfig(clusterName, promAddr string) {
+func writeConfig(clusterName, promAddr string) (logReturn string) {
+	errors := ""
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/container/config.csv")
 	if err != nil {
 		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
+		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
 	}
 
 	//Write out the header.
@@ -43,14 +46,17 @@ func writeConfig(clusterName, promAddr string) {
 			}
 		}
 	}
+	return errors
 }
 
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
-func writeHPAConfig(clusterName, promAddr string, systems map[string]map[string]string) {
+func writeHPAConfig(clusterName, promAddr string, systems map[string]map[string]string) (logReturn string) {
+	errors := ""
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/hpa/hpa_extra_config.csv")
 	if err != nil {
 		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
+		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
 	}
 
 	//Write out the header.
@@ -68,14 +74,17 @@ func writeHPAConfig(clusterName, promAddr string, systems map[string]map[string]
 		fmt.Fprintf(configWrite, "%s,%s,,,,%s,Linux,HPA", cluster, systems[i]["namespace"], i)
 		fmt.Fprintf(configWrite, "\n")
 	}
+	return errors
 }
 
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
-func writeAttributes(clusterName, promAddr string) {
+func writeAttributes(clusterName, promAddr string) (logReturn string) {
+	errors := ""
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/container/attributes.csv")
 	if err != nil {
 		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
+		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
 	}
 
 	//Write out the header.
@@ -200,14 +209,17 @@ func writeAttributes(clusterName, promAddr string) {
 			}
 		}
 	}
+	return errors
 }
 
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
-func writeHPAAttributes(clusterName, promAddr string, systems map[string]map[string]string) {
+func writeHPAAttributes(clusterName, promAddr string, systems map[string]map[string]string) (logReturn string) {
+	errors := ""
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/hpa/hpa_extra_attributes.csv")
 	if err != nil {
 		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
+		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
 	}
 
 	var cluster string
@@ -234,6 +246,7 @@ func writeHPAAttributes(clusterName, promAddr string, systems map[string]map[str
 		}
 		fmt.Fprintf(attributeWrite, "\n")
 	}
+	return errors
 }
 
 //writeWorkload will write out the workload data specific to metric provided to the file that was passed in.

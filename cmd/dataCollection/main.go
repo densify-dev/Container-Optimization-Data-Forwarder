@@ -1,4 +1,4 @@
-//Package datacollection collects data from Prometheus and formats the data into CSVs that will be sent to Densify through the Forwarder.
+//Package main collects data from Prometheus and formats the data into CSVs that will be sent to Densify through the Forwarder.
 package main
 
 import (
@@ -10,13 +10,17 @@ import (
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/cluster"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/spf13/viper"
 )
 
+//PromAddr is the prometheus address
+var PromAddr string
+
 //Global variables used for Storing system info, command line\config file parameters.
-var clusterName, promAddr, promPort, promProtocol, interval, configFile, configPath string
+var clusterName, promPort, promProtocol, interval, configFile, configPath string
 var intervalSize, history, offset int
 var debug bool
 var currentTime time.Time
@@ -32,7 +36,7 @@ func initParameters() {
 	//Set default settings
 	clusterName = ""
 	promProtocol = "http"
-	promAddr = ""
+	PromAddr = ""
 	promPort = "9090"
 	interval = "hours"
 	intervalSize = 1
@@ -52,7 +56,7 @@ func initParameters() {
 	}
 
 	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_ADDRESS"); ok {
-		promAddr = tempEnvVar
+		PromAddr = tempEnvVar
 	}
 
 	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_PORT"); ok {
@@ -102,7 +106,7 @@ func initParameters() {
 	//Get the settings passed in from the command line and update the variables as required.
 	flag.StringVar(&clusterNameTemp, "clusterName", clusterName, "Name of the cluster to show in Densify")
 	flag.StringVar(&promProtocolTemp, "protocol", promProtocol, "Which protocol to use http|https")
-	flag.StringVar(&promAddrTemp, "address", promAddr, "Name of the Prometheus Server")
+	flag.StringVar(&promAddrTemp, "address", PromAddr, "Name of the Prometheus Server")
 	flag.StringVar(&promPortTemp, "port", promPort, "Prometheus Port")
 	flag.StringVar(&intervalTemp, "interval", interval, "Interval to use for data collection. Can be days, hours or minutes")
 	flag.IntVar(&intervalSizeTemp, "intervalSize", intervalSize, "Interval size to be used for querying. eg. default of 1 with default interval of hours queries 1 last hour of info")
@@ -118,7 +122,7 @@ func initParameters() {
 
 		viper.SetDefault("cluster_name", clusterName)
 		viper.SetDefault("prometheus_protocol", promProtocol)
-		viper.SetDefault("prometheus_address", promAddr)
+		viper.SetDefault("prometheus_address", PromAddr)
 		viper.SetDefault("prometheus_port", promPort)
 		viper.SetDefault("interval", interval)
 		viper.SetDefault("interval_size", intervalSize)
@@ -134,7 +138,7 @@ func initParameters() {
 			//Process the config.properties file update the variables as required.
 			clusterName = viper.GetString("cluster_name")
 			promProtocol = viper.GetString("prometheus_protocol")
-			promAddr = viper.GetString("prometheus_address")
+			PromAddr = viper.GetString("prometheus_address")
 			promPort = viper.GetString("prometheus_port")
 			interval = viper.GetString("interval")
 			intervalSize = viper.GetInt("interval_size")
@@ -152,7 +156,7 @@ func initParameters() {
 		case "protocol":
 			promProtocol = promProtocolTemp
 		case "address":
-			promAddr = promAddrTemp
+			PromAddr = promAddrTemp
 		case "port":
 			promPort = promPortTemp
 		case "interval":
@@ -174,13 +178,13 @@ func initParameters() {
 
 //main function.
 func main() {
+	errors := "Version 2.0.1-beta"
 
 	//Open the debug log file for writing.
 	debugLog, err := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		log.Fatal(prometheus.LogMessage("[ERROR]", promAddr, "Main", "N/A", err.Error(), "N/A"))
+		log.Fatal(prometheus.LogMessage("[ERROR]", PromAddr, "Main", "N/A", err.Error(), "N/A"))
 	}
-	defer debugLog.Close()
 	//Set log to use the debug log for writing output.
 	log.SetOutput(debugLog)
 	log.SetFlags(0)
@@ -191,6 +195,7 @@ func main() {
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
+	logger.SetPromAddr(PromAddr)
 
 	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
 	var t time.Time
@@ -204,7 +209,15 @@ func main() {
 		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute()-offset, 0, 0, t.Location())
 	}
 
-	container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	cluster.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+	errors += container2.Metrics(clusterName, promProtocol, PromAddr, promPort, interval, intervalSize, history, debug, currentTime)
+	node.Metrics(clusterName, promProtocol, PromAddr, promPort, interval, intervalSize, history, debug, currentTime)
+	cluster.Metrics(clusterName, promProtocol, PromAddr, promPort, interval, intervalSize, history, debug, currentTime)
+
+	//Open the debug log file for writing.
+	debugLog2, err := os.OpenFile("./data/log2.txt", os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		log.Fatal(prometheus.LogMessage("[ERROR]", PromAddr, "Main", "N/A", err.Error(), "N/A"))
+	}
+
+	logger.PrintLog(errors, debugLog2)
 }

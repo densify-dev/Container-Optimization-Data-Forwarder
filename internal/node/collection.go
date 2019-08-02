@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 )
@@ -95,7 +96,8 @@ func getNodeMetric(result model.Value, node model.LabelName, metric string) {
 	}
 }
 
-func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) {
+func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) (logReturn string) {
+	errors := ""
 	var query2 string
 	var cluster string
 	if clusterName == "" {
@@ -112,6 +114,7 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 	workloadWrite, err := os.Create("./data/node/" + aggregator + `_` + fileName + ".csv")
 	if err != nil {
 		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, metricName, err.Error(), query2))
+		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
 	}
 	fmt.Fprintf(workloadWrite, "cluster,node,Datetime,%s\n", metricName)
 
@@ -122,11 +125,12 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
 
 		query2 = aggregator + "(" + aggregator + "(" + query + `) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
-		result = prometheus.MetricCollect(promaddress, query2, start, end, "Node", metricName)
+		result, _ = prometheus.MetricCollect(promaddress, query2, start, end, "Node", metricName, false)
 		writeWorkload(workloadWrite, result, "node", promAddr, cluster)
 	}
 	//Close the workload files.
 	workloadWrite.Close()
+	return errors
 }
 
 //getNodeMetricString is used to parse the label based results from Prometheus related to Container Entities and store them in the systems data structure.

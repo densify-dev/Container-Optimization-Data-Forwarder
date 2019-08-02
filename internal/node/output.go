@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 )
@@ -45,7 +46,8 @@ func writeWorkload(file io.Writer, result model.Value, node model.LabelName, pro
 }
 
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
-func writeConfig(clusterName, promAddr string) {
+func writeConfig(clusterName, promAddr string) (logReturn string) {
+	errors := ""
 	var cluster string
 	if clusterName == "" {
 		cluster = promAddr
@@ -57,6 +59,7 @@ func writeConfig(clusterName, promAddr string) {
 	configWrite, err := os.Create("./data/node/config.csv")
 	if err != nil {
 		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
+		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
 	}
 
 	//Write out the header.
@@ -89,10 +92,12 @@ func writeConfig(clusterName, promAddr string) {
 		fmt.Fprintf(configWrite, "\n")
 	}
 
+	return errors
 }
 
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
-func writeAttributes(clusterName, promAddr string) {
+func writeAttributes(clusterName, promAddr string) (logReturn string) {
+	errors := ""
 	var cluster string
 	if clusterName == "" {
 		cluster = promAddr
@@ -104,6 +109,7 @@ func writeAttributes(clusterName, promAddr string) {
 	attributeWrite, err := os.Create("./data/node/attributes.csv")
 	if err != nil {
 		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
+		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
 	}
 
 	//Write out the header.
@@ -214,4 +220,5 @@ func writeAttributes(clusterName, promAddr string) {
 
 	}
 
+	return errors
 }

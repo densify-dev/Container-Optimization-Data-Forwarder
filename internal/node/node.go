@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 )
@@ -29,8 +30,10 @@ var nodes = map[string]*node{}
 var entityKind = "Node"
 
 //Metrics a global func for collecting node level metrics in prometheus
-func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, intervalSize, history int, debug bool, currentTime time.Time) {
+func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, intervalSize, history int, debug bool, currentTime time.Time) (logReturn string) {
 	//Setup variables used in the code.
+	var errors = ""
+	var logLine string
 	var historyInterval time.Duration
 	historyInterval = 0
 	var promaddress, query string
@@ -44,7 +47,10 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Query and store kubernetes node information/labels
 	query = "max(kube_node_labels) by (instance, label_beta_kubernetes_io_arch, label_beta_kubernetes_io_os, label_kubernetes_io_hostname, node)"
-	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "nodeLabels")
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "nodeLabels", true)
+	if logLine != "" {
+		return errors + logLine
+	}
 
 	//Prefix for indexing (less clutter on screen)
 	var rsltIndex = result.(model.Matrix)
@@ -74,12 +80,12 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Additonal config/attribute queries
 	query = `kube_node_labels`
-	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "nodeLabels")
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "nodeLabels", false)
 	getNodeMetricString(result, "node", "nodeLabel")
 
 	//Gets the network speed in bytes as an attribute/config value for each node
 	query = `label_replace(node_network_speed_bytes, "pod_ip", "$1", "instance", "(.*):.*")`
-	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "networkSpeedBytes")
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "networkSpeedBytes", false)
 	getNodeMetric(result, "node", "netSpeedBytes")
 
 	if result.(model.Matrix).Len() == 0 {
@@ -88,7 +94,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Queries the capacity fields of all nodes
 	query = `kube_node_status_capacity`
-	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusCapacity")
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusCapacity", false)
 
 	/*
 	  Some older versions of prometheus don't support kube_node_status_capacity.
@@ -102,26 +108,42 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	if result.(model.Matrix).Len() == 0 {
 		//capacity_cpu_cores query
 		query = `kube_node_status_capacity_cpu_cores`
-		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusCapacityCpuCores")
-		getNodeMetric(result, "node", "capacity_cpu")
+		result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusCapacityCpuCores", false)
+		if logLine == "" {
+			getNodeMetric(result, "node", "capacity_cpu")
+		} else {
+			errors += logLine
+		}
 
 		//capacity_memory_bytes query
 		query = `kube_node_status_capacity_memory_bytes`
-		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusCapacityMemoryBytes")
-		getNodeMetric(result, "node", "capacity_mem")
+		result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusCapacityMemoryBytes", false)
+		if logLine == "" {
+			getNodeMetric(result, "node", "capacity_mem")
+		} else {
+			errors += logLine
+		}
 
 		//capacity_pods query
 		query = `kube_node_status_capacity_pods`
-		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusCapacityPods")
-		getNodeMetric(result, "node", "capacity_pod")
+		result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusCapacityPods", false)
+		if logLine == "" {
+			getNodeMetric(result, "node", "capacity_pod")
+		} else {
+			errors += logLine
+		}
 
 	} else {
-		getNodeMetric(result, "node", "capacity")
+		if logLine == "" {
+			getNodeMetric(result, "node", "capacity")
+		} else {
+			errors += logLine
+		}
 	}
 
 	//Queries the allocatable metric fields of all the nodes
 	query = `kube_node_status_allocatable`
-	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusAllocatable")
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusAllocatable", false)
 
 	/*
 	  Some older versions of prometheus don't support kube_node_status_allocatable.
@@ -134,19 +156,35 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	*/
 	if result.(model.Matrix).Len() == 0 {
 		query = `kube_node_status_allocatable_cpu_cores`
-		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusAllocatableCpuCores")
-		getNodeMetric(result, "node", "allocatable_cpu")
+		result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusAllocatableCpuCores", false)
+		if logLine == "" {
+			getNodeMetric(result, "node", "allocatable_cpu")
+		} else {
+			errors += logLine
+		}
 
 		query = `kube_node_status_allocatable_memory_bytes`
-		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusAllocatableMemoryBytes")
-		getNodeMetric(result, "node", "allocatable_mem")
+		result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusAllocatableMemoryBytes", false)
+		if logLine == "" {
+			getNodeMetric(result, "node", "allocatable_mem")
+		} else {
+			errors += logLine
+		}
 
 		query = `kube_node_status_allocatable_pods`
-		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusAllocatablePods")
-		getNodeMetric(result, "node", "allocatable_pod")
+		result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusAllocatablePods", false)
+		if logLine == "" {
+			getNodeMetric(result, "node", "allocatable_pod")
+		} else {
+			errors += logLine
+		}
 
 	} else {
-		getNodeMetric(result, "node", "allocatable")
+		if logLine == "" {
+			getNodeMetric(result, "node", "allocatable")
+		} else {
+			errors += logLine
+		}
 	}
 
 	//**************************************************************************************************************
@@ -162,33 +200,49 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	*/
 
 	query = `sum(kube_pod_container_resource_limits_cpu_cores) by (node)*1000`
-	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "cpuLimit")
-	getNodeMetric(result, "node", "cpuLimit")
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "cpuLimit", false)
+	if logLine == "" {
+		getNodeMetric(result, "node", "cpuLimit")
+	} else {
+		errors += logLine
+	}
 
 	query = `sum(kube_pod_container_resource_requests_cpu_cores) by (node)*1000`
-	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "cpuRequest")
-	getNodeMetric(result, "node", "cpuRequest")
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "cpuRequest", false)
+	if logLine == "" {
+		getNodeMetric(result, "node", "cpuRequest")
+	} else {
+		errors += logLine
+	}
 
 	query = `sum(kube_pod_container_resource_limits_memory_bytes) by (node)/1024/1024`
-	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "memLimit")
-	getNodeMetric(result, "node", "memLimit")
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "memLimit", false)
+	if logLine == "" {
+		getNodeMetric(result, "node", "memLimit")
+	} else {
+		errors += logLine
+	}
 
 	query = `sum(kube_pod_container_resource_requests_memory_bytes) by (node)/1024/1024`
-	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "memRequest")
-	getNodeMetric(result, "node", "memRequest")
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "memRequest", false)
+	if logLine == "" {
+		getNodeMetric(result, "node", "memRequest")
+	} else {
+		errors += logLine
+	}
 
 	/*
 		==========NODE REQUEST/LIMIT METRICS============
 	*/
 
 	//Writes the config and attribute files
-	writeConfig(clusterName, promAddr)
-	writeAttributes(clusterName, promAddr)
+	errors += writeConfig(clusterName, promAddr)
+	errors += writeAttributes(clusterName, promAddr)
 
 	//Checks to see if Node Exporter is installed. Based off if anything is returned from network speed bytes
 	if haveNodeExport == false {
 		log.Println(prometheus.LogMessage("[ERROR]", promaddress, entityKind, "N/A", "It appears you do not have Node Exporter installed.", "N/A"))
-		return
+		return errors + logger.LogError(map[string]string{"entity": entityKind, "message": "It appears you do not have Node Exporter installed."}, "ERROR")
 	}
 
 	/*
@@ -208,23 +262,23 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Query and store prometheus node disk write in bytes
 	query = `label_replace(irate(node_disk_written_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	getWorkload(promaddress, "disk_write_bytes", "Raw Disk Write Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "disk_write_bytes", "Raw Disk Write Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "disk_write_bytes", "Raw Disk Write Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "disk_write_bytes", "Raw Disk Write Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node disk read in bytes
 	query = `label_replace(irate(node_disk_read_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	getWorkload(promaddress, "disk_read_bytes", "Raw Disk Read Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "disk_read_bytes", "Raw Disk Read Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "disk_read_bytes", "Raw Disk Read Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "disk_read_bytes", "Raw Disk Read Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus total disk read uptime as a percentage
 	query = `label_replace(irate(node_disk_read_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	getWorkload(promaddress, "disk_read_ops", "Disk Read Operations", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "disk_read_ops", "Disk Read Operations", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "disk_read_ops", "Disk Read Operations", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "disk_read_ops", "Disk Read Operations", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus total disk write uptime as a percentage
 	query = `label_replace(irate(node_disk_write_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	getWorkload(promaddress, "disk_write_ops", "Disk Write Operations", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "disk_write_ops", "Disk Write Operations", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "disk_write_ops", "Disk Write Operations", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "disk_write_ops", "Disk Write Operations", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	/*
 		==========END OF DISK METRICS==========
@@ -250,23 +304,23 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Query and store prometheus node memory total in bytes
 	query = `label_replace(irate(node_memory_MemTotal_bytes[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	getWorkload(promaddress, "memory_total_bytes", "Total Memory Bytes", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "memory_total_bytes", "Total Memory Bytes", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "memory_total_bytes", "Total Memory Bytes", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "memory_total_bytes", "Total Memory Bytes", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory active bytes
 	query = `label_replace(irate(node_memory_Active_bytes[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	getWorkload(promaddress, "memory_active_bytes", "Active Memory Bytes", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "memory_active_bytes", "Active Memory Bytes", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "memory_active_bytes", "Active Memory Bytes", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "memory_active_bytes", "Active Memory Bytes", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory total in bytes
 	query = `label_replace(irate(node_memory_MemTotal_bytes[5m]) - irate(node_memory_MemFree_bytes[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	getWorkload(promaddress, "memory_raw_bytes", "Raw Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "memory_raw_bytes", "Raw Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "memory_raw_bytes", "Raw Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "memory_raw_bytes", "Raw Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory total free in bytes
 	query = `label_replace(irate(node_memory_MemTotal_bytes[5m]) - (irate(node_memory_MemFree_bytes[5m]) + irate(node_memory_Cached_bytes[5m]) + irate(node_memory_Buffers_bytes[5m])), "pod_ip", "$1", "instance", "(.*):.*")`
-	getWorkload(promaddress, "memory_actual_workload", "Actual Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "memory_actual_workload", "Actual Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "memory_actual_workload", "Actual Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "memory_actual_workload", "Actual Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	/*
 		==========END OF MEMORY METRICS============
@@ -292,23 +346,23 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Query and store prometheus node recieved network data in bytes
 	query = `label_replace(irate(node_network_receive_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	getWorkload(promaddress, "net_received_bytes", "Raw Net Received Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "net_received_bytes", "Raw Net Received Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "net_received_bytes", "Raw Net Received Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "net_received_bytes", "Raw Net Received Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus recieved network data in packets
 	query = `label_replace(irate(node_network_receive_packets_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	getWorkload(promaddress, "net_received_packets", "Network Packets Received", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "net_received_packets", "Network Packets Received", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "net_received_packets", "Network Packets Received", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "net_received_packets", "Network Packets Received", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus total transmitted network data in bytes
 	query = `label_replace(irate(node_network_transmit_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	getWorkload(promaddress, "net_sent_bytes", "Raw Net Sent Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "net_sent_bytes", "Raw Net Sent Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "net_sent_bytes", "Raw Net Sent Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "net_sent_bytes", "Raw Net Sent Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus total transmitted network data in packets
 	query = `label_replace(irate(node_network_transmit_packets_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	getWorkload(promaddress, "net_sent_packets", "Network Packets Sent", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "net_sent_packets", "Network Packets Sent", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "net_sent_packets", "Network Packets Sent", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "net_sent_packets", "Network Packets Sent", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	/*
 		==========END OF NETWORK METRICS============
@@ -325,11 +379,13 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Query and store prometheus total cpu uptime in seconds
 	query = `label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100, "pod_ip", "$1", "instance", "(.*):.*")`
-	getWorkload(promaddress, "cpu_utilization", "CPU Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "cpu_utilization", "CPU Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "cpu_utilization", "CPU Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "cpu_utilization", "CPU Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	/*
 		==========END OF CPU METRICS============
 	*/
+
+	return errors
 
 }

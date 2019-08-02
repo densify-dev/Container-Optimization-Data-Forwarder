@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 )
@@ -249,16 +250,19 @@ func getNamespaceMetricString(result model.Value, namespace model.LabelName) {
 	}
 }
 
-func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) {
+func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) (logReturn string) {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
 	var start, end time.Time
 	var query2 string
+	var logLine string
+	errors := ""
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/" + aggregator + `_` + fileName + ".csv")
 	if err != nil {
 		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, metricName, err.Error(), query))
+		return logger.LogError(map[string]string{"entity": entityKind, "metric": metricName, "query": query, "message": err.Error()}, "ERROR")
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,%s\n", metricName)
 
@@ -270,38 +274,46 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 
 		//query containers under a pod with no owner
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left max(kube_pod_owner{owner_name="<none>"}) by (namespace, pod, container_name)) by (pod,namespace,container_name)`
-		result = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "pod_"+metricName)
+		result, logLine = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "pod_"+metricName, false)
 		writeWorkload(workloadWrite, result, "namespace", "pod", "container_name", clusterName, promAddr, "Pod")
+		errors += logLine
 
 		//query containers under a controller with no owner
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (owner_name,owner_kind) max(kube_pod_owner) by (namespace, pod, owner_name, owner_kind)) by (owner_kind,owner_name,namespace,container_name)`
-		result = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "controller_"+metricName)
+		result, logLine = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "controller_"+metricName, false)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "")
+		errors += logLine
 
 		//query containers under a deployment
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) max(label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)")) by (namespace, pod, replicaset) * on (replicaset, namespace) group_left (owner_name) max(kube_replicaset_owner{owner_kind="Deployment"}) by (namespace, replicaset, owner_name)) by (owner_name,namespace,container_name)`
-		result = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "deployment_"+metricName)
+		result, logLine = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "deployment_"+metricName, false)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "Deployment")
+		errors += logLine
 
 		//query containers under a cron job
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) max(label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)")) by (namespace, pod, job) * on (job, namespace) group_left (owner_name) max(label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (namespace, job, owner_name)) by (owner_name,namespace,container_name)`
-		result = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "cronJob_"+metricName)
+		result, logLine = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "cronJob_"+metricName, false)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "CronJob")
+		errors += logLine
 
 	}
 	//Close the workload files.
 	workloadWrite.Close()
+	return errors
 }
 
-func getDeploymentWorkload(promaddress, fileName, metricName, query, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) {
+func getDeploymentWorkload(promaddress, fileName, metricName, query, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) (logReturn string) {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
 	var start, end time.Time
+	var logLine string
+	errors := ""
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/deployment_" + fileName + ".csv")
 	if err != nil {
 		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, metricName, err.Error(), query))
+		return logger.LogError(map[string]string{"query": query, "metric": metricName, "message": "File not found"}, "ERROR")
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,%s\n", metricName)
 
@@ -310,7 +322,8 @@ func getDeploymentWorkload(promaddress, fileName, metricName, query, clusterName
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		tempMap[int(historyInterval)] = map[string]map[string][]model.SamplePair{}
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
-		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, metricName)
+		result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, metricName, false)
+		errors += logLine
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
 				if _, ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]; !ok {
@@ -344,21 +357,26 @@ func getDeploymentWorkload(promaddress, fileName, metricName, query, clusterName
 		}
 	}
 	workloadWrite.Close()
+	return errors
 }
 
-func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) {
+func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) (logReturn string) {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
 	var start, end time.Time
+	var logLine string
+	errors := ""
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/hpa_" + fileName + ".csv")
 	if err != nil {
 		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, metricName, err.Error(), query))
+		return logger.LogError(map[string]string{"query": query, "metric": metricName, "message": "File not found"}, "ERROR")
 	}
 	workloadWriteExtra, err := os.Create("./data/hpa/hpa_extra_" + fileName + ".csv")
 	if err != nil {
 		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, metricName, err.Error(), query))
+		return logger.LogError(map[string]string{"query": query, "metric": metricName, "message": "File not found"}, "ERROR")
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,HPA Name,Datetime,%s\n", metricName)
 	fmt.Fprintf(workloadWriteExtra, "cluster,namespace,entity_name,entity_type,container,HPA Name,Datetime,%s\n", metricName)
@@ -368,7 +386,8 @@ func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promA
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		tempMap[int(historyInterval)] = map[string]map[string][]model.SamplePair{}
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
-		result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, metricName)
+		result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, metricName, false)
+		errors += logLine
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
 				if _, ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]; !ok {
@@ -429,6 +448,7 @@ func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promA
 		}
 	}
 	workloadWriteExtra.Close()
+	return errors
 }
 
 func addToLabelMap(key string, value string, labelPath map[string]string) {

@@ -22,8 +22,10 @@ var clusterEntity = clusterStruct{}
 var entityKind = "Cluster"
 
 //Metrics a global func for collecting node level metrics in prometheus
-func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, intervalSize, history int, debug bool, currentTime time.Time) {
+func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, intervalSize, history int, debug bool, currentTime time.Time) (logReturn string) {
 	//Setup variables used in the code.
+	var errors = ""
+	var logLine string
 	var historyInterval time.Duration
 	historyInterval = 0
 	var promaddress, query string
@@ -47,45 +49,63 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	*/
 
 	query = `sum(kube_pod_container_resource_limits_cpu_cores)*1000`
-	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "cpuLimit")
-	getClusterMetric(result, "cpuLimit")
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "cpuLimit", false)
+	if logLine != "" {
+		getClusterMetric(result, "cpuLimit")
+	} else {
+		errors += logLine
+	}
 
 	query = `sum(kube_pod_container_resource_requests_cpu_cores)*1000`
-	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "cpuRequest")
-	getClusterMetric(result, "cpuRequest")
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "cpuRequest", false)
+	if logLine != "" {
+		getClusterMetric(result, "cpuRequest")
+	} else {
+		errors += logLine
+	}
 
 	query = `sum(kube_pod_container_resource_limits_memory_bytes)/1024/1024`
-	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "memLimit")
-	getClusterMetric(result, "memLimit")
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "memLimit", false)
+	if logLine != "" {
+		getClusterMetric(result, "memLimit")
+	} else {
+		errors += logLine
+	}
 
 	query = `avg(kube_pod_container_resource_requests_memory_bytes)/1024/1024`
-	result = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "memRequest")
-	getClusterMetric(result, "memRequest")
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "memRequest", false)
+	if logLine != "" {
+		getClusterMetric(result, "memRequest")
+	} else {
+		errors += logLine
+	}
 
 	/*
 		==========NODE REQUEST/LIMIT METRICS============
 	*/
 
-	writeAttributes(clusterName, promAddr)
-	writeConfig(clusterName, promAddr)
+	errors += writeAttributes(clusterName, promAddr)
+	errors += writeConfig(clusterName, promAddr)
 
 	//Query and store prometheus CPU limit
 	query = `kube_pod_container_resource_limits_cpu_cores*1000`
-	getWorkload(promaddress, "cpu_limit", "CPU Limit", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "cpu_limit", "CPU Limit", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "cpu_limit", "CPU Limit", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "cpu_limit", "CPU Limit", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus Memory Limit
 	query = `kube_pod_container_resource_requests_cpu_cores*1000`
-	getWorkload(promaddress, "cpu_requests", "CPU Requests", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "cpu_requests", "CPU Requests", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "cpu_requests", "CPU Requests", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "cpu_requests", "CPU Requests", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus CPU limit
 	query = `kube_pod_container_resource_limits_memory_bytes/1024/1024`
-	getWorkload(promaddress, "memory_limit", "Memory Limit", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "memory_limit", "Memory Limit", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "memory_limit", "Memory Limit", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "memory_limit", "Memory Limit", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus Memory Limit
 	query = `kube_pod_container_resource_requests_memory_bytes/1024/1024`
-	getWorkload(promaddress, "memory_requests", "Memory Requests", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	getWorkload(promaddress, "memory_requests", "Memory Requests", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "memory_requests", "Memory Requests", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "memory_requests", "Memory Requests", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	return errors
 }

@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
+
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 )
@@ -39,9 +41,11 @@ func getClusterMetric(result model.Value, metric string) {
 	}
 }
 
-func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) {
+func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) (logReturn string) {
+	var errors = ""
 	var query2 string
 	var cluster string
+	var logLine string
 	if clusterName == "" {
 		cluster = promAddr
 	} else {
@@ -56,6 +60,7 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 	workloadWrite, err := os.Create("./data/cluster/" + aggregator + `_` + fileName + ".csv")
 	if err != nil {
 		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, metricName, err.Error(), query2))
+		return logger.LogError(map[string]string{"entity": entityKind, "metric": metricName, "query": query, "message": err.Error()}, "ERROR")
 	}
 	fmt.Fprintf(workloadWrite, "cluster,Datetime,%s\n", metricName)
 
@@ -66,9 +71,12 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
 
 		query2 = aggregator + "(" + query + `)`
-		result = prometheus.MetricCollect(promaddress, query2, start, end, "Cluster", metricName)
+		result, logLine = prometheus.MetricCollect(promaddress, query2, start, end, "Cluster", metricName, false)
 		writeWorkload(workloadWrite, result, promAddr, cluster)
+		errors += logLine
 	}
 	//Close the workload files.
 	workloadWrite.Close()
+
+	return errors
 }

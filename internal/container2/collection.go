@@ -3,7 +3,6 @@ package container2
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -261,7 +260,6 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/" + aggregator + `_` + fileName + ".csv")
 	if err != nil {
-		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, metricName, err.Error(), query))
 		return logger.LogError(map[string]string{"entity": entityKind, "metric": metricName, "query": query, "message": err.Error()}, "ERROR")
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,%s\n", metricName)
@@ -312,7 +310,6 @@ func getDeploymentWorkload(promaddress, fileName, metricName, query, clusterName
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/deployment_" + fileName + ".csv")
 	if err != nil {
-		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, metricName, err.Error(), query))
 		return logger.LogError(map[string]string{"query": query, "metric": metricName, "message": "File not found"}, "ERROR")
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,%s\n", metricName)
@@ -370,12 +367,10 @@ func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promA
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/hpa_" + fileName + ".csv")
 	if err != nil {
-		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, metricName, err.Error(), query))
 		return logger.LogError(map[string]string{"query": query, "metric": metricName, "message": "File not found"}, "ERROR")
 	}
 	workloadWriteExtra, err := os.Create("./data/hpa/hpa_extra_" + fileName + ".csv")
 	if err != nil {
-		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, metricName, err.Error(), query))
 		return logger.LogError(map[string]string{"query": query, "metric": metricName, "message": "File not found"}, "ERROR")
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,HPA Name,Datetime,%s\n", metricName)

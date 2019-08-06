@@ -8,7 +8,6 @@ package node
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -113,7 +112,6 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/node/" + aggregator + `_` + fileName + ".csv")
 	if err != nil {
-		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, metricName, err.Error(), query2))
 		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
 	}
 	fmt.Fprintf(workloadWrite, "cluster,node,Datetime,%s\n", metricName)

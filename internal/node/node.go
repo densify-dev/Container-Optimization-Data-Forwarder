@@ -2,7 +2,6 @@
 package node
 
 import (
-	"log"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
@@ -241,7 +240,6 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Checks to see if Node Exporter is installed. Based off if anything is returned from network speed bytes
 	if haveNodeExport == false {
-		log.Println(prometheus.LogMessage("[ERROR]", promaddress, entityKind, "N/A", "It appears you do not have Node Exporter installed.", "N/A"))
 		return errors + logger.LogError(map[string]string{"entity": entityKind, "message": "It appears you do not have Node Exporter installed."}, "ERROR")
 	}
 

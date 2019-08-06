@@ -8,14 +8,12 @@ package node
 import (
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 )
 
@@ -58,7 +56,6 @@ func writeConfig(clusterName, promAddr string) (logReturn string) {
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/node/config.csv")
 	if err != nil {
-		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
 		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
 	}
 
@@ -108,7 +105,6 @@ func writeAttributes(clusterName, promAddr string) (logReturn string) {
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/node/attributes.csv")
 	if err != nil {
-		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
 		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
 	}
 

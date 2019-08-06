@@ -3,7 +3,6 @@ package main
 
 import (
 	"flag"
-	"log"
 	"os"
 	"strconv"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/spf13/viper"
 )
 
@@ -180,19 +178,6 @@ func initParameters() {
 func main() {
 	errors := "Version 2.0.1-beta"
 
-	//Open the debug log file for writing.
-	debugLog, err := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		log.Fatal(prometheus.LogMessage("[ERROR]", PromAddr, "Main", "N/A", err.Error(), "N/A"))
-	}
-	//Set log to use the debug log for writing output.
-	log.SetOutput(debugLog)
-	log.SetFlags(0)
-	log.SetPrefix(time.Now().Format(time.RFC3339Nano + " "))
-
-	//Version number used for tracking which version of the code the client is using if there is an issue with data collection.
-	log.Println("Version 2.0.1-beta")
-
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
 	logger.SetPromAddr(PromAddr)
@@ -214,10 +199,7 @@ func main() {
 	cluster.Metrics(clusterName, promProtocol, PromAddr, promPort, interval, intervalSize, history, debug, currentTime)
 
 	//Open the debug log file for writing.
-	debugLog2, err := os.OpenFile("./data/log2.txt", os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		log.Fatal(prometheus.LogMessage("[ERROR]", PromAddr, "Main", "N/A", err.Error(), "N/A"))
-	}
+	debugLog, _ := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
 
-	logger.PrintLog(errors, debugLog2)
+	logger.PrintLog(errors, debugLog)
 }

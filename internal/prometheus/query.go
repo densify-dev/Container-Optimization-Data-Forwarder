@@ -3,7 +3,6 @@ package prometheus
 
 import (
 	"context"
-	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -32,31 +31,28 @@ func MetricCollect(promaddress, query string, start, end time.Time, entityKind, 
 	//Setup the API client connection
 	client, err := api.NewClient(api.Config{Address: promaddress})
 	if err != nil {
-		log.Fatalln("entity="+entityKind, "metric="+metric, "message="+err.Error(), "query="+query)
+		return value, logger.LogError(map[string]string{"message": err.Error(), "query": query, "metric": metric}, "WARN")
 	}
 
 	//Query prometheus with the values defined above as well as the query that was passed into the function.
 	q := v1.NewAPI(client)
 	value, _, err = q.QueryRange(ctx, query, v1.Range{Start: start, End: end, Step: step})
 	if err != nil {
-		log.Println("entity="+entityKind, "metric="+metric, "message="+err.Error(), "query="+query)
+		return value, logger.LogError(map[string]string{"message": err.Error(), "query": query, "metric": metric}, "ERROR")
 	}
 
 	//If the values from the query return no data (length of 0) then give a warning
 	if value == nil {
-		log.Println(LogMessage("[WARN]", promaddress, entityKind, metric, "No data returned", query))
 		if vital {
 			return value, logger.LogError(map[string]string{"message": "No data returned from value", "query": query, "metric": metric}, "ERROR")
 		}
 		return value, logger.LogError(map[string]string{"message": "No data returned", "query": query, "metric": metric}, "WARN")
 	} else if value.(model.Matrix) == nil {
-		log.Println(LogMessage("[WARN]", promaddress, entityKind, metric, "No data returned from value.(model.Matrix)", query))
 		if vital {
 			return value, logger.LogError(map[string]string{"message": "No data returned", "query": query, "metric": metric}, "ERROR")
 		}
 		return value, logger.LogError(map[string]string{"message": "No data returned", "query": query, "metric": metric}, "WARN")
 	} else if value.(model.Matrix).Len() == 0 {
-		log.Println(LogMessage("[WARN]", promaddress, entityKind, metric, "No data returned", query))
 		if vital {
 			return value, logger.LogError(map[string]string{"message": "No data returned, value.(model.Matrix) is empty", "query": query, "metric": metric}, "ERROR")
 		}

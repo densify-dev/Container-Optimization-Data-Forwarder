@@ -3,7 +3,6 @@ package container2
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -613,7 +612,6 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	//Current size workloads
 	currentSizeWrite, err := os.Create("./data/container/currentSize.csv")
 	if err != nil {
-		log.Println(prometheus.LogMessage("[ERROR]", promAddr, entityKind, "N/A", err.Error(), "N/A"))
 		return errors + logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
 	}
 	fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,currentSize\n")

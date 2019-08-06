@@ -94,9 +94,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	query = `max(kube_pod_container_info) by (container, pod, namespace)`
 	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "containers", true)
-	if logLine == "" {
-
-	} else {
+	if logLine != "" {
 		return errors + logLine
 	}
 

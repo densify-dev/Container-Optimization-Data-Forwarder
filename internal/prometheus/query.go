@@ -3,8 +3,6 @@ package prometheus
 
 import (
 	"context"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
@@ -79,22 +77,4 @@ func TimeRange(interval string, intervalSize int, currentTime time.Time, history
 		end = currentTime.Add(time.Minute * -1 * time.Duration(intervalSize) * historyInterval)
 	}
 	return start, end
-}
-
-//LogMessage formats and logs errors, warnings and debug messages
-func LogMessage(logType, promA, entityKind, metric, message, query string) string {
-	//Checks to see if the cluster name for log printing has been made. If not then run
-	if hasClusterName == false {
-		//Cuts everthing off before the ://
-		delimiter := "://"
-		rightOf := strings.Join(strings.Split(promA, delimiter)[1:], delimiter)
-
-		//Removes the colon and port number
-		delimiter1 := regexp.MustCompile(`[:]\d+`)
-		promAddLog = delimiter1.ReplaceAllString(rightOf, "")
-
-		//Sets to true to ensure this is not run again when cluster name is aqquired
-		hasClusterName = true
-	}
-	return logType + " address=" + promAddLog + " " + "entity=" + `"` + entityKind + ", " + metric + `"` + " " + "message=" + `"` + message + `"` + " " + "query=" + `"` + query + `"`
 }

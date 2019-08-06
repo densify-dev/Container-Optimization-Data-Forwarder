@@ -38,7 +38,7 @@ type container struct {
 }
 
 //Metrics function to collect data related to containers.
-func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, intervalSize, history int, debug bool, currentTime time.Time) (logReturn string) {
+func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, intervalSize, history int, debug bool, currentTime time.Time) string {
 	//Setup variables used in the code.
 	var errors = ""
 	var historyInterval time.Duration

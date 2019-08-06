@@ -13,7 +13,7 @@ import (
 )
 
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
-func writeConfig(clusterName, promAddr string) (logReturn string) {
+func writeConfig(clusterName, promAddr string) string {
 	errors := ""
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/container/config.csv")
@@ -47,7 +47,7 @@ func writeConfig(clusterName, promAddr string) (logReturn string) {
 }
 
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
-func writeHPAConfig(clusterName, promAddr string, systems map[string]map[string]string) (logReturn string) {
+func writeHPAConfig(clusterName, promAddr string, systems map[string]map[string]string) string {
 	errors := ""
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/hpa/hpa_extra_config.csv")
@@ -74,7 +74,7 @@ func writeHPAConfig(clusterName, promAddr string, systems map[string]map[string]
 }
 
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
-func writeAttributes(clusterName, promAddr string) (logReturn string) {
+func writeAttributes(clusterName, promAddr string) string {
 	errors := ""
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/container/attributes.csv")
@@ -208,7 +208,7 @@ func writeAttributes(clusterName, promAddr string) (logReturn string) {
 }
 
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
-func writeHPAAttributes(clusterName, promAddr string, systems map[string]map[string]string) (logReturn string) {
+func writeHPAAttributes(clusterName, promAddr string, systems map[string]map[string]string) string {
 	errors := ""
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/hpa/hpa_extra_attributes.csv")

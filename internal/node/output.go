@@ -44,7 +44,7 @@ func writeWorkload(file io.Writer, result model.Value, node model.LabelName, pro
 }
 
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
-func writeConfig(clusterName, promAddr string) (logReturn string) {
+func writeConfig(clusterName, promAddr string) string {
 	errors := ""
 	var cluster string
 	if clusterName == "" {
@@ -93,7 +93,7 @@ func writeConfig(clusterName, promAddr string) (logReturn string) {
 }
 
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
-func writeAttributes(clusterName, promAddr string) (logReturn string) {
+func writeAttributes(clusterName, promAddr string) string {
 	errors := ""
 	var cluster string
 	if clusterName == "" {

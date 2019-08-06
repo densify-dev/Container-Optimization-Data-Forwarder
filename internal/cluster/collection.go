@@ -40,7 +40,7 @@ func getClusterMetric(result model.Value, metric string) {
 	}
 }
 
-func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) (logReturn string) {
+func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) string {
 	var errors = ""
 	var query2 string
 	var cluster string

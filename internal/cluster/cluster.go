@@ -22,7 +22,7 @@ var clusterEntity = clusterStruct{}
 var entityKind = "Cluster"
 
 //Metrics a global func for collecting node level metrics in prometheus
-func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, intervalSize, history int, debug bool, currentTime time.Time) (logReturn string) {
+func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, intervalSize, history int, debug bool, currentTime time.Time) string {
 	//Setup variables used in the code.
 	var errors = ""
 	var logLine string

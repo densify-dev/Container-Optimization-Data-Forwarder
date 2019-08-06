@@ -95,7 +95,7 @@ func getNodeMetric(result model.Value, node model.LabelName, metric string) {
 	}
 }
 
-func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) (logReturn string) {
+func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) string {
 	errors := ""
 	var query2 string
 	var cluster string

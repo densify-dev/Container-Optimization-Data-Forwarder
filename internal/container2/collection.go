@@ -249,7 +249,7 @@ func getNamespaceMetricString(result model.Value, namespace model.LabelName) {
 	}
 }
 
-func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) (logReturn string) {
+func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) string {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
@@ -300,7 +300,7 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 	return errors
 }
 
-func getDeploymentWorkload(promaddress, fileName, metricName, query, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) (logReturn string) {
+func getDeploymentWorkload(promaddress, fileName, metricName, query, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) string {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
@@ -357,7 +357,7 @@ func getDeploymentWorkload(promaddress, fileName, metricName, query, clusterName
 	return errors
 }
 
-func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) (logReturn string) {
+func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) string {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value

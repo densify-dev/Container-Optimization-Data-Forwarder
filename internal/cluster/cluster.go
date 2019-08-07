@@ -92,17 +92,17 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	errors += getWorkload(promaddress, "cpu_limit", "CPU Limit", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 	errors += getWorkload(promaddress, "cpu_limit", "CPU Limit", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
-	//Query and store prometheus Memory Limit
+	//Query and store prometheus CPU requests
 	query = `kube_pod_container_resource_requests_cpu_cores*1000`
 	errors += getWorkload(promaddress, "cpu_requests", "CPU Requests", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 	errors += getWorkload(promaddress, "cpu_requests", "CPU Requests", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
-	//Query and store prometheus CPU limit
+	//Query and store prometheus Memory limit
 	query = `kube_pod_container_resource_limits_memory_bytes/1024/1024`
 	errors += getWorkload(promaddress, "memory_limit", "Memory Limit", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 	errors += getWorkload(promaddress, "memory_limit", "Memory Limit", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
-	//Query and store prometheus Memory Limit
+	//Query and store prometheus Memory requests
 	query = `kube_pod_container_resource_requests_memory_bytes/1024/1024`
 	errors += getWorkload(promaddress, "memory_requests", "Memory Requests", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 	errors += getWorkload(promaddress, "memory_requests", "Memory Requests", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)

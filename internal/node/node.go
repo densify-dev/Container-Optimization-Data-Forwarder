@@ -301,22 +301,22 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	*/
 
 	//Query and store prometheus node memory total in bytes
-	query = `label_replace(irate(node_memory_MemTotal_bytes[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(node_memory_MemTotal_bytes, "pod_ip", "$1", "instance", "(.*):.*")`
 	errors += getWorkload(promaddress, "memory_total_bytes", "Total Memory Bytes", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 	errors += getWorkload(promaddress, "memory_total_bytes", "Total Memory Bytes", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory active bytes
-	query = `label_replace(irate(node_memory_Active_bytes[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(node_memory_Active_bytes, "pod_ip", "$1", "instance", "(.*):.*")`
 	errors += getWorkload(promaddress, "memory_active_bytes", "Active Memory Bytes", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 	errors += getWorkload(promaddress, "memory_active_bytes", "Active Memory Bytes", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory total in bytes
-	query = `label_replace(irate(node_memory_MemTotal_bytes[5m]) - irate(node_memory_MemFree_bytes[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(node_memory_MemTotal_bytes - node_memory_MemFree_bytes, "pod_ip", "$1", "instance", "(.*):.*")`
 	errors += getWorkload(promaddress, "memory_raw_bytes", "Raw Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 	errors += getWorkload(promaddress, "memory_raw_bytes", "Raw Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory total free in bytes
-	query = `label_replace(irate(node_memory_MemTotal_bytes[5m]) - (irate(node_memory_MemFree_bytes[5m]) + irate(node_memory_Cached_bytes[5m]) + irate(node_memory_Buffers_bytes[5m])), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(node_memory_MemTotal_bytes - (node_memory_MemFree_bytes + node_memory_Cached_bytes + node_memory_Buffers_bytes), "pod_ip", "$1", "instance", "(.*):.*")`
 	errors += getWorkload(promaddress, "memory_actual_workload", "Actual Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 	errors += getWorkload(promaddress, "memory_actual_workload", "Actual Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 

@@ -171,17 +171,22 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	//for printing containers
+	tempString := ""
 	if debug {
 		for i := range systems {
 			fmt.Println("\nnamespace: " + i)
+			tempString += "\nnamespace: " + i
 			for j, v := range systems[i].midLevels {
 				fmt.Println("- entity name: " + v.name + "\n  entity kind: " + v.kind + "\n  namespace: " + i + "\n  containers:")
+				tempString += "- entity name: " + v.name + "\n  entity kind: " + v.kind + "\n  namespace: " + i + "\n  containers:"
 				for k := range systems[i].midLevels[j].containers {
 					fmt.Println("  - " + k)
+					tempString += "  - " + k
 				}
 			}
 		}
 	}
+	errors += logger.LogError(map[string]string{"message": (tempString)}, "DEBUG")
 
 	//Container metrics
 	query = `container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}/1024/1024`

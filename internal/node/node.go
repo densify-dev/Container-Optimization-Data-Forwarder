@@ -96,7 +96,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusCapacity", false)
 
 	/*
-	  Some older versions of prometheus don't support kube_node_status_capacity.
+	  Some older versions of kube-state-metrics don't support kube_node_status_capacity.
 	  If this is the case then we can use the older queries, which query the individual
 	  metrics that kube_node_status_capacity returns.
 
@@ -145,7 +145,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "statusAllocatable", false)
 
 	/*
-	  Some older versions of prometheus don't support kube_node_status_allocatable.
+	  Some older versions of kube-state-metrics don't support kube_node_status_allocatable.
 	  If this is the case then we can use the older queries, which query the individual
 	  metrics that kube_node_status_allocatable returns.
 

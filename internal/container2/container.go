@@ -71,25 +71,21 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `sum(kube_replicaset_owner{owner_name!="<none>"}) by (namespace, replicaset, owner_name)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "replicasets", true)
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "replicasets", false)
 	if logLine == "" {
 		rslt = result.(model.Matrix)
 		for i := 0; i < rslt.Len(); i++ {
 			replicaSetOwners[string(rslt[i].Metric["replicaset"])+"__"+string(rslt[i].Metric["namespace"])] = string(rslt[i].Metric["owner_name"])
 		}
-	} else {
-		return errors + logLine
 	}
 
 	query = `sum(kube_job_owner{owner_name!="<none>"}) by (namespace, job_name, owner_name)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "jobs", true)
+	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "jobs", false)
 	if logLine == "" {
 		rslt = result.(model.Matrix)
 		for i := 0; i < rslt.Len(); i++ {
 			jobOwners[string(rslt[i].Metric["job_name"])+"__"+string(rslt[i].Metric["namespace"])] = string(rslt[i].Metric["owner_name"])
 		}
-	} else {
-		return errors + logLine
 	}
 
 	query = `max(kube_pod_container_info) by (container, pod, namespace)`
@@ -185,8 +181,8 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 				}
 			}
 		}
+		errors += logger.LogError(map[string]string{"message": (tempString)}, "DEBUG")
 	}
-	errors += logger.LogError(map[string]string{"message": (tempString)}, "DEBUG")
 
 	//Container metrics
 	query = `container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}/1024/1024`

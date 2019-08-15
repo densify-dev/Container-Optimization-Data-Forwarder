@@ -1,6 +1,6 @@
 /*
 Used for collecting metric data. Mostly the same as the container collection but less checks.
-(namespace, pods and containers)
+(pods and containers)
 */
 
 //Package node used for collecting node metric data
@@ -8,22 +8,21 @@ package node
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 )
 
 //Gets node metrics from prometheus (and checks to see if they are valid)
-func getNodeMetric(result model.Value, namespace, node model.LabelName, metric string) {
+func getNodeMetric(result model.Value, node model.LabelName, metric string) {
 
 	if result != nil {
 		//Loop through the different entities in the results.
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
-			//Validate that the data contains the namespace label with value and check it exists in our systems structure.
 			if nodeValue, ok := result.(model.Matrix)[i].Metric[node]; ok {
 				if _, ok := nodes[string(nodeValue)]; ok {
 					//validates that the value of the entity is set and if not will default to 0
@@ -80,6 +79,14 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 							nodes[string(nodeValue)].podsAllocatable = int(value)
 						case "netSpeedBytes":
 							nodes[string(nodeValue)].netSpeedBytes = int(value)
+						case "cpuLimit":
+							nodes[string(nodeValue)].cpuLimit = int(value)
+						case "cpuRequest":
+							nodes[string(nodeValue)].cpuRequest = int(value)
+						case "memLimit":
+							nodes[string(nodeValue)].memLimit = int(value)
+						case "memRequest":
+							nodes[string(nodeValue)].memRequest = int(value)
 						}
 					}
 				}
@@ -88,7 +95,9 @@ func getNodeMetric(result model.Value, namespace, node model.LabelName, metric s
 	}
 }
 
-func getWorkload(promaddress, fileName, metricName, query2, aggregrator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) {
+func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) string {
+	errors := ""
+	var query2 string
 	var cluster string
 	if clusterName == "" {
 		cluster = promAddr
@@ -101,9 +110,9 @@ func getWorkload(promaddress, fileName, metricName, query2, aggregrator, cluster
 	//var query string
 	var start, end time.Time
 	//Open the files that will be used for the workload data types and write out there headers.
-	workloadWrite, err := os.Create("./data/node/" + aggregrator + `_` + fileName + ".csv")
+	workloadWrite, err := os.Create("./data/node/" + aggregator + `_` + fileName + ".csv")
 	if err != nil {
-		log.Println(err)
+		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
 	}
 	fmt.Fprintf(workloadWrite, "cluster,node,Datetime,%s\n", metricName)
 
@@ -112,11 +121,14 @@ func getWorkload(promaddress, fileName, metricName, query2, aggregrator, cluster
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
-		result = prometheus.MetricCollect(promaddress, query2, start, end)
+
+		query2 = aggregator + "(" + aggregator + "(" + query + `) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+		result, _ = prometheus.MetricCollect(promaddress, query2, start, end, "Node", metricName, false)
 		writeWorkload(workloadWrite, result, "node", promAddr, cluster)
 	}
 	//Close the workload files.
 	workloadWrite.Close()
+	return errors
 }
 
 //getNodeMetricString is used to parse the label based results from Prometheus related to Container Entities and store them in the systems data structure.
@@ -126,7 +138,6 @@ func getNodeMetricString(result model.Value, node model.LabelName, metric string
 	if result != nil {
 		//Loop through the different entities in the results.
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
-			//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
 			if nodeValue, ok := result.(model.Matrix)[i].Metric[node]; ok {
 				if _, ok := nodes[string(nodeValue)]; ok {
 					if _, ok := tempSystems[string(nodeValue)]; ok == false {

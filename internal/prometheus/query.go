@@ -3,9 +3,10 @@ package prometheus
 
 import (
 	"context"
-	"log"
 	"time"
 
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
+	//"github.com/densify-dev/Container-Optimization-Data-Forwarder/cmd/datacollection"
 	"github.com/prometheus/common/model"
 
 	"github.com/prometheus/client_golang/api"
@@ -15,8 +16,12 @@ import (
 //step is set to be 5minutes as it is defined in microseconds.
 const step = 300000000000
 
+var promAddLog string
+var hasClusterName = false
+
 //MetricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
-func MetricCollect(promaddress, query string, start, end time.Time) (value model.Value) {
+func MetricCollect(promaddress, query string, start, end time.Time, entityKind, metric string, vital bool) (value model.Value, logLine string) {
+
 	//setup the context to use for the API calls
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -24,24 +29,36 @@ func MetricCollect(promaddress, query string, start, end time.Time) (value model
 	//Setup the API client connection
 	client, err := api.NewClient(api.Config{Address: promaddress})
 	if err != nil {
-		log.Fatalln(err)
+		return value, logger.LogError(map[string]string{"message": err.Error(), "query": query, "metric": metric}, "WARN")
 	}
 
 	//Query prometheus with the values defined above as well as the query that was passed into the function.
 	q := v1.NewAPI(client)
 	value, _, err = q.QueryRange(ctx, query, v1.Range{Start: start, End: end, Step: step})
 	if err != nil {
-		log.Println(err)
+		return value, logger.LogError(map[string]string{"message": err.Error(), "query": query, "metric": metric}, "ERROR")
 	}
 
 	//If the values from the query return no data (length of 0) then give a warning
-
-	if value.(model.Matrix).Len() == 0 {
-		log.Println("Warning: no data returned from query: ", query)
+	if value == nil {
+		if vital {
+			return value, logger.LogError(map[string]string{"message": "No data returned from value", "query": query, "metric": metric}, "ERROR")
+		}
+		return value, logger.LogError(map[string]string{"message": "No data returned", "query": query, "metric": metric}, "WARN")
+	} else if value.(model.Matrix) == nil {
+		if vital {
+			return value, logger.LogError(map[string]string{"message": "No data returned", "query": query, "metric": metric}, "ERROR")
+		}
+		return value, logger.LogError(map[string]string{"message": "No data returned", "query": query, "metric": metric}, "WARN")
+	} else if value.(model.Matrix).Len() == 0 {
+		if vital {
+			return value, logger.LogError(map[string]string{"message": "No data returned, value.(model.Matrix) is empty", "query": query, "metric": metric}, "ERROR")
+		}
+		return value, logger.LogError(map[string]string{"message": "No data returned", "query": query, "metric": metric}, "WARN")
 	}
 
 	//Return the data that was received from Prometheus.
-	return value
+	return value, ""
 }
 
 //TimeRange allows you to define the start and end values of the range will pass to the Prometheus for the query.

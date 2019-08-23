@@ -91,3 +91,12 @@ The following table lists Prometheus metrics and their usage.
 | node_network_transmit_bytes_total | Raw net sent utilization (avg & max) |
 | node_network_transmit_packets_total | Network packets sent (avg & max) |
 | node_cpu_seconds_total | CPU utilization (avg & max) |
+
+## Cluster Metrics
+| Metric | Usage |
+|--------|-------|
+| kube_pod_container_resource_limits_cpu_cores | CPU limit (used for workload and attribute) |
+| kube_pod_container_resource_requests_cpu_cores | CPU requests (used for workload and attribute) |
+| kube_pod_container_resource_limits_memory_bytes | Memory limit (used for workload and attribute) |
+| kube_pod_container_resource_requests_memory_bytes | Memory requests (used for workload and attribute) |
+

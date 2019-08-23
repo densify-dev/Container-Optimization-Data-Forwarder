@@ -4,7 +4,7 @@ NOTE: IF THE CONFIG FILE IS FILLED OUT AND YOU PASS COMMAND LINE
 ARGUMENTS, IT WILL DEFAULT TO THE CONFIG FILE VARIABLES
 
 ## Variable Names
-| Name | Default | Environment Variables | Command Line Variables |
+| Config-Properties Name | Default | Environment Variables | Command Line Variables |
 |--------|-------|-------|-------|
 | Cluster Name | "" | PROMETHEUS_CLUSTER | clusterName | 
 | Prometheus Protocol | http | PROMETHEUS_PROTOCOL | protocol |

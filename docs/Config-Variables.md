@@ -5,7 +5,7 @@ ARGUMENTS, IT WILL DEFAULT TO THE CONFIG FILE VARIABLES
 
 ## Variable Names
 | Config-Properties Name | Default | Environment Variables | Config File Variables | Command Line Variables |
-|--------|-------|-------|-------|
+|--------|-------|-------|-------|-------|
 | Cluster Name | "" | DENSIFY_PROMETHEUS_CLUSTER | cluster_name | clusterName | 
 | Prometheus Protocol | http | DENSIFY_PROMETHEUS_PROTOCOL | protocol | protocol |
 | Prometheus Address | "" | DENSIFY_PROMETHEUS_ADDRESS | prometheus_address | address | 

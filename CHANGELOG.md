@@ -1,3 +1,7 @@
+## 2.0.2
+
+* Update to permissions of data directory for when running as other users.
+
 ## 2.0.1 
 
 * Add support for passing parameters via Environment variables

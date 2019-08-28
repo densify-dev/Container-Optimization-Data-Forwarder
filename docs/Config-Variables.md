@@ -2,7 +2,7 @@ The following table briefly explains the default variable values, environment an
 
 THe order of precedence is Command Line, Config File, Environment Variables. 
 
-## Variable Names
+## Collection Names
 | Config Setting Name | Default | Environment Variables | Config.Properties | Command Line |
 |--------|-------|-------|-------|-------|
 | Cluster Name | "" | PROMETHEUS_CLUSTER | cluster_name | clusterName | 
@@ -17,4 +17,22 @@ THe order of precedence is Command Line, Config File, Environment Variables.
 | Config File | config | PROMETHEUS_CONFIGFILE | N/A | file |
 | Config Path | ./config | PROMETHEUS_CONFIGPATH | N/A | path |
 
-
+## Variable Names
+| Name  | Densify Environment Variable | 
+|--------|-------|
+| Host | DENSIFY_HOST |
+| Protocol | DENSIFY_PROTOCOL |
+| Port | DENSIFY_PORT |
+| Endpoint | DENSIFY_ENDPOINT |
+| User | DENSIFY_USER |
+| Proxy Host | DENSIFY_PROXYHOST | 
+| Proxy Port | DENSIFY_PROXYPORT |
+| Proxy Protocol | DENSIFY_PROXYPROTOCOL | 
+| Proxy Auth | DENSIFY_PROXYAUTH |
+| Proxy User | DENSIFY_PROXYUSER |
+|Proxy Password | DENSIFY_PROXYPASSWORD | 
+| Encrypted Proxy Password | DENSIFY_EPROXYPASSWORD | 
+| Proxy Server | DENSIFY_PROXYSERVER |
+| Proxy Domain | DENISFY_PROXYDOMAIN | 
+| Debug | DENSIFY_DEBUG | 
+| Internal | DENSIFY_INTERNAL |

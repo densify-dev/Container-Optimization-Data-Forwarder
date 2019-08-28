@@ -1,6 +1,6 @@
 The following table briefly explains the default variable values, environment and command line variable names.
 
-THe order of presedence is Command Line, Config File, Environment Variables. 
+THe order of precedence is Command Line, Config File, Environment Variables. 
 
 ## Variable Names
 | Config Setting Name | Default | Environment Variables | Config File Variables | Command Line Variables |

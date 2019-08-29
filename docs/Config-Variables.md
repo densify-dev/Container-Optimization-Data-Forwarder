@@ -2,7 +2,7 @@ The following table briefly explains the default variable values, environment an
 
 THe order of precedence is Command Line, Config File, Environment Variables. 
 
-## Collection Names
+## Variable Names Data Collection
 | Config Setting Name | Default | Environment Variables | Config.Properties | Command Line |
 |--------|-------|-------|-------|-------|
 | Cluster Name | "" | PROMETHEUS_CLUSTER | cluster_name | clusterName | 
@@ -17,8 +17,8 @@ THe order of precedence is Command Line, Config File, Environment Variables.
 | Config File | config | PROMETHEUS_CONFIGFILE | N/A | file |
 | Config Path | ./config | PROMETHEUS_CONFIGPATH | N/A | path |
 
-## Variable Names
-| Name  | Densify Environment Variable | 
+## Variable Names Forwarder
+| Config Setting Name  | Environment Variable | 
 |--------|-------|
 | Host | DENSIFY_HOST |
 | Protocol | DENSIFY_PROTOCOL |
@@ -35,4 +35,3 @@ THe order of precedence is Command Line, Config File, Environment Variables.
 | Proxy Server | DENSIFY_PROXYSERVER |
 | Proxy Domain | DENISFY_PROXYDOMAIN | 
 | Debug | DENSIFY_DEBUG | 
-| Internal | DENSIFY_INTERNAL |

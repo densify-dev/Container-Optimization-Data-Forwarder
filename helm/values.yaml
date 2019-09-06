@@ -1,0 +1,42 @@
+#################################################################
+# Global configuration defaults.
+#################################################################
+
+#################################################################
+# Application configuration defaults.
+#################################################################
+# application image
+image:  densify/container-optimization-data-forwarder
+imageTag: latest
+pullPolicy: Always
+
+# application configuration
+# Example:
+config:
+# densify server settings
+  densify:
+    hostname: localhost
+    protocol: http
+    port: 8086
+    user: 
+    password: 
+# prometheus server settings    
+  prometheus:
+    hostname:
+    port:
+# controls whether contents are zipped before transmission    
+  zipEnabled: true    
+# Name of the zip file that archives the content
+  zipname: 
+
+  cronJob:
+    schedule: 0 * * * *  
+    
+# default number of instances
+replicaCount: 1
+
+nodeSelector: {}
+
+resources: {}
+
+affinity: {}

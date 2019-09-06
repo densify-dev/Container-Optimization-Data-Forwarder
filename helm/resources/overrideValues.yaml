@@ -1,0 +1,19 @@
+#################################################################
+#  Use this file to set up customer's specific settings 
+#################################################################
+config:
+# densify server settings
+  densify:
+    hostname: <hostname>
+    protocol: <http/https>
+    port: <port>
+    user: <username>
+    password: <password>
+# prometheus server settings    
+  prometheus:
+    hostname: <prometheus hostname>
+    port: <prometheus port>
+# controls whether contents are zipped before transmission    
+  zipEnabled: true    
+# Name of the zip file that archives the content
+  zipname: <zip file name>

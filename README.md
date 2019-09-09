@@ -29,14 +29,14 @@ The Docker image is available on [Docker Hub](https://hub.docker.com/r/densify/c
 ## Helm Chart
 
 To deploy it via Helm follow these steps:
-* Clone the repo
+* Clone or update repo
 * Set the relevant endpoints and credentials values in helm/resources/overrideValues.yaml (see the configuration table below)
 * cd helm
 * Run the command: 'helm install . -f resources/overrideValues.yaml'
 
  ## Helm chart Configuration
 
-The following table lists the configurable parameters of the container-optimization-data-forwarder chart.
+The following table lists the configurable parameters of the container-optimization-data-forwarder chart in helm/resources/overrideValues.yaml.
 
 | Parameter                                | Description                                             | Default                   |
 |------------------------------------------|---------------------------------------------------------|---------------------------|

@@ -9,6 +9,7 @@ config:
     port: <port>
     user: <username>
     password: <password>
+    epassword: <epassword>
 # prometheus server settings    
   prometheus:
     hostname: <prometheus hostname>

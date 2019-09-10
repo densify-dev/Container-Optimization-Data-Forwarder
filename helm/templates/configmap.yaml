@@ -24,7 +24,8 @@ data:
    
    user {{ .Values.config.densify.user }}
    password {{ .Values.config.densify.password }}
-   #epassword <override plaintext; use result of Encrypt.jar>
+   # <override plaintext; use result of Encrypt.jar>
+   epassword {{ .Values.config.densify.epassword }}
    
    ###################################################################
    # \ Specify settings for Prometheus used by the dataCollection

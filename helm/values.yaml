@@ -20,6 +20,7 @@ config:
     port: 8086
     user: 
     password: 
+    epassword: 
 # prometheus server settings    
   prometheus:
     hostname:

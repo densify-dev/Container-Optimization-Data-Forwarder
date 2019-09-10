@@ -23,10 +23,14 @@ data:
    endpoint /CIRBA/api/v2/
    
    user {{ .Values.config.densify.user }}
+{{- if .Values.config.densify.password }}   
    password {{ .Values.config.densify.password }}
+{{- end }}   
+{{- if .Values.config.densify.epassword }}
    # <override plaintext; use result of Encrypt.jar>
    epassword {{ .Values.config.densify.epassword }}
-   
+{{- end }}
+  
    ###################################################################
    # \ Specify settings for Prometheus used by the dataCollection
    ###################################################################

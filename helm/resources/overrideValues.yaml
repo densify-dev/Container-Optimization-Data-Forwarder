@@ -6,18 +6,18 @@ config:
 # densify server settings
 #===============================
   densify:
-    hostname: 35.239.138.174
-    protocol: http
-    port: 80
-    user: admin
+    hostname: <hostname>
+    protocol: <http/https>
+    port: <port>
+    user: <username>
 #    password: <password>
-    epassword: af20321158f4e793f89db8ad9d8b66df9210a33b0c1875bed9e99a029b9dae7f6fffd59e
+    epassword: <epassword>
 #===============================    
 # prometheus server settings    
 #===============================
   prometheus:
-    hostname: 192.168.22.245
-    port: 30000
+    hostname: <prometheus host name>
+    port: <prometheus port>
 #    clustername: <cluster name>
 #===================
 # proxy settings    
@@ -39,9 +39,9 @@ config:
 #=========================================================
   zipEnabled: true    
 # Name of the zip file that archives the content
-  zipname: new_test
+  zipname: <zip file name>
 # Enable debug if needed   
   debug: false
-  debugkey: 
+  debugkey:
   
   

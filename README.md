@@ -44,8 +44,8 @@ The following table lists the configurable parameters of the container-optimizat
 | `config.densify.port`            | Port of the Densify server                                      |                 |
 | `config.densify.protocol`        | Protocol for Densify server connectivity (http/https)           |                 |
 | `config.densify.user`            | Username to access Densify server                               |                 |
-| `config.densify.password`        | Passsord to access Densify server                               |                 |
-| `config.densify.epassword`       | Epasssord to access Densify server                              |                 |
+| `config.densify.password`        | Password to access Densify server                               |                 |
+| `config.densify.epassword`       | Epassword to access Densify server                              |                 |
 | `config.prometheus.hostname`     | Host Name / IP of the Prometheus server                         |                 |
 | `config.prometheus.port`         | Port to connect in Prometheus server                            |                 |
 | `config.zipEnabled`              | Controls whether contents are zipped before transmission        | true            |

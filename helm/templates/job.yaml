@@ -1,5 +1,5 @@
-apiVersion: extensions/v1beta1
-kind: Deployment
+apiVersion: batch/v1
+kind: Job
 metadata:
   name: {{ template "common.fullname" . }}
   namespace: {{ template "common.namespace" . }}
@@ -9,7 +9,7 @@ metadata:
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  backoffLimit: 4
   template:
     metadata:
       labels:
@@ -50,3 +50,5 @@ spec:
             items:
             - key: config.properties
               path: config.properties              
+      restartPolicy: Never
+      

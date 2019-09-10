@@ -2,19 +2,46 @@
 #  Use this file to set up customer's specific settings 
 #################################################################
 config:
+#===============================
 # densify server settings
+#===============================
   densify:
-    hostname: <hostname>
-    protocol: <http/https>
-    port: <port>
-    user: <username>
-    password: <password>
-    epassword: <epassword>
+    hostname: 35.239.138.174
+    protocol: http
+    port: 80
+    user: admin
+#    password: <password>
+    epassword: af20321158f4e793f89db8ad9d8b66df9210a33b0c1875bed9e99a029b9dae7f6fffd59e
+#===============================    
 # prometheus server settings    
+#===============================
   prometheus:
-    hostname: <prometheus hostname>
-    port: <prometheus port>
+    hostname: 192.168.22.245
+    port: 30000
+#    clustername: <cluster name>
+#===================
+# proxy settings    
+#===================
+#  proxy:
+#    host: <proxy host>    
+#    port: <proxy port>
+#    protocol: <protocol>
+#    # <Basic|NTLM>
+#    auth: <auth type>
+#    user: <proxy server username>
+#    password: <proxy server password>
+#    epassword: <proxy server epassword>
+#    # NTLM authentication
+#    domainuser: <domain username>
+#    domain: <domain name>    
+#=========================================================
 # controls whether contents are zipped before transmission    
+#=========================================================
   zipEnabled: true    
 # Name of the zip file that archives the content
-  zipname: <zip file name>
+  zipname: new_test
+# Enable debug if needed   
+  debug: false
+  debugkey: 
+  
+  

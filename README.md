@@ -48,8 +48,21 @@ The following table lists the configurable parameters of the container-optimizat
 | `config.densify.epassword`       | Epassword to access Densify server                              |                 |
 | `config.prometheus.hostname`     | Host Name / IP of the Prometheus server                         |                 |
 | `config.prometheus.port`         | Port to connect in Prometheus server                            |                 |
+| `config.prometheus.clustername`  | Prometheus cluster name (optional)                              |                 |
 | `config.zipEnabled`              | Controls whether contents are zipped before transmission        | true            |
 | `config.zipname`                 | Name of the zip file that archives the content                  |                 |
+| `config.proxy.host`              | Host Name of the Proxy server                                   |                 |
+| `config.proxy.port`              | Port of the Proxy server                                        |                 |
+| `config.proxy.protocol`          | Protocol of the Proxy server (http/https)                       |                 |
+| `config.proxy.auth`              | Athentication type of the Proxy server  (Basic/NTLM)            |                 |
+| `config.proxy.user`              | User Name of the Proxy server                                   |                 |
+| `config.proxy.password`          | Password of the Proxy server                                    |                 |
+| `config.proxy.epassword`         | Epassword of the Proxy server                                   |                 |
+| `config.proxy.domainuser`        | Domain username (NTLM authentication)                           |                 |
+| `config.proxy.domain`            | Domain name (NTLM authentication)                               |                 |
+| `config.debug`                   | Enable debugging                                                | false           |
+| `config.debugkey`                | Debug key                                                       |                 |
+
 
 ## Documentation
 * [Documentation](docs)

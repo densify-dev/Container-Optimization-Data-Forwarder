@@ -20,7 +20,6 @@ config:
     port: 8086
     user: 
     password: 
-    epassword: 
 # prometheus server settings    
   prometheus:
     hostname:
@@ -32,6 +31,8 @@ config:
 
   cronJob:
     schedule: 0 * * * *  
+    
+  debug: false  
     
 # default number of instances
 replicaCount: 1

@@ -81,31 +81,31 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	/*
-		==========NODE REQUEST/LIMIT METRICS============
+		==========CLUSTER REQUEST/LIMIT METRICS============
 	*/
 
 	errors += writeAttributes(clusterName, promAddr)
 	errors += writeConfig(clusterName, promAddr)
 
-	//Query and store prometheus CPU limit
-	query = `kube_pod_container_resource_limits_cpu_cores*1000`
-	errors += getWorkload(promaddress, "cpu_limit", "CPU Limit", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "cpu_limit", "CPU Limit", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	/*
+		//Query and store prometheus CPU limit
+		query = `kube_pod_container_resource_limits_cpu_cores*1000`
+		errors += getWorkload(promaddress, "cpu_limit", "CPU Limit", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	*/
 
 	//Query and store prometheus CPU requests
-	query = `kube_pod_container_resource_requests_cpu_cores*1000`
-	errors += getWorkload(promaddress, "cpu_requests", "CPU Requests", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "cpu_requests", "CPU Requests", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	query = `(kube_pod_container_resource_requests_cpu_cores*1000) * on (namespace,pod,container) group_left kube_pod_container_status_running`
+	errors += getWorkload(promaddress, "cpu_requests", "CPU Reservation in Cores", query, "sum", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
-	//Query and store prometheus Memory limit
-	query = `kube_pod_container_resource_limits_memory_bytes/1024/1024`
-	errors += getWorkload(promaddress, "memory_limit", "Memory Limit", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "memory_limit", "Memory Limit", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	/*
+		//Query and store prometheus Memory limit
+		query = `kube_pod_container_resource_limits_memory_bytes/1024/1024`
+		errors += getWorkload(promaddress, "memory_limit", "Memory Limit", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	*/
 
 	//Query and store prometheus Memory requests
-	query = `kube_pod_container_resource_requests_memory_bytes/1024/1024`
-	errors += getWorkload(promaddress, "memory_requests", "Memory Requests", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "memory_requests", "Memory Requests", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	query = `(kube_pod_container_resource_requests_memory_bytes/1024/1024) * on (namespace,pod,container) group_left kube_pod_container_status_running`
+	errors += getWorkload(promaddress, "memory_requests", "Memory Reservation in MB", query, "sum", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	return errors
 }

@@ -464,39 +464,6 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	} else {
 		errors += logLine
 	}
-	/*
-			query = `kube_job_status_active * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-			result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "jobStatusActive", false)
-		if logLine == "" {
-				getMidMetric(result, "namespace", "job", "statusActive", "Job")
-		} else {
-			errors += logLine
-		}
-
-			query = `kube_job_status_failed * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-			result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "jobStatusFailed", false)
-		if logLine == "" {
-				getMidMetric(result, "namespace", "job", "statusFailed", "Job")
-		} else {
-			errors += logLine
-		}
-
-			query = `kube_job_status_succeeded * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-			result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "jobStatusSucceeded", false)
-		if logLine == "" {
-				getMidMetric(result, "namespace", "job", "statusSucceeded", "Job")
-		} else {
-			errors += logLine
-		}
-
-			query = `kube_job_complete * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-			result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "jobComplete", false)
-		if logLine == "" {
-				getMidMetric(result, "namespace", "job", "complete", "Job")
-		} else {
-			errors += logLine
-		}
-	*/
 
 	//CronJob metrics
 	query = `kube_cronjob_labels`
@@ -556,66 +523,12 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 		errors += logLine
 	}
 
-	/*
-			query = `kube_hpa_status_condition{status="AbleToScale",condition="true"}`
-			result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind)
-		if logLine == "" {
-				getHPAMetric(result, "namespace", "hpa", "ableToScale")
-		} else {
-			errors += logLine
-		}
-
-			query = `kube_hpa_status_condition{status="ScalingActive",condition="true"}`
-			result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind)
-		if logLine == "" {
-				getHPAMetric(result, "namespace", "hpa", "scalingActive")
-		} else {
-			errors += logLine
-		}
-	*/
-
-	errors += writeAttributes(clusterName, promAddr)
-	errors += writeConfig(clusterName, promAddr)
-
-	//Container workloads
-	query = `label_replace(round(sum(irate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name)*1000,1), "pod", "$1", "pod_name", "(.*)")`
-	errors += getWorkload(promaddress, "cpu_mCores_workload", "CPU Utilization in mCores", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "cpu_mCores_workload", "CPU Utilization in mCores", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-
-	query = `label_replace(sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
-	errors += getWorkload(promaddress, "mem_workload", "Raw Mem Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "mem_workload", "Raw Mem Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-
-	query = `label_replace(sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
-	errors += getWorkload(promaddress, "rss_workload", "Actual Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "rss_workload", "Actual Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-
-	query = `label_replace(sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
-	errors += getWorkload(promaddress, "disk_workload", "Raw Disk Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "disk_workload", "Raw Disk Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-
-	query = `label_replace(sum(irate(container_fs_read_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
-	errors += getWorkload(promaddress, "fs_read_seconds_workload", "FS Read Seconds", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "fs_read_seconds_workload", "FS Read Seconds", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-
-	query = `label_replace(sum(irate(container_fs_write_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
-	errors += getWorkload(promaddress, "fs_write_seconds_workload", "FS Write Seconds", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "fs_write_seconds_workload", "FS Write Seconds", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-
-	query = `label_replace(sum(irate(container_fs_io_time_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
-	errors += getWorkload(promaddress, "fs_time_seconds_workload", "FS Time Seconds", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "fs_time_seconds_workload", "FS Time Seconds", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-
-	query = `label_replace(sum(irate(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod,namespace,container), "container_name", "$1", "container", "(.*)")`
-	errors += getWorkload(promaddress, "restarts", "Restarts", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "restarts", "Restarts", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-
 	//Current size workloads
 	currentSizeWrite, err := os.Create("./data/container/currentSize.csv")
 	if err != nil {
 		return errors + logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
 	}
-	fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,currentSize\n")
+	fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,Auto Scaling - In Service Instances\n")
 
 	query = `kube_replicaset_spec_replicas`
 	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "replicaSetSpecReplicas", false)
@@ -682,31 +595,72 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	currentSizeWrite.Close()
 
-	//Deployment workloads
-	query = `kube_deployment_status_replicas_available`
-	errors += getDeploymentWorkload(promaddress, "status_replicas_available", "Status Replicas Available", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += writeAttributes(clusterName, promAddr)
+	errors += writeConfig(clusterName, promAddr)
 
-	query = `kube_deployment_status_replicas`
-	errors += getDeploymentWorkload(promaddress, "status_replicas", "Status Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	//Container workloads
+	query = `label_replace(round(sum(irate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name)*1000,1), "pod", "$1", "pod_name", "(.*)")`
+	errors += getWorkload(promaddress, "cpu_mCores_workload", "CPU Utilization in mCores", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "cpu_mCores_workload", "Prometheus CPU Utilization in mCores", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
-	query = `kube_deployment_spec_replicas`
-	errors += getDeploymentWorkload(promaddress, "spec_replicas", "Spec Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	query = `label_replace(sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
+	errors += getWorkload(promaddress, "mem_workload", "Raw Mem Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "mem_workload", "Prometheus Raw Mem Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	query = `label_replace(sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
+	errors += getWorkload(promaddress, "rss_workload", "Actual Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "rss_workload", "Prometheus Actual Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	query = `label_replace(sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
+	errors += getWorkload(promaddress, "disk_workload", "Raw Disk Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "disk_workload", "Prometheus Raw Disk Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	/*
+		query = `label_replace(sum(irate(container_fs_read_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
+		errors += getWorkload(promaddress, "fs_read_seconds_workload", "FS Read Seconds", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+		errors += getWorkload(promaddress, "fs_read_seconds_workload", "FS Read Seconds", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+		query = `label_replace(sum(irate(container_fs_write_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
+		errors += getWorkload(promaddress, "fs_write_seconds_workload", "FS Write Seconds", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+		errors += getWorkload(promaddress, "fs_write_seconds_workload", "FS Write Seconds", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+		query = `label_replace(sum(irate(container_fs_io_time_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
+		errors += getWorkload(promaddress, "fs_time_seconds_workload", "FS Time Seconds", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+		errors += getWorkload(promaddress, "fs_time_seconds_workload", "FS Time Seconds", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	*/
+
+	query = `label_replace(sum(irate(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod,namespace,container), "container_name", "$1", "container", "(.*)")`
+	errors += getWorkload(promaddress, "restarts", "Restarts", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	/*
+		//Deployment workloads
+		query = `kube_deployment_status_replicas_available`
+		errors += getDeploymentWorkload(promaddress, "status_replicas_available", "Status Replicas Available", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+		query = `kube_deployment_status_replicas`
+		errors += getDeploymentWorkload(promaddress, "status_replicas", "Status Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+		query = `kube_deployment_spec_replicas`
+		errors += getDeploymentWorkload(promaddress, "spec_replicas", "Spec Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	*/
 
 	//HPA workloads
 	query = `kube_hpa_spec_max_replicas`
-	errors += getHPAWorkload(promaddress, "max_replicas", "Max Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getHPAWorkload(promaddress, "max_replicas", "Auto Scaling - Maximum Size", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	query = `kube_hpa_spec_min_replicas`
-	errors += getHPAWorkload(promaddress, "min_replicas", "Min Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getHPAWorkload(promaddress, "min_replicas", "Auto Scaling - Minimum Size", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	query = `kube_hpa_status_condition{status="ScalingLimited",condition="true"}`
 	errors += getHPAWorkload(promaddress, "condition_scaling_limited", "Scaling Limited", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	query = `kube_hpa_status_current_replicas`
-	errors += getHPAWorkload(promaddress, "current_replicas", "Current Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getHPAWorkload(promaddress, "current_replicas", "Auto Scaling - Total Instances", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
 
-	query = `kube_hpa_status_desired_replicas`
-	errors += getHPAWorkload(promaddress, "desired_replicas", "Desired Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	/*
+		query = `kube_hpa_status_desired_replicas`
+		errors += getHPAWorkload(promaddress, "desired_replicas", "Desired Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	*/
 
 	return errors
 }

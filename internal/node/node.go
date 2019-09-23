@@ -244,42 +244,17 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	/*
-		==========START OF DISK METRICS========
-		-node_disk_written_bytes_total 		(MAX)
-		-node_disk_written_bytes_total 		(AVG)
-
-		-node_disk_read_bytes_total    		(MAX)
-		-node_disk_read_bytes_total    		(AVG)
-
-		-irate(node_disk_read_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m])    		(MAX)
-		-irate(node_disk_read_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m])    		(AVG)
-
-		-irate(node_disk_write_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]			(MAX)
-		-irate(node_disk_write_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]			(AVG)
+		==========START OF CPU METRICS==========
+		-irate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100	(MAX)
+		-irate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100	(AVG)
 	*/
 
-	//Query and store prometheus node disk write in bytes
-	query = `label_replace(irate(node_disk_written_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	errors += getWorkload(promaddress, "disk_write_bytes", "Raw Disk Write Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "disk_write_bytes", "Raw Disk Write Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-
-	//Query and store prometheus node disk read in bytes
-	query = `label_replace(irate(node_disk_read_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	errors += getWorkload(promaddress, "disk_read_bytes", "Raw Disk Read Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "disk_read_bytes", "Raw Disk Read Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-
-	//Query and store prometheus total disk read uptime as a percentage
-	query = `label_replace(irate(node_disk_read_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	errors += getWorkload(promaddress, "disk_read_ops", "Disk Read Operations", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "disk_read_ops", "Disk Read Operations", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-
-	//Query and store prometheus total disk write uptime as a percentage
-	query = `label_replace(irate(node_disk_write_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
-	errors += getWorkload(promaddress, "disk_write_ops", "Disk Write Operations", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "disk_write_ops", "Disk Write Operations", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	//Query and store prometheus total cpu uptime in seconds
+	query = `label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100, "pod_ip", "$1", "instance", "(.*):.*")`
+	errors += getWorkload(promaddress, "cpu_utilization", "CPU Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	/*
-		==========END OF DISK METRICS==========
+		==========END OF CPU METRICS============
 	*/
 
 	//**************************************************************************************************************
@@ -300,28 +275,64 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 		-node_memory_MemTotal_bytes - (node_memory_MemFree_bytes + node_memory_Cached_bytes + node_memory_Buffers_bytes)	(AVG)
 	*/
 
-	//Query and store prometheus node memory total in bytes
-	query = `label_replace(node_memory_MemTotal_bytes, "pod_ip", "$1", "instance", "(.*):.*")`
-	errors += getWorkload(promaddress, "memory_total_bytes", "Total Memory Bytes", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "memory_total_bytes", "Total Memory Bytes", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	/*
+		//Query and store prometheus node memory total in bytes
+		query = `label_replace(node_memory_MemTotal_bytes, "pod_ip", "$1", "instance", "(.*):.*")`
+		errors += getWorkload(promaddress, "memory_total_bytes", "Total Memory Bytes", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
-	//Query and store prometheus node memory active bytes
-	query = `label_replace(node_memory_Active_bytes, "pod_ip", "$1", "instance", "(.*):.*")`
-	errors += getWorkload(promaddress, "memory_active_bytes", "Active Memory Bytes", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "memory_active_bytes", "Active Memory Bytes", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+		//Query and store prometheus node memory active bytes
+		query = `label_replace(node_memory_Active_bytes, "pod_ip", "$1", "instance", "(.*):.*")`
+		errors += getWorkload(promaddress, "memory_active_bytes", "Active Memory Bytes", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	*/
 
 	//Query and store prometheus node memory total in bytes
 	query = `label_replace(node_memory_MemTotal_bytes - node_memory_MemFree_bytes, "pod_ip", "$1", "instance", "(.*):.*")`
 	errors += getWorkload(promaddress, "memory_raw_bytes", "Raw Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "memory_raw_bytes", "Raw Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory total free in bytes
 	query = `label_replace(node_memory_MemTotal_bytes - (node_memory_MemFree_bytes + node_memory_Cached_bytes + node_memory_Buffers_bytes), "pod_ip", "$1", "instance", "(.*):.*")`
 	errors += getWorkload(promaddress, "memory_actual_workload", "Actual Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "memory_actual_workload", "Actual Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	/*
 		==========END OF MEMORY METRICS============
+	*/
+
+	//**************************************************************************************************************
+	//**************************************************************************************************************
+
+	/*
+		==========START OF DISK METRICS========
+		-node_disk_written_bytes_total 		(MAX)
+		-node_disk_written_bytes_total 		(AVG)
+
+		-node_disk_read_bytes_total    		(MAX)
+		-node_disk_read_bytes_total    		(AVG)
+
+		-irate(node_disk_read_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m])    		(MAX)
+		-irate(node_disk_read_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m])    		(AVG)
+
+		-irate(node_disk_write_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]			(MAX)
+		-irate(node_disk_write_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]			(AVG)
+	*/
+
+	//Query and store prometheus node disk write in bytes
+	query = `label_replace(irate(node_disk_written_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	errors += getWorkload(promaddress, "disk_write_bytes", "Raw Disk Write Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	//Query and store prometheus node disk read in bytes
+	query = `label_replace(irate(node_disk_read_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	errors += getWorkload(promaddress, "disk_read_bytes", "Raw Disk Read Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	//Query and store prometheus total disk read uptime as a percentage
+	query = `label_replace(irate(node_disk_read_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	errors += getWorkload(promaddress, "disk_read_ops", "Disk Read Operations", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	//Query and store prometheus total disk write uptime as a percentage
+	query = `label_replace(irate(node_disk_write_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	errors += getWorkload(promaddress, "disk_write_ops", "Disk Write Operations", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+
+	/*
+		==========END OF DISK METRICS==========
 	*/
 
 	//**************************************************************************************************************
@@ -345,43 +356,21 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	//Query and store prometheus node recieved network data in bytes
 	query = `label_replace(irate(node_network_receive_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
 	errors += getWorkload(promaddress, "net_received_bytes", "Raw Net Received Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "net_received_bytes", "Raw Net Received Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus recieved network data in packets
 	query = `label_replace(irate(node_network_receive_packets_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
 	errors += getWorkload(promaddress, "net_received_packets", "Network Packets Received", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "net_received_packets", "Network Packets Received", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus total transmitted network data in bytes
 	query = `label_replace(irate(node_network_transmit_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
 	errors += getWorkload(promaddress, "net_sent_bytes", "Raw Net Sent Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "net_sent_bytes", "Raw Net Sent Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus total transmitted network data in packets
 	query = `label_replace(irate(node_network_transmit_packets_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
 	errors += getWorkload(promaddress, "net_sent_packets", "Network Packets Sent", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "net_sent_packets", "Network Packets Sent", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	/*
 		==========END OF NETWORK METRICS============
-	*/
-
-	//**************************************************************************************************************
-	//**************************************************************************************************************
-
-	/*
-		==========START OF CPU METRICS==========
-		-irate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100	(MAX)
-		-irate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100	(AVG)
-	*/
-
-	//Query and store prometheus total cpu uptime in seconds
-	query = `label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100, "pod_ip", "$1", "instance", "(.*):.*")`
-	errors += getWorkload(promaddress, "cpu_utilization", "CPU Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "cpu_utilization", "CPU Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
-
-	/*
-		==========END OF CPU METRICS============
 	*/
 
 	return errors

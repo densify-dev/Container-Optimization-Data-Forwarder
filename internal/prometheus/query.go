@@ -13,14 +13,11 @@ import (
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 )
 
-//step is set to be 5minutes as it is defined in microseconds.
-const step = 300000000000
-
 var promAddLog string
 var hasClusterName = false
 
 //MetricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
-func MetricCollect(promaddress, query string, start, end time.Time, entityKind, metric string, vital bool) (value model.Value, logLine string) {
+func MetricCollect(promaddress, query string, v1Range v1.Range, entityKind, metric string, vital bool) (value model.Value, logLine string) {
 
 	//setup the context to use for the API calls
 	ctx, cancel := context.WithCancel(context.Background())
@@ -34,7 +31,7 @@ func MetricCollect(promaddress, query string, start, end time.Time, entityKind, 
 
 	//Query prometheus with the values defined above as well as the query that was passed into the function.
 	q := v1.NewAPI(client)
-	value, _, err = q.QueryRange(ctx, query, v1.Range{Start: start, End: end, Step: step})
+	value, _, err = q.QueryRange(ctx, query, v1Range)
 	if err != nil {
 		return value, logger.LogError(map[string]string{"message": err.Error(), "query": query, "metric": metric}, "ERROR")
 	}

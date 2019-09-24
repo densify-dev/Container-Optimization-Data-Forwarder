@@ -10,6 +10,7 @@ import (
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
+	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 )
 
@@ -82,8 +83,9 @@ func getWorkload(promaddress, fileName, metricName, query, clusterName, promAddr
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
+		range5Min := v1.Range{Start: start, End: end, Step: time.Minute * 5}
 
-		result, logLine = prometheus.MetricCollect(promaddress, query, start, end, "Cluster", metricName, false)
+		result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, "Cluster", metricName, false)
 		writeWorkload(workloadWrite, result, promAddr, cluster)
 		errors += logLine
 	}
@@ -206,6 +208,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Start and end time + the prometheus address used for querying
 	start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
+	range5Min := v1.Range{Start: start, End: end, Step: time.Minute * 5}
 	promaddress = promProtocol + "://" + promAddr + ":" + promPort
 
 	//Prefix for indexing (less clutter on screen)
@@ -221,7 +224,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	*/
 
 	query = `sum(kube_pod_container_resource_limits_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "cpuLimit", false)
+	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "cpuLimit", false)
 	if logLine == "" {
 		getClusterMetric(result, "cpuLimit")
 	} else {
@@ -229,7 +232,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `sum(kube_pod_container_resource_requests_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "cpuRequest", false)
+	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "cpuRequest", false)
 	if logLine == "" {
 		getClusterMetric(result, "cpuRequest")
 	} else {
@@ -237,7 +240,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `sum(kube_pod_container_resource_limits_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "memLimit", false)
+	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "memLimit", false)
 	if logLine == "" {
 		getClusterMetric(result, "memLimit")
 	} else {
@@ -245,7 +248,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `sum(kube_pod_container_resource_requests_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, "memRequest", false)
+	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "memRequest", false)
 	if logLine == "" {
 		getClusterMetric(result, "memRequest")
 	} else {

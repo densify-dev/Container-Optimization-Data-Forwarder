@@ -15,6 +15,7 @@ import (
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
+	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 )
 
 //Gets node metrics from prometheus (and checks to see if they are valid)
@@ -121,9 +122,10 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
+		range5Min := v1.Range{Start: start, End: end, Step: time.Minute * 5}
 
 		query2 = aggregator + "(" + aggregator + "(" + query + `) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
-		result, _ = prometheus.MetricCollect(promaddress, query2, start, end, "Node", metricName, false)
+		result, _ = prometheus.MetricCollect(promaddress, query2, range5Min, "Node", metricName, false)
 		writeWorkload(workloadWrite, result, "node", promAddr, cluster)
 	}
 	//Close the workload files.

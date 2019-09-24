@@ -632,7 +632,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 		errors += getWorkload(promaddress, "fs_time_seconds_workload", "FS Time Seconds", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
 	*/
 
-	query = `label_replace(sum(irate(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod,namespace,container), "container_name", "$1", "container", "(.*)")`
+	query = `label_replace(sum(irate(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}[1h])) by (instance,pod,namespace,container), "container_name", "$1", "container", "(.*)")`
 	errors += getWorkload(promaddress, "restarts", "Restarts", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	/*

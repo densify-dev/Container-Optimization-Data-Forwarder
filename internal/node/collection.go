@@ -14,8 +14,8 @@ import (
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
-	"github.com/prometheus/common/model"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/common/model"
 )
 
 //Gets node metrics from prometheus (and checks to see if they are valid)
@@ -111,7 +111,7 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 	//var query string
 	var start, end time.Time
 	//Open the files that will be used for the workload data types and write out there headers.
-	workloadWrite, err := os.Create("./data/node/" + aggregator + `_` + fileName + ".csv")
+	workloadWrite, err := os.Create("./data/node/" + fileName + ".csv")
 	if err != nil {
 		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
 	}

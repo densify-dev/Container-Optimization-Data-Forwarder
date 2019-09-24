@@ -190,13 +190,14 @@ func main() {
 	} else {
 		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute()-offset, 0, 0, t.Location())
 	}
-
-	errors += container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	errors += node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	errors += cluster.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-
 	//Open the debug log file for writing.
 	debugLog, _ := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
+	logger.PrintLog(errors, debugLog)
 
+	errors = container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+	logger.PrintLog(errors, debugLog)
+	errors = node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+	logger.PrintLog(errors, debugLog)
+	errors = cluster.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
 	logger.PrintLog(errors, debugLog)
 }

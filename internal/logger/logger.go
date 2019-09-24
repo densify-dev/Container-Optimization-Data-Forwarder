@@ -37,5 +37,5 @@ func LogError(fields map[string]string, level string) (s string) {
 //PrintLog prints the log
 func PrintLog(errors string, f *os.File) {
 	fmt.Fprintf(f, errors)
-	f.Close()
+	fmt.Printf(errors)
 }

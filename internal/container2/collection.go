@@ -10,6 +10,7 @@ import (
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
+	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 )
 
@@ -256,6 +257,12 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 	var start, end time.Time
 	var query2 string
 	var logLine string
+	var step time.Duration
+	if metricName == "Restarts" {
+		step = time.Hour
+	} else {
+		step = time.Minute * 5
+	}
 	errors := ""
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/" + aggregator + `_` + fileName + ".csv")
@@ -269,28 +276,29 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
+		range5Min := v1.Range{Start: start, End: end, Step: step}
 
 		//query containers under a pod with no owner
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left max(kube_pod_owner{owner_name="<none>"}) by (namespace, pod, container_name)) by (pod,namespace,container_name)`
-		result, logLine = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "pod_"+metricName, false)
+		result, logLine = prometheus.MetricCollect(promaddress, query2, range5Min, entityKind, "pod_"+metricName, false)
 		writeWorkload(workloadWrite, result, "namespace", "pod", "container_name", clusterName, promAddr, "Pod")
 		errors += logLine
 
 		//query containers under a controller with no owner
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (owner_name,owner_kind) max(kube_pod_owner) by (namespace, pod, owner_name, owner_kind)) by (owner_kind,owner_name,namespace,container_name)`
-		result, logLine = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "controller_"+metricName, false)
+		result, logLine = prometheus.MetricCollect(promaddress, query2, range5Min, entityKind, "controller_"+metricName, false)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "")
 		errors += logLine
 
 		//query containers under a deployment
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) max(label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)")) by (namespace, pod, replicaset) * on (replicaset, namespace) group_left (owner_name) max(kube_replicaset_owner{owner_kind="Deployment"}) by (namespace, replicaset, owner_name)) by (owner_name,namespace,container_name)`
-		result, logLine = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "deployment_"+metricName, false)
+		result, logLine = prometheus.MetricCollect(promaddress, query2, range5Min, entityKind, "deployment_"+metricName, false)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "Deployment")
 		errors += logLine
 
 		//query containers under a cron job
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) max(label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)")) by (namespace, pod, job) * on (job, namespace) group_left (owner_name) max(label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (namespace, job, owner_name)) by (owner_name,namespace,container_name)`
-		result, logLine = prometheus.MetricCollect(promaddress, query2, start, end, entityKind, "cronJob_"+metricName, false)
+		result, logLine = prometheus.MetricCollect(promaddress, query2, range5Min, entityKind, "cronJob_"+metricName, false)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", "container_name", clusterName, promAddr, "CronJob")
 		errors += logLine
 
@@ -319,7 +327,8 @@ func getDeploymentWorkload(promaddress, fileName, metricName, query, clusterName
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		tempMap[int(historyInterval)] = map[string]map[string][]model.SamplePair{}
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
-		result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, metricName, false)
+		range5Min := v1.Range{Start: start, End: end, Step: time.Minute * 5}
+		result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, metricName, false)
 		errors += logLine
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
@@ -363,6 +372,12 @@ func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promA
 	var result model.Value
 	var start, end time.Time
 	var logLine string
+	var step time.Duration
+	if metricName == "Scaling Limited" {
+		step = time.Hour
+	} else {
+		step = time.Minute * 5
+	}
 	errors := ""
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/hpa_" + fileName + ".csv")
@@ -381,7 +396,8 @@ func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promA
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		tempMap[int(historyInterval)] = map[string]map[string][]model.SamplePair{}
 		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
-		result, logLine = prometheus.MetricCollect(promaddress, query, start, end, entityKind, metricName, false)
+		range5Min := v1.Range{Start: start, End: end, Step: step}
+		result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, metricName, false)
 		errors += logLine
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {

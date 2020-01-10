@@ -173,7 +173,7 @@ func initParameters() {
 
 //main function.
 func main() {
-	errors := "Version 2.1.0"
+	errors := "Version 2.1.1"
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()

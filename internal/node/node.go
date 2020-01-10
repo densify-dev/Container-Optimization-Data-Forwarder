@@ -289,7 +289,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Query and store prometheus node memory total in bytes
 	query = `label_replace(node_memory_MemTotal_bytes - node_memory_MemFree_bytes, "pod_ip", "$1", "instance", "(.*):.*")`
-	errors += getWorkload(promaddress, "memory_raw_bytes", "Raw Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload(promaddress, "memory_raw_bytes", "Raw Mem Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	//Query and store prometheus node memory total free in bytes
 	query = `label_replace(node_memory_MemTotal_bytes - (node_memory_MemFree_bytes + node_memory_Cached_bytes + node_memory_Buffers_bytes), "pod_ip", "$1", "instance", "(.*):.*")`

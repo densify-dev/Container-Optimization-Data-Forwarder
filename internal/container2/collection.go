@@ -15,49 +15,60 @@ import (
 )
 
 //getContainerMetric is used to parse the results from Prometheus related to Container Entities and store them in the systems data structure.
-func getContainerMetric(result model.Value, namespace model.LabelName, pod, container model.LabelName, metric string) {
+func getContainerMetric(result model.Value, namespace, pod, container model.LabelName, metric string) {
 	//Validate there is data in the results.
-	if result != nil {
-		//Loop through the different entities in the results.
-		for i := 0; i < result.(model.Matrix).Len(); i++ {
-			//Validate that the data contains the namespace label with value and check it exists in our systems structure.
-			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := systems[string(namespaceValue)]; ok {
-					//Validate that the data contains the pod label with value and check it exists in our systems structure
-					if podValue, ok := result.(model.Matrix)[i].Metric[pod]; ok {
-						if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)]; ok {
-							//Validate that the data contains the container label with value and check it exists in our systems structure
-							if containerValue, ok := result.(model.Matrix)[i].Metric[container]; ok {
-								if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)]; ok {
-									//validates that the value of the entity is set and if not will default to 0
-									var value int
-									if len(result.(model.Matrix)[i].Values) == 0 {
-										value = 0
-									} else {
-										value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
-									}
-									//Check which metric this is for and update the corresponding variable for this container in the system data structure
-									if metric == "memory" {
-										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memory = value
-									} else if metric == "cpuLimit" {
-										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuLimit = value
-									} else if metric == "cpuRequest" {
-										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuRequest = value
-									} else if metric == "memLimit" {
-										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memLimit = value
-									} else if metric == "memRequest" {
-										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memRequest = value
-									} else if metric == "restarts" {
-										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].restarts = value
-									} else if metric == "powerState" {
-										systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].powerState = value
-									}
-								}
-							}
-						}
-					}
-				}
-			}
+	if result == nil {
+		return
+	}
+	//Loop through the different entities in the results.
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
+		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
+		namespaceValue, test := result.(model.Matrix)[i].Metric[namespace]
+		if test == false {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)]; ok == false {
+			continue
+		}
+		//Validate that the data contains the pod label with value and check it exists in our systems structure
+		podValue, test := result.(model.Matrix)[i].Metric[pod]
+		if test == false {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)]; ok == false {
+			continue
+		}
+		//Validate that the data contains the container label with value and check it exists in our systems structure
+		containerValue, test := result.(model.Matrix)[i].Metric[container]
+		if test == false {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)]; ok == false {
+			continue
+		}
+		//validates that the value of the entity is set and if not will default to 0
+		var value int
+		if len(result.(model.Matrix)[i].Values) == 0 {
+			value = 0
+		} else {
+			value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+		}
+		//Check which metric this is for and update the corresponding variable for this container in the system data structure
+		switch metric {
+		case "memory":
+			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memory = value
+		case "cpuLimit":
+			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuLimit = value
+		case "cpuRequest":
+			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuRequest = value
+		case "memLimit":
+			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memLimit = value
+		case "memRequest":
+			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memRequest = value
+		case "restarts":
+			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].restarts = value
+		case "powerState":
+			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].powerState = value
 		}
 	}
 }
@@ -65,27 +76,37 @@ func getContainerMetric(result model.Value, namespace model.LabelName, pod, cont
 //getContainerMetricString is used to parse the label based results from Prometheus related to Container Entities and store them in the systems data structure.
 func getContainerMetricString(result model.Value, namespace model.LabelName, pod, container model.LabelName) {
 	//Validate there is data in the results.
-	if result != nil {
-		for i := 0; i < result.(model.Matrix).Len(); i++ {
-			//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
-			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := systems[string(namespaceValue)]; ok {
-					//Validate that the data contains the pod label with value and check it exists in our temp structure if not it will be added
-					if podValue, ok := result.(model.Matrix)[i].Metric[pod]; ok {
-						if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)]; ok {
-							//Validate that the data contains the container label with value and check it exists in our temp structure if not it will be added
-							if containerValue, ok := result.(model.Matrix)[i].Metric[container]; ok {
-								if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)]; ok {
-									//loop through all the labels for an entity and store them in a map. For controller based entities where there will be multiple copies of containers they will have there values concatinated together.
-									for key, value := range result.(model.Matrix)[i].Metric {
-										addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].labelMap)
-									}
-								}
-							}
-						}
-					}
-				}
-			}
+	if result == nil {
+		return
+	}
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
+		//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
+		namespaceValue, test := result.(model.Matrix)[i].Metric[namespace]
+		if test == false {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)]; ok == false {
+			continue
+		}
+		//Validate that the data contains the pod label with value and check it exists in our temp structure if not it will be added
+		podValue, test := result.(model.Matrix)[i].Metric[pod]
+		if test == false {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)]; ok == false {
+			continue
+		}
+		//Validate that the data contains the container label with value and check it exists in our temp structure if not it will be added
+		containerValue, test := result.(model.Matrix)[i].Metric[container]
+		if test == false {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)]; ok == false {
+			continue
+		}
+		//loop through all the labels for an entity and store them in a map. For controller based entities where there will be multiple copies of containers they will have there values concatinated together.
+		for key, value := range result.(model.Matrix)[i].Metric {
+			addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].labelMap)
 		}
 	}
 }

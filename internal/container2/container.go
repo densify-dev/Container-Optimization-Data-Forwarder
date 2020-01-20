@@ -192,6 +192,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "memory", false)
 	if logLine == "" {
 		getContainerMetric(result, "namespace", "pod_name", "container_name", "memory")
+		getContainerMetric(result, "namespace", "pod", "container", "memory")
 	} else {
 		errors += logLine
 	}
@@ -232,6 +233,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "conLabel", false)
 	if logLine == "" {
 		getContainerMetricString(result, "namespace", "pod_name", "container_name")
+		getContainerMetricString(result, "namespace", "pod", "container")
 	} else {
 		errors += logLine
 	}

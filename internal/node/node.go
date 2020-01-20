@@ -252,7 +252,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	*/
 
 	//Query and store prometheus total cpu uptime in seconds
-	query = `label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[5m])) by (pod, instance, cpu)*100, "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[5m])) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100, "pod_ip", "$1", "instance", "(.*):.*")`
 	errors += getWorkload(promaddress, "cpu_utilization", "CPU Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	/*

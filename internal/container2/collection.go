@@ -114,38 +114,45 @@ func getContainerMetricString(result model.Value, namespace model.LabelName, pod
 //getmidMetric is used to parse the results from Prometheus related to mid Entities and store them in the systems data structure.
 func getMidMetric(result model.Value, namespace model.LabelName, mid model.LabelName, metric string, prefix string) {
 	//Validate there is data in the results.
-	if result != nil {
-		//Loop through the different entities in the results.
-		for i := 0; i < result.(model.Matrix).Len(); i++ {
-			//Validate that the data contains the namespace label with value and check it exists in our systems structure.
-			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := systems[string(namespaceValue)]; ok {
-					//Validate that the data contains the mid label with value and check it exists in our systems structure
-					if midValue, ok := result.(model.Matrix)[i].Metric[mid]; ok {
-						if _, ok := systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)]; ok {
-							if _, ok := systems[string(namespaceValue)].midLevels[prefix+"__"+string(midValue)]; ok {
-								//validates that the value of the entity is set and if not will default to 0
-								var value int64
-								if len(result.(model.Matrix)[i].Values) == 0 {
-									value = 0
-								} else {
-									value = int64(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
-								}
-								_ = value
-								//Check which metric this is for and update the corresponding variable for this mid in the system data structure
-
-								if metric == "currentSize" {
-									systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].currentSize = int(value)
-								} else if metric == "creationTime" {
-									systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].creationTime = value
-								} else {
-									addToLabelMap(metric, strconv.FormatInt(value, 10), systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
-								}
-							}
-						}
-					}
-				}
-			}
+	if result == nil {
+		return
+	}
+	//Loop through the different entities in the results.
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
+		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
+		namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]
+		if !ok {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)]; !ok {
+			continue
+		}
+		//Validate that the data contains the mid label with value and check it exists in our systems structure
+		midValue, ok := result.(model.Matrix)[i].Metric[mid]
+		if !ok {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)]; !ok {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)].midLevels[prefix+"__"+string(midValue)]; !ok {
+			continue
+		}
+		//validates that the value of the entity is set and if not will default to 0
+		var value int64
+		if len(result.(model.Matrix)[i].Values) == 0 {
+			value = 0
+		} else {
+			value = int64(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+		}
+		//Check which metric this is for and update the corresponding variable for this mid in the system data structure
+		switch metric {
+		case "currentSize":
+			systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].currentSize = int(value)
+		case "creationTime":
+			systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].creationTime = value
+		default:
+			addToLabelMap(metric, strconv.FormatInt(value, 10), systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
 		}
 	}
 }
@@ -154,22 +161,29 @@ func getMidMetric(result model.Value, namespace model.LabelName, mid model.Label
 func getMidMetricString(result model.Value, namespace model.LabelName, mid model.LabelName, prefix string) {
 	//temp structure used to store data while working with it. As we are combining the labels into a formatted string for loading.
 	//Validate there is data in the results.
-	if result != nil {
-		for i := 0; i < result.(model.Matrix).Len(); i++ {
-			//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
-			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := systems[string(namespaceValue)]; ok {
-					//Validate that the data contains the mid label with value and check it exists in our temp structure if not it will be added
-					if midValue, ok := result.(model.Matrix)[i].Metric[mid]; ok {
-						if _, ok := systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)]; ok {
-							//loop through all the labels for an entity and store them in a map. For controller based entities where there will be multiple copies of containers they will have there values concatinated together.
-							for key, value := range result.(model.Matrix)[i].Metric {
-								addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
-							}
-						}
-					}
-				}
-			}
+	if result == nil {
+		return
+	}
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
+		//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
+		namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]
+		if !ok {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)]; !ok {
+			continue
+		}
+		//Validate that the data contains the mid label with value and check it exists in our temp structure if not it will be added
+		midValue, ok := result.(model.Matrix)[i].Metric[mid]
+		if !ok {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)]; !ok {
+			continue
+		}
+		//loop through all the labels for an entity and store them in a map. For controller based entities where there will be multiple copies of containers they will have there values concatinated together.
+		for key, value := range result.(model.Matrix)[i].Metric {
+			addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
 		}
 	}
 }

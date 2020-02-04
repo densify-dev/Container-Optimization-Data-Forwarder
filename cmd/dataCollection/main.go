@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/cluster"
@@ -19,11 +20,13 @@ var clusterName, promPort, promAddr, promProtocol, interval, configFile, configP
 var intervalSize, history, offset int
 var debug bool
 var currentTime time.Time
+var include string
 
 //Temps
 var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp string
 var intervalSizeTemp, historyTemp, offsetTemp int
 var debugTemp bool
+var includeTemp string
 
 //initParamters will look for settings defined on the command line or in config.properties file and update accordingly. Also defines the default values for these variables.
 //Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
@@ -40,6 +43,7 @@ func initParameters() {
 	debug = false
 	configFile = "config"
 	configPath = "./config"
+	include = "container,node,cluster"
 
 	//Set settings using environment variables
 	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_CLUSTER"); ok {
@@ -98,6 +102,10 @@ func initParameters() {
 		configPath = tempEnvVar
 	}
 
+	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_INCLUDE"); ok {
+		include = parseIncludeParam(tempEnvVar)
+	}
+
 	//Get the settings passed in from the command line and update the variables as required.
 	flag.StringVar(&clusterNameTemp, "clusterName", clusterName, "Name of the cluster to show in Densify")
 	flag.StringVar(&promProtocolTemp, "protocol", promProtocol, "Which protocol to use http|https")
@@ -110,6 +118,7 @@ func initParameters() {
 	flag.BoolVar(&debugTemp, "debug", debug, "Enable debug logging")
 	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
 	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
+	flag.StringVar(&includeTemp, "include-list", include, "Comma separated list of data to include in collection (cluster, node, container) Ex: \"node,cluster\"")
 	flag.Parse()
 
 	//Set defaults for viper to use if setting not found in the config.properties file.
@@ -124,6 +133,7 @@ func initParameters() {
 		viper.SetDefault("history", history)
 		viper.SetDefault("offset", offset)
 		viper.SetDefault("debug", debug)
+		viper.SetDefault("include_list", include)
 		// Config import setup.
 		viper.SetConfigName(configFile)
 		viper.AddConfigPath(configPath)
@@ -140,7 +150,7 @@ func initParameters() {
 			history = viper.GetInt("history")
 			offset = viper.GetInt("offset")
 			debug = viper.GetBool("debug")
-
+			include = parseIncludeParam(viper.GetString("include_list"))
 		}
 	}
 
@@ -164,11 +174,24 @@ func initParameters() {
 			offset = offsetTemp
 		case "debug":
 			debug = debugTemp
+		case "include-list":
+			include = parseIncludeParam(includeTemp)
 		}
 	}
 
 	flag.Visit(visitor)
 
+}
+
+func parseIncludeParam(param string) string {
+	param = strings.ToLower(param)
+	var list string
+	for _, elem := range strings.Split(param, ",") {
+		if strings.Compare(elem, "cluster") == 0 || strings.Compare(elem, "node") == 0 || strings.Compare(elem, "container") == 0 || strings.Compare(elem, "") == 0 {
+			list += elem + ","
+		}
+	}
+	return list
 }
 
 //main function.
@@ -194,10 +217,22 @@ func main() {
 	debugLog, _ := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
 	logger.PrintLog(errors, debugLog)
 
-	errors = container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	logger.PrintLog(errors, debugLog)
-	errors = node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	logger.PrintLog(errors, debugLog)
-	errors = cluster.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-	logger.PrintLog(errors, debugLog)
+	if !strings.Contains(include, "container") {
+		logger.PrintLog("\nSkipping container data collection", debugLog)
+	} else {
+		errors = container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+		logger.PrintLog(errors, debugLog)
+	}
+	if !strings.Contains(include, "node") {
+		logger.PrintLog("\nSkipping node data collection", debugLog)
+	} else {
+		errors = node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+		logger.PrintLog(errors, debugLog)
+	}
+	if !strings.Contains(include, "cluster") {
+		logger.PrintLog("\nSkipping cluster data collection", debugLog)
+	} else {
+		errors = cluster.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+		logger.PrintLog(errors, debugLog)
+	}
 }

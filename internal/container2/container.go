@@ -664,6 +664,13 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 		errors += getDeploymentWorkload(promaddress, "spec_replicas", "Spec Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
 	*/
 
+	hpaStatus := `true`
+	hpaCondition := `ScalingLimited`
+	if labelSuffix != "" {
+		hpaStatus = `ScalingLimited`
+		hpaCondition = `true`
+	}
+
 	//HPA workloads
 	query = `kube_hpa_spec_max_replicas`
 	errors += getHPAWorkload(promaddress, "max_replicas", "Auto Scaling - Maximum Size", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
@@ -671,7 +678,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	query = `kube_hpa_spec_min_replicas`
 	errors += getHPAWorkload(promaddress, "min_replicas", "Auto Scaling - Minimum Size", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
 
-	query = `kube_hpa_status_condition{status="ScalingLimited",condition="true"}`
+	query = `kube_hpa_status_condition{status="` + hpaStatus + `",condition="` + hpaCondition + `"}`
 	errors += getHPAWorkload(promaddress, "condition_scaling_limited", "Scaling Limited", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
 
 	query = `kube_hpa_status_current_replicas`

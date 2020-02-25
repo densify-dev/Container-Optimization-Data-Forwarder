@@ -196,33 +196,39 @@ func getMidMetricString(result model.Value, namespace model.LabelName, mid model
 func getHPAMetricString(result model.Value, namespace model.LabelName, hpa model.LabelName, clusterName string, promAddr string) {
 	hpas := map[string]map[string]string{}
 	//Validate there is data in the results.
-	if result != nil {
-		for i := 0; i < result.(model.Matrix).Len(); i++ {
-			//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
-			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := systems[string(namespaceValue)]; ok {
-					//Validate that the data contains the mid label with value and check it exists in our temp structure if not it will be added
-					if hpaValue, ok := result.(model.Matrix)[i].Metric[hpa]; ok {
-						if _, ok := systems[string(namespaceValue)].pointers["Deployment__"+string(hpaValue)]; ok {
-							for key, value := range result.(model.Matrix)[i].Metric {
-								addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["Deployment__"+string(hpaValue)].labelMap)
-							}
-						} else if _, ok := systems[string(namespaceValue)].pointers["ReplicaSet__"+string(hpaValue)]; ok {
-							for key, value := range result.(model.Matrix)[i].Metric {
-								addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["ReplicaSet__"+string(hpaValue)].labelMap)
-							}
-						} else if _, ok := systems[string(namespaceValue)].pointers["ReplicationController__"+string(hpaValue)]; ok {
-							for key, value := range result.(model.Matrix)[i].Metric {
-								addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["ReplicationController__"+string(hpaValue)].labelMap)
-							}
-						} else {
-							hpas[string(hpaValue)] = map[string]string{}
-							for key, value := range result.(model.Matrix)[i].Metric {
-								addToLabelMap(string(key), string(value), hpas[string(hpaValue)])
-							}
-						}
-					}
-				}
+	if result == nil {
+		return
+	}
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
+		//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
+		namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]
+		if !ok {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)]; !ok {
+			continue
+		}
+		//Validate that the data contains the mid label with value and check it exists in our temp structure if not it will be added
+		hpaValue, ok := result.(model.Matrix)[i].Metric[hpa]
+		if !ok {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)].pointers["Deployment__"+string(hpaValue)]; ok {
+			for key, value := range result.(model.Matrix)[i].Metric {
+				addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["Deployment__"+string(hpaValue)].labelMap)
+			}
+		} else if _, ok := systems[string(namespaceValue)].pointers["ReplicaSet__"+string(hpaValue)]; ok {
+			for key, value := range result.(model.Matrix)[i].Metric {
+				addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["ReplicaSet__"+string(hpaValue)].labelMap)
+			}
+		} else if _, ok := systems[string(namespaceValue)].pointers["ReplicationController__"+string(hpaValue)]; ok {
+			for key, value := range result.(model.Matrix)[i].Metric {
+				addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["ReplicationController__"+string(hpaValue)].labelMap)
+			}
+		} else {
+			hpas[string(hpaValue)] = map[string]string{}
+			for key, value := range result.(model.Matrix)[i].Metric {
+				addToLabelMap(string(key), string(value), hpas[string(hpaValue)])
 			}
 		}
 	}
@@ -235,37 +241,38 @@ func getHPAMetricString(result model.Value, namespace model.LabelName, hpa model
 //getNamespaceMetric is used to parse the results from Prometheus related to Namespace Entities and store them in the systems data structure.
 func getNamespacelimits(result model.Value, namespace model.LabelName) {
 	//Validate there is data in the results.
-	if result != nil {
-		//Loop through the different entities in the results.
-		for i := 0; i < result.(model.Matrix).Len(); i++ {
-			//Validate that the data contains the namespace label with value and check it exists in our systems structure.
-			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := systems[string(namespaceValue)]; ok {
-					//validates that the value of the entity is set and if not will default to 0
-					var value int
-					if len(result.(model.Matrix)[i].Values) == 0 {
-						value = 0
-					} else {
-						value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
-					}
-					//Check which metric this is for and update the corresponding variable for this container in the system data structure
-					//For systems limits they are defined based on 2 of the labels as they combine the Limits and Request for CPU and Memory all into 1 call.
+	if result == nil {
+		return
+	}
+	//Loop through the different entities in the results.
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
+		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
+		namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]
+		if !ok {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)]; !ok {
+			continue
+		}
+		//validates that the value of the entity is set and if not will default to 0
+		var value int = 0
+		if len(result.(model.Matrix)[i].Values) != 0 {
+			value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+		}
 
-					if constraint := result.(model.Matrix)[i].Metric["constraint"]; constraint == "defaultRequest" {
-						if resource := result.(model.Matrix)[i].Metric["resource"]; resource == "cpu" {
-							systems[string(namespaceValue)].cpuRequest = value
-						} else if resource := result.(model.Matrix)[i].Metric["resource"]; resource == "memory" {
-							systems[string(namespaceValue)].memRequest = value
-						}
-					} else if constraint := result.(model.Matrix)[i].Metric["constraint"]; constraint == "default" {
-						if resource := result.(model.Matrix)[i].Metric["resource"]; resource == "cpu" {
-							systems[string(namespaceValue)].cpuLimit = value
-						} else if resource := result.(model.Matrix)[i].Metric["resource"]; resource == "memory" {
-							systems[string(namespaceValue)].memLimit = value
-						}
-					}
-				}
-			}
+		//Check which metric this is for and update the corresponding variable for this container in the system data structure
+		//For systems limits they are defined based on 2 of the labels as they combine the Limits and Request for CPU and Memory all into 1 call.
+		constraint := result.(model.Matrix)[i].Metric["constraint"]
+		resource := result.(model.Matrix)[i].Metric["resource"]
+		switch {
+		case constraint == "defaultRequest" && resource == "cpu":
+			systems[string(namespaceValue)].cpuRequest = value
+		case constraint == "defaultRequest" && resource == "memory":
+			systems[string(namespaceValue)].memRequest = value
+		case constraint == "default" && resource == "cpu":
+			systems[string(namespaceValue)].cpuLimit = value
+		case constraint == "default" && resource == "memory":
+			systems[string(namespaceValue)].memLimit = value
 		}
 	}
 }
@@ -273,18 +280,22 @@ func getNamespacelimits(result model.Value, namespace model.LabelName) {
 //getNamespaceMetricString is used to parse the label based results from Prometheus related to Namespace Entities and store them in the systems data structure.
 func getNamespaceMetricString(result model.Value, namespace model.LabelName) {
 	//Validate there is data in the results.
-	if result != nil {
-		//Loop through the different entities in the results.
-		for i := 0; i < result.(model.Matrix).Len(); i++ {
-			//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
-			if namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]; ok {
-				if _, ok := systems[string(namespaceValue)]; ok {
-					//loop through all the labels for an entity and store them in a map.
-					for key, value := range result.(model.Matrix)[i].Metric {
-						addToLabelMap(string(key), string(value), systems[string(namespaceValue)].labelMap)
-					}
-				}
-			}
+	if result == nil {
+		return
+	}
+	//Loop through the different entities in the results.
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
+		//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
+		namespaceValue, ok := result.(model.Matrix)[i].Metric[namespace]
+		if !ok {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)]; !ok {
+			continue
+		}
+		//loop through all the labels for an entity and store them in a map.
+		for key, value := range result.(model.Matrix)[i].Metric {
+			addToLabelMap(string(key), string(value), systems[string(namespaceValue)].labelMap)
 		}
 	}
 }
@@ -390,12 +401,13 @@ func getDeploymentWorkload(promaddress, fileName, metricName, query, clusterName
 
 	for n := range systems {
 		for m, midVal := range systems[n].midLevels {
-			if midVal.kind == "Deployment" {
-				for c := range systems[n].midLevels[m].containers {
-					for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
-						for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
-							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%f\n", cluster, n, midVal.name, midVal.kind, c, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
-						}
+			if midVal.kind != "Deployment" {
+				continue
+			}
+			for c := range systems[n].midLevels[m].containers {
+				for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
+					for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
+						fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%f\n", cluster, n, midVal.name, midVal.kind, c, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
 					}
 				}
 			}
@@ -460,21 +472,20 @@ func getHPAWorkload(promaddress, fileName, metricName, query, clusterName, promA
 	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
 		for n := range systems {
 			for m, midVal := range systems[n].pointers {
-				if midVal.kind == "Deployment" {
+				switch midVal.kind {
+				case "Deployment":
 					for c := range systems[n].pointers[m].containers {
 						for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
 							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", cluster, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
 						}
 					}
-				}
-				if midVal.kind == "ReplicaSet" {
+				case "ReplicaSet":
 					for c := range systems[n].pointers[m].containers {
 						for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
 							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", cluster, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
 						}
 					}
-				}
-				if midVal.kind == "ReplicationController" {
+				case "ReplicationController":
 					for c := range systems[n].pointers[m].containers {
 						for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
 							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", cluster, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
@@ -509,37 +520,39 @@ func addToLabelMap(key string, value string, labelPath map[string]string) {
 		} else {
 			labelPath[key] = value
 		}
-	} else {
-		if strings.Contains(value, ";") {
-			currValue := ""
-			for _, l := range value {
-				currValue = currValue + string(l)
-				if l == ';' {
-					addToLabelMap(key, currValue[:len(currValue)-1], labelPath)
-					currValue = ""
-				}
+		return
+	}
+
+	if strings.Contains(value, ";") {
+		currValue := ""
+		for _, l := range value {
+			currValue = currValue + string(l)
+			if l == ';' {
+				addToLabelMap(key, currValue[:len(currValue)-1], labelPath)
+				currValue = ""
 			}
-			addToLabelMap(key, currValue, labelPath)
+		}
+		addToLabelMap(key, currValue, labelPath)
+		return
+	}
+
+	currValue := ""
+	notPresent := true
+	for _, l := range labelPath[key] {
+		currValue = currValue + string(l)
+		if l == ';' {
+			if currValue[:len(currValue)-1] == value {
+				notPresent = false
+				break
+			}
+			currValue = ""
+		}
+	}
+	if currValue != value && notPresent {
+		if len(value) > 255 {
+			labelPath[key] = labelPath[key] + ";" + value[:255]
 		} else {
-			currValue := ""
-			notPresent := true
-			for _, l := range labelPath[key] {
-				currValue = currValue + string(l)
-				if l == ';' {
-					if currValue[:len(currValue)-1] == value {
-						notPresent = false
-						break
-					}
-					currValue = ""
-				}
-			}
-			if currValue != value && notPresent {
-				if len(value) > 255 {
-					labelPath[key] = labelPath[key] + ";" + value[:255]
-				} else {
-					labelPath[key] = labelPath[key] + ";" + value
-				}
-			}
+			labelPath[key] = labelPath[key] + ";" + value
 		}
 	}
 }

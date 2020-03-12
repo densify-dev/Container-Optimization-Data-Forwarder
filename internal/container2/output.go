@@ -96,27 +96,26 @@ func writeAttributes(clusterName, promAddr string) string {
 	for kn, vn := range systems {
 		for kt, vt := range systems[kn].midLevels {
 			for kc, vc := range systems[kn].midLevels[kt].containers {
-				var cstate string
+				var cstate string = "Running"
 				//convert the powerState from number to string 1 is Terminated and 0 is running.
 				if vc.powerState == 1 {
 					cstate = "Terminated"
-				} else {
-					cstate = "Running"
 				}
-
 				//for wt, vt := range systems[kn].pods
 				//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
 				fmt.Fprintf(attributeWrite, "%s,%s,%s,%s,%s,Containers,%s,%s,%s,", cluster, kn, strings.Replace(vt.name, ";", ".", -1), vt.kind, strings.Replace(kc, ":", ".", -1), cluster, kn, vt.name)
 				for key, value := range systems[kn].midLevels[kt].containers[kc].labelMap {
-					if len(key) < 250 {
-						value = strings.Replace(value, ",", " ", -1)
-						if len(value)+3+len(key) < 256 {
-							fmt.Fprintf(attributeWrite, key+" : "+value+"|")
-						} else {
-							templength := 256 - 3 - len(key)
-							fmt.Fprintf(attributeWrite, key+" : "+value[:templength]+"|")
-						}
+					if len(key) >= 250 {
+						continue
 					}
+					value = strings.Replace(value, ",", " ", -1)
+					if len(value)+3+len(key) < 256 {
+						fmt.Fprintf(attributeWrite, key+" : "+value+"|")
+					} else {
+						templength := 256 - 3 - len(key)
+						fmt.Fprintf(attributeWrite, key+" : "+value[:templength]+"|")
+					}
+
 				}
 				fmt.Fprintf(attributeWrite, ",")
 

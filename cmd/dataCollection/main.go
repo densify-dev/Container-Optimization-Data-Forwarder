@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/cluster"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
@@ -217,10 +218,19 @@ func main() {
 	debugLog, _ := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
 	logger.PrintLog(errors, debugLog)
 
+	args := &common.ARGS{
+		ClusterName:  &clusterName,
+		PromAddress:  &promAddr,
+		Interval:     &interval,
+		IntervalSize: &intervalSize,
+		History:      &history,
+	}
+
 	if !strings.Contains(include, "container") {
 		logger.PrintLog("\nSkipping container data collection", debugLog)
 	} else {
 		errors = container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+		container2.MetricsWithARGS(args, promProtocol, promPort, debug, currentTime)
 		logger.PrintLog(errors, debugLog)
 	}
 	if !strings.Contains(include, "node") {

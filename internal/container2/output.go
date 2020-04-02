@@ -164,7 +164,6 @@ func writeAttributes(clusterName, promAddr string) string {
 					//Formatting the date into the expexted format. Note the reason for that date is a Go specific way of declaring a format you must use that exact date and time.
 					fmt.Fprintf(attributeWrite, ",%s", time.Unix(int64(vt.creationTime), 0).Format("2006-01-02 15:04:05.000"))
 				}
-				// TODO: Possibly an extra comma
 				if vc.restarts == -1 {
 					fmt.Fprintf(attributeWrite, ",,")
 				} else {
@@ -193,7 +192,7 @@ func writeAttributes(clusterName, promAddr string) string {
 				} else {
 					fmt.Fprintf(attributeWrite, ",%d", vn.cpuLimit)
 				}
-				if vn.memLimit == -1 {
+				if vn.memRequest == -1 {
 					fmt.Fprintf(attributeWrite, ",")
 				} else {
 					fmt.Fprintf(attributeWrite, ",%d", vn.memRequest)

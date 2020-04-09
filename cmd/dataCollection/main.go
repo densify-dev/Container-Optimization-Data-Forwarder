@@ -217,20 +217,24 @@ func main() {
 	//Open the debug log file for writing.
 	debugLog, _ := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
 	logger.PrintLog(errors, debugLog)
+	promURL := promProtocol + "://" + promAddr + ":" + promPort
 
 	args := &common.ARGS{
 		ClusterName:  &clusterName,
+		PromURL:      &promURL,
 		PromAddress:  &promAddr,
 		Interval:     &interval,
 		IntervalSize: &intervalSize,
 		History:      &history,
+		Debug:        debug,
+		CurrentTime:  &currentTime,
 	}
 
 	if !strings.Contains(include, "container") {
 		logger.PrintLog("\nSkipping container data collection", debugLog)
 	} else {
-		errors = container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-		container2.MetricsWithARGS(args, promProtocol, promPort, debug, currentTime)
+		// errors = container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+		errors = container2.MetricsWithARGS(args)
 		logger.PrintLog(errors, debugLog)
 	}
 	if !strings.Contains(include, "node") {

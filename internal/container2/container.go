@@ -40,8 +40,8 @@ type container struct {
 	labelMap                                                                 map[string]string
 }
 
-//MetricsWith function to collect data related to containers.
-func MetricsWith(args *common.Parameters) string {
+//Metrics function to collect data related to containers.
+func Metrics(args *common.Parameters) string {
 	//Setup variables used in the code.
 	var errors = ""
 	var historyInterval time.Duration

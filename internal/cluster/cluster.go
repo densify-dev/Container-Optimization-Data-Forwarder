@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -57,14 +58,14 @@ func getClusterMetric(result model.Value, metric string) {
 
 }
 
-func getWorkload(promaddress, fileName, metricName, query, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) string {
+func getWorkload(fileName, metricName, query string, args *common.Parameters) string {
 	var errors = ""
 	var cluster string
 	var logLine string
-	if clusterName == "" {
-		cluster = promAddr
+	if *args.ClusterName == "" {
+		cluster = *args.PromAddress
 	} else {
-		cluster = clusterName
+		cluster = *args.ClusterName
 	}
 	var historyInterval time.Duration
 	historyInterval = 0
@@ -81,12 +82,19 @@ func getWorkload(promaddress, fileName, metricName, query, clusterName, promAddr
 	//If the History parameter is set to anything but default 1 then will loop through the calls starting with the current day\hour\minute interval and work backwards.
 	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
-	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
-		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
+	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
+		start, end = prometheus.TimeRange(*args.Interval, *args.IntervalSize, *args.CurrentTime, historyInterval)
 		range5Min := v1.Range{Start: start, End: end, Step: time.Minute * 5}
 
-		result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, "Cluster", metricName, false)
-		writeWorkload(workloadWrite, result, promAddr, cluster)
+		prometheusARGS := &prometheus.CollectionArgs{
+			EntityKind: &entityKind,
+			PromURL:    args.PromURL,
+			Query:      &query,
+			Range:      &range5Min,
+		}
+
+		result, logLine = prometheus.MetricCollect(prometheusARGS, metricName, false)
+		writeWorkload(workloadWrite, result, *args.PromAddress, cluster)
 		errors += logLine
 	}
 	//Close the workload files.
@@ -196,20 +204,26 @@ func writeAttributes(clusterName, promAddr string) string {
 }
 
 //Metrics a global func for collecting node level metrics in prometheus
-func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, intervalSize, history int, debug bool, currentTime time.Time) string {
+func Metrics(args *common.Parameters) string {
 	//Setup variables used in the code.
 	var errors = ""
 	var logLine string
 	var historyInterval time.Duration
 	historyInterval = 0
-	var promaddress, query string
+	var query string
 	var result model.Value
 	var start, end time.Time
 
 	//Start and end time + the prometheus address used for querying
-	start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
+	start, end = prometheus.TimeRange(*args.Interval, *args.IntervalSize, *args.CurrentTime, historyInterval)
 	range5Min := v1.Range{Start: start, End: end, Step: time.Minute * 5}
-	promaddress = promProtocol + "://" + promAddr + ":" + promPort
+
+	collectArgs := &prometheus.CollectionArgs{
+		EntityKind: &entityKind,
+		PromURL:    args.PromURL,
+		Query:      &query,
+		Range:      &range5Min,
+	}
 
 	//Prefix for indexing (less clutter on screen)
 	//var rsltIndex = result.(model.Matrix)
@@ -224,7 +238,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	*/
 
 	query = `sum(kube_pod_container_resource_limits_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "cpuLimit", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "cpuLimit", false)
 	if logLine == "" {
 		getClusterMetric(result, "cpuLimit")
 	} else {
@@ -232,7 +246,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `sum(kube_pod_container_resource_requests_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "cpuRequest", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "cpuRequest", false)
 	if logLine == "" {
 		getClusterMetric(result, "cpuRequest")
 	} else {
@@ -240,7 +254,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `sum(kube_pod_container_resource_limits_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "memLimit", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "memLimit", false)
 	if logLine == "" {
 		getClusterMetric(result, "memLimit")
 	} else {
@@ -248,7 +262,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `sum(kube_pod_container_resource_requests_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "memRequest", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "memRequest", false)
 	if logLine == "" {
 		getClusterMetric(result, "memRequest")
 	} else {
@@ -259,8 +273,8 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 		==========CLUSTER REQUEST/LIMIT METRICS============
 	*/
 
-	errors += writeAttributes(clusterName, promAddr)
-	errors += writeConfig(clusterName, promAddr)
+	errors += writeAttributes(*args.ClusterName, *args.PromAddress)
+	errors += writeConfig(*args.ClusterName, *args.PromAddress)
 
 	/*
 		//Query and store prometheus CPU limit
@@ -270,11 +284,11 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Query and store prometheus CPU requests
 	query = `sum((kube_pod_container_resource_requests_cpu_cores) * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	errors += getWorkload(promaddress, "cpu_requests", "CPU Reservation in Cores", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload("cpu_requests", "CPU Reservation in Cores", query, args)
 
 	//Query and store prometheus CPU requests
 	query = `sum((kube_pod_container_resource_requests_cpu_cores) * on (namespace,pod,container) group_left kube_pod_container_status_running) / sum(kube_node_status_allocatable_cpu_cores) * 100`
-	errors += getWorkload(promaddress, "cpu_reservation_percent", "CPU Reservation Percent", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload("cpu_reservation_percent", "CPU Reservation Percent", query, args)
 
 	/*
 		//Query and store prometheus Memory limit
@@ -284,11 +298,11 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Query and store prometheus Memory requests
 	query = `sum((kube_pod_container_resource_requests_memory_bytes/1024/1024) * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	errors += getWorkload(promaddress, "memory_requests", "Memory Reservation in MB", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload("memory_requests", "Memory Reservation in MB", query, args)
 
 	//Query and store prometheus Memory requests
 	query = `sum((kube_pod_container_resource_requests_memory_bytes/1024/1024) * on (namespace,pod,container) group_left kube_pod_container_status_running) / sum(kube_node_status_allocatable_memory_bytes/1024/1024) * 100`
-	errors += getWorkload(promaddress, "memory_reservation_percent", "Memory Reservation Percent", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getWorkload("memory_reservation_percent", "Memory Reservation Percent", query, args)
 
 	return errors
 }

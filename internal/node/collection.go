@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -98,14 +99,14 @@ func getNodeMetric(result model.Value, node model.LabelName, metric string) {
 	}
 }
 
-func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterName, promAddr, interval string, intervalSize, history int, currentTime time.Time) string {
+func getWorkload(fileName, metricName, query, aggregator string, args *common.Parameters) string {
 	errors := ""
 	var query2 string
 	var cluster string
-	if clusterName == "" {
-		cluster = promAddr
+	if *args.ClusterName == "" {
+		cluster = *args.PromAddress
 	} else {
-		cluster = clusterName
+		cluster = *args.ClusterName
 	}
 	var historyInterval time.Duration
 	historyInterval = 0
@@ -122,13 +123,20 @@ func getWorkload(promaddress, fileName, metricName, query, aggregator, clusterNa
 	//If the History parameter is set to anything but default 1 then will loop through the calls starting with the current day\hour\minute interval and work backwards.
 	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
-	for historyInterval = 0; int(historyInterval) < history; historyInterval++ {
-		start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
+	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
+		start, end = prometheus.TimeRange(*args.Interval, *args.IntervalSize, *args.CurrentTime, historyInterval)
 		range5Min := v1.Range{Start: start, End: end, Step: time.Minute * 5}
 
+		prometheusARGS := &prometheus.CollectionArgs{
+			EntityKind: &entityKind,
+			PromURL:    args.PromURL,
+			Query:      &query2,
+			Range:      &range5Min,
+		}
+
 		query2 = aggregator + "(" + aggregator + "(" + query + `) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
-		result, _ = prometheus.MetricCollect(promaddress, query2, range5Min, "Node", metricName, false)
-		writeWorkload(workloadWrite, result, "node", promAddr, cluster)
+		result, _ = prometheus.MetricCollect(prometheusARGS, metricName, false)
+		writeWorkload(workloadWrite, result, "node", *args.PromAddress, cluster)
 	}
 	//Close the workload files.
 	workloadWrite.Close()

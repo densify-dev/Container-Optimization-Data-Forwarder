@@ -219,7 +219,7 @@ func main() {
 	logger.PrintLog(errors, debugLog)
 	promURL := promProtocol + "://" + promAddr + ":" + promPort
 
-	args := &common.ARGS{
+	instArgs := &common.Parameters{
 		ClusterName:  &clusterName,
 		PromURL:      &promURL,
 		PromAddress:  &promAddr,
@@ -234,19 +234,21 @@ func main() {
 		logger.PrintLog("\nSkipping container data collection", debugLog)
 	} else {
 		// errors = container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
-		errors = container2.MetricsWithARGS(args)
+		errors = container2.MetricsWith(instArgs)
 		logger.PrintLog(errors, debugLog)
 	}
 	if !strings.Contains(include, "node") {
 		logger.PrintLog("\nSkipping node data collection", debugLog)
 	} else {
-		errors = node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+		// errors = node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+		errors = node.Metrics(instArgs)
 		logger.PrintLog(errors, debugLog)
 	}
 	if !strings.Contains(include, "cluster") {
 		logger.PrintLog("\nSkipping cluster data collection", debugLog)
 	} else {
-		errors = cluster.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+		// errors = cluster.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+		errors = cluster.Metrics(instArgs)
 		logger.PrintLog(errors, debugLog)
 	}
 }

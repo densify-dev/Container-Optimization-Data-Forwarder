@@ -9,41 +9,41 @@ import (
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/cluster"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
 	"github.com/spf13/viper"
 )
 
-//Global variables used for Storing system info, command line\config file parameters.
-var clusterName, promPort, promAddr, promProtocol, interval, configFile, configPath string
-var intervalSize, history, offset int
-var debug bool
-var currentTime time.Time
-var include string
+// Global structure used to store Forwarder instance parameters
+var params *common.Parameters
 
-//Temps
-var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp string
-var intervalSizeTemp, historyTemp, offsetTemp int
-var debugTemp bool
-var includeTemp string
+// Parameter that allows user to control what levels they want to collect data on (cluster, node, container)
+var include string
 
 //initParamters will look for settings defined on the command line or in config.properties file and update accordingly. Also defines the default values for these variables.
 //Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
 func initParameters() {
 	//Set default settings
-	clusterName = ""
-	promProtocol = "http"
-	promAddr = ""
-	promPort = "9090"
-	interval = "hours"
-	intervalSize = 1
-	history = 1
-	offset = 0
-	debug = false
-	configFile = "config"
-	configPath = "./config"
+	var clusterName string = ""
+	var promProtocol string = "http"
+	var promAddr string = ""
+	var promPort string = "9090"
+	var interval string = "hours"
+	var intervalSize int = 1
+	var history int = 1
+	var offset int = 0
+	var debug bool = false
+	var configFile string = "config"
+	var configPath string = "./config"
 	include = "container,node,cluster"
+
+	//Temporary variables for procassing flags
+	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp string
+	var intervalSizeTemp, historyTemp, offsetTemp int
+	var debugTemp bool
+	var includeTemp string
 
 	//Set settings using environment variables
 	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_CLUSTER"); ok {
@@ -181,6 +181,18 @@ func initParameters() {
 
 	flag.Visit(visitor)
 
+	promURL := promProtocol + "://" + promAddr + ":" + promPort
+
+	params = &common.Parameters{
+		ClusterName:  &clusterName,
+		PromAddress:  &promAddr,
+		PromURL:      &promURL,
+		Interval:     &interval,
+		IntervalSize: &intervalSize,
+		History:      &history,
+		Offset:       &offset,
+		Debug:        debug,
+	}
 }
 
 func parseIncludeParam(param string) string {
@@ -200,19 +212,20 @@ func main() {
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
-	logger.SetPromAddr(promAddr)
+	logger.SetPromAddr(*params.PromAddress)
 
 	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
 	var t time.Time
 	t = time.Now().UTC()
-
-	if interval == "days" {
-		currentTime = time.Date(t.Year(), t.Month(), t.Day()-offset, 0, 0, 0, 0, t.Location())
-	} else if interval == "hours" {
-		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour()-offset, 0, 0, 0, t.Location())
+	var currentTime time.Time
+	if *params.Interval == "days" {
+		currentTime = time.Date(t.Year(), t.Month(), t.Day()-*params.Offset, 0, 0, 0, 0, t.Location())
+	} else if *params.Interval == "hours" {
+		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour()-*params.Offset, 0, 0, 0, t.Location())
 	} else {
-		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute()-offset, 0, 0, t.Location())
+		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute()-*params.Offset, 0, 0, t.Location())
 	}
+	params.CurrentTime = &currentTime
 	//Open the debug log file for writing.
 	debugLog, _ := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
 	logger.PrintLog(errors, debugLog)
@@ -220,19 +233,19 @@ func main() {
 	if !strings.Contains(include, "container") {
 		logger.PrintLog("\nSkipping container data collection", debugLog)
 	} else {
-		errors = container2.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+		errors = container2.Metrics(params)
 		logger.PrintLog(errors, debugLog)
 	}
 	if !strings.Contains(include, "node") {
 		logger.PrintLog("\nSkipping node data collection", debugLog)
 	} else {
-		errors = node.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+		errors = node.Metrics(params)
 		logger.PrintLog(errors, debugLog)
 	}
 	if !strings.Contains(include, "cluster") {
 		logger.PrintLog("\nSkipping cluster data collection", debugLog)
 	} else {
-		errors = cluster.Metrics(clusterName, promProtocol, promAddr, promPort, interval, intervalSize, history, debug, currentTime)
+		errors = cluster.Metrics(params)
 		logger.PrintLog(errors, debugLog)
 	}
 }

@@ -669,9 +669,9 @@ func Metrics(args *common.Parameters) string {
 	*/
 
 	if args.LabelSuffix == "" {
-		query = `kube_hpa_status_condition{status="ScalingLimited",condition="true"}`
-	} else {
 		query = `kube_hpa_status_condition{status="true",condition="ScalingLimited"}`
+	} else {
+		query = `kube_hpa_status_condition{status="ScalingLimited",condition="true"}`
 	}
 	errors += getHPAWorkload("condition_scaling_limited", "Scaling Limited", query, args)
 

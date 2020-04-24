@@ -337,27 +337,27 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 		}
 
 		//query containers under a pod with no owner
-		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left max(kube_pod_owner{owner_name="<none>"}) by (namespace, pod, container` + labelSuffix + `)) by (pod,namespace,container` + labelSuffix + `)`
+		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left max(kube_pod_owner{owner_name="<none>"}) by (namespace, pod, container` + args.LabelSuffix + `)) by (pod,namespace,container` + args.LabelSuffix + `)`
 		result, logLine = prometheus.MetricCollect(prometheusARGS, "pod_"+metricName, false)
-		writeWorkload(workloadWrite, result, "namespace", "pod", model.LabelName("container"+labelSuffix), *args.ClusterName, *args.PromAddress, "Pod")
+		writeWorkload(workloadWrite, result, "namespace", "pod", model.LabelName("container"+args.LabelSuffix), *args.ClusterName, *args.PromAddress, "Pod")
 		errors += logLine
 
 		//query containers under a controller with no owner
-		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (owner_name,owner_kind) max(kube_pod_owner) by (namespace, pod, owner_name, owner_kind)) by (owner_kind,owner_name,namespace,container` + labelSuffix + `)`
+		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (owner_name,owner_kind) max(kube_pod_owner) by (namespace, pod, owner_name, owner_kind)) by (owner_kind,owner_name,namespace,container` + args.LabelSuffix + `)`
 		result, logLine = prometheus.MetricCollect(prometheusARGS, "controller_"+metricName, false)
-		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+labelSuffix), *args.ClusterName, *args.PromAddress, "")
+		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), *args.ClusterName, *args.PromAddress, "")
 		errors += logLine
 
 		//query containers under a deployment
-		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) max(label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)")) by (namespace, pod, replicaset) * on (replicaset, namespace) group_left (owner_name) max(kube_replicaset_owner{owner_kind="Deployment"}) by (namespace, replicaset, owner_name)) by (owner_name,namespace,container` + labelSuffix + `)`
+		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) max(label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)")) by (namespace, pod, replicaset) * on (replicaset, namespace) group_left (owner_name) max(kube_replicaset_owner{owner_kind="Deployment"}) by (namespace, replicaset, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
 		result, logLine = prometheus.MetricCollect(prometheusARGS, "deployment_"+metricName, false)
-		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+labelSuffix), *args.ClusterName, *args.PromAddress, "Deployment")
+		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), *args.ClusterName, *args.PromAddress, "Deployment")
 		errors += logLine
 
 		//query containers under a cron job
-		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) max(label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)")) by (namespace, pod, job) * on (job, namespace) group_left (owner_name) max(label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (namespace, job, owner_name)) by (owner_name,namespace,container` + labelSuffix + `)`
+		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) max(label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)")) by (namespace, pod, job) * on (job, namespace) group_left (owner_name) max(label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (namespace, job, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
 		result, logLine = prometheus.MetricCollect(prometheusARGS, "cronJob_"+metricName, false)
-		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+labelSuffix), *args.ClusterName, *args.PromAddress, "CronJob")
+		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), *args.ClusterName, *args.PromAddress, "CronJob")
 		errors += logLine
 
 	}

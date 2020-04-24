@@ -13,7 +13,6 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-var labelSuffix = ""
 var systems = map[string]*namespace{}
 var entityKind = "Container"
 
@@ -198,10 +197,10 @@ func Metrics(args *common.Parameters) string {
 	query = `container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}/1024/1024`
 	result, logLine = prometheus.MetricCollect(collectArgs, "memory", false)
 	if logLine == "" {
-		if labelSuffix == "" && getContainerMetric(result, "namespace", "pod", "container", "memory") {
+		if args.LabelSuffix == "" && getContainerMetric(result, "namespace", "pod", "container", "memory") {
 			//Don't do anything
 		} else if getContainerMetric(result, "namespace", "pod_name", "container_name", "memory") {
-			labelSuffix = "_name"
+			args.LabelSuffix = "_name"
 		}
 	} else {
 		errors += logLine
@@ -242,8 +241,7 @@ func Metrics(args *common.Parameters) string {
 	query = `container_spec_cpu_shares{name!~"k8s_POD_.*"}`
 	result, logLine = prometheus.MetricCollect(collectArgs, "conLabel", false)
 	if logLine == "" {
-		getContainerMetricString(result, "namespace", model.LabelName("pod"+labelSuffix), model.LabelName("container"+labelSuffix))
-		// getContainerMetricString(result, "namespace", "pod", "container")
+		getContainerMetricString(result, "namespace", model.LabelName("pod"+args.LabelSuffix), model.LabelName("container"+args.LabelSuffix))
 	} else {
 		errors += logLine
 	}
@@ -615,25 +613,25 @@ func Metrics(args *common.Parameters) string {
 
 	queryPrefix := ``
 	querySuffix := ``
-	if labelSuffix != "" {
+	if args.LabelSuffix != "" {
 		queryPrefix = `label_replace(`
 		querySuffix = `, "pod", "$1", "pod_name", "(.*)")`
 	}
 
 	//Container workloads
-	query = queryPrefix + `round(sum(irate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod` + labelSuffix + `,namespace,container` + labelSuffix + `)*1000,1)` + querySuffix
+	query = queryPrefix + `round(sum(irate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)*1000,1)` + querySuffix
 	errors += getWorkload("cpu_mCores_workload", "CPU Utilization in mCores", query, "max", args)
 	errors += getWorkload("cpu_mCores_workload", "Prometheus CPU Utilization in mCores", query, "avg", args)
 
-	query = queryPrefix + `sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + labelSuffix + `,namespace,container` + labelSuffix + `)` + querySuffix
+	query = queryPrefix + `sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
 	errors += getWorkload("mem_workload", "Raw Mem Utilization", query, "max", args)
 	errors += getWorkload("mem_workload", "Prometheus Raw Mem Utilization", query, "avg", args)
 
-	query = queryPrefix + `sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod` + labelSuffix + `,namespace,container` + labelSuffix + `)` + querySuffix
+	query = queryPrefix + `sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
 	errors += getWorkload("rss_workload", "Actual Memory Utilization", query, "max", args)
 	errors += getWorkload("rss_workload", "Prometheus Actual Memory Utilization", query, "avg", args)
 
-	query = queryPrefix + `sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + labelSuffix + `,namespace,container` + labelSuffix + `)` + querySuffix
+	query = queryPrefix + `sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
 	errors += getWorkload("disk_workload", "Raw Disk Utilization", query, "max", args)
 	errors += getWorkload("disk_workload", "Prometheus Raw Disk Utilization", query, "avg", args)
 
@@ -651,7 +649,7 @@ func Metrics(args *common.Parameters) string {
 		errors += getWorkload(promaddress, "fs_time_seconds_workload", "FS Time Seconds", query, "avg", *args.ClusterName, *args.PromAddress, *args.Interval, *args.IntervalSize, *args.History, currentTime)
 	*/
 
-	if labelSuffix != "" {
+	if args.LabelSuffix != "" {
 		queryPrefix = `label_replace(`
 		querySuffix = `, "container_name", "$1", "container", "(.*)")`
 	}
@@ -670,7 +668,7 @@ func Metrics(args *common.Parameters) string {
 		errors += getDeploymentWorkload(promaddress, "spec_replicas", "Spec Replicas", query, *args.ClusterName, *args.PromAddress, *args.Interval, *args.IntervalSize, *args.History, currentTime)
 	*/
 
-	if labelSuffix == "" {
+	if args.LabelSuffix == "" {
 		query = `kube_hpa_status_condition{status="ScalingLimited",condition="true"}`
 	} else {
 		query = `kube_hpa_status_condition{status="true",condition="ScalingLimited"}`

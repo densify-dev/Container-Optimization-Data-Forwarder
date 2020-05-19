@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -39,12 +40,12 @@ type container struct {
 }
 
 //Metrics function to collect data related to containers.
-func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, intervalSize, history int, debug bool, currentTime time.Time) string {
+func Metrics(args *common.Parameters) string {
 	//Setup variables used in the code.
 	var errors = ""
 	var historyInterval time.Duration
 	historyInterval = 0
-	var query, promaddress string
+	var query string
 	var result model.Value
 	var logLine string
 	var start, end time.Time
@@ -55,14 +56,19 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	var replicaSetOwners = map[string]string{}
 	var jobOwners = map[string]string{}
 
-	start, end = prometheus.TimeRange(interval, intervalSize, currentTime, historyInterval)
+	start, end = prometheus.TimeRange(*args.Interval, *args.IntervalSize, *args.CurrentTime, historyInterval)
 	range5Min := v1.Range{Start: start, End: end, Step: time.Minute * 5}
 
-	promaddress = promProtocol + "://" + promAddr + ":" + promPort
+	collectArgs := &prometheus.CollectionArgs{
+		EntityKind: &entityKind,
+		PromURL:    args.PromURL,
+		Query:      &query,
+		Range:      &range5Min,
+	}
 
 	//querys gathering hierarchy information for the containers
 	query = `sum(kube_pod_owner{owner_name!="<none>"}) by (namespace, pod, owner_name, owner_kind)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "pods", true)
+	result, logLine = prometheus.MetricCollect(collectArgs, "pods", true)
 	if logLine == "" {
 		rslt = result.(model.Matrix)
 		for i := 0; i < rslt.Len(); i++ {
@@ -74,7 +80,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `sum(kube_replicaset_owner{owner_name!="<none>"}) by (namespace, replicaset, owner_name)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "replicasets", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "replicasets", false)
 	if logLine == "" {
 		rslt = result.(model.Matrix)
 		for i := 0; i < rslt.Len(); i++ {
@@ -83,7 +89,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `sum(kube_job_owner{owner_name!="<none>"}) by (namespace, job_name, owner_name)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "jobs", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "jobs", false)
 	if logLine == "" {
 		rslt = result.(model.Matrix)
 		for i := 0; i < rslt.Len(); i++ {
@@ -92,7 +98,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `max(kube_pod_container_info) by (container, pod, namespace)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "containers", true)
+	result, logLine = prometheus.MetricCollect(collectArgs, "containers", true)
 	if logLine == "" {
 		rslt = result.(model.Matrix)
 	} else {
@@ -171,7 +177,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//for printing containers
 	tempString := ""
-	if debug {
+	if args.Debug {
 		for i := range systems {
 			fmt.Println("\nnamespace: " + i)
 			tempString += "\nnamespace: " + i
@@ -189,15 +195,19 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Container metrics
 	query = `container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}/1024/1024`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "memory", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "memory", false)
 	if logLine == "" {
-		getContainerMetric(result, "namespace", "pod_name", "container_name", "memory")
+		if args.LabelSuffix == "" && getContainerMetric(result, "namespace", "pod", "container", "memory") {
+			//Don't do anything
+		} else if getContainerMetric(result, "namespace", "pod_name", "container_name", "memory") {
+			args.LabelSuffix = "_name"
+		}
 	} else {
 		errors += logLine
 	}
 
 	query = `sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "cpuLimit", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "cpuLimit", false)
 	if logLine == "" {
 		getContainerMetric(result, "namespace", "pod", "container", "cpuLimit")
 	} else {
@@ -205,7 +215,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "cpuRequest", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "cpuRequest", false)
 	if logLine == "" {
 		getContainerMetric(result, "namespace", "pod", "container", "cpuRequest")
 	} else {
@@ -213,7 +223,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `sum(kube_pod_container_resource_limits_memory_bytes) by (pod,namespace,container)/1024/1024`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "memLimit", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "memLimit", false)
 	if logLine == "" {
 		getContainerMetric(result, "namespace", "pod", "container", "memLimit")
 	} else {
@@ -221,7 +231,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `sum(kube_pod_container_resource_requests_memory_bytes) by (pod,namespace,container)/1024/1024`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "memRequest", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "memRequest", false)
 	if logLine == "" {
 		getContainerMetric(result, "namespace", "pod", "container", "memRequest")
 	} else {
@@ -229,15 +239,15 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `container_spec_cpu_shares{name!~"k8s_POD_.*"}`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "conLabel", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "conLabel", false)
 	if logLine == "" {
-		getContainerMetricString(result, "namespace", "pod_name", "container_name")
+		getContainerMetricString(result, "namespace", model.LabelName("pod"+args.LabelSuffix), model.LabelName("container"+args.LabelSuffix))
 	} else {
 		errors += logLine
 	}
 
 	query = `kube_pod_container_info`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "conInfo", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "conInfo", false)
 	if logLine == "" {
 		getContainerMetricString(result, "namespace", "pod", "container")
 	} else {
@@ -246,7 +256,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Pod metrics
 	query = `kube_pod_info`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "podInfo", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "podInfo", false)
 	if logLine == "" {
 		getMidMetricString(result, "namespace", "pod", "Pod")
 	} else {
@@ -254,7 +264,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_pod_labels`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "podLabels", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "podLabels", false)
 	if logLine == "" {
 		getMidMetricString(result, "namespace", "pod", "Pod")
 	} else {
@@ -262,7 +272,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `sum(kube_pod_container_status_restarts_total) by (pod,namespace,container)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "restarts", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "restarts", false)
 	if logLine == "" {
 		getContainerMetric(result, "namespace", "pod", "container", "restarts")
 	} else {
@@ -270,7 +280,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `sum(kube_pod_container_status_terminated) by (pod,namespace,container)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "powerState", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "powerState", false)
 	if logLine == "" {
 		getContainerMetric(result, "namespace", "pod", "container", "powerState")
 	} else {
@@ -278,7 +288,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_pod_created`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "podCreationTime", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "podCreationTime", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "pod", "creationTime", "Pod")
 	} else {
@@ -287,7 +297,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Namespace metrics
 	query = `kube_namespace_labels`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "namespaceLabels", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "namespaceLabels", false)
 	if logLine == "" {
 		getNamespaceMetricString(result, "namespace")
 	} else {
@@ -295,7 +305,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_namespace_annotations`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "namespaceAnnotations", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "namespaceAnnotations", false)
 	if logLine == "" {
 		getNamespaceMetricString(result, "namespace")
 	} else {
@@ -303,7 +313,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_limitrange`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "nameSpaceLimitrange", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "nameSpaceLimitrange", false)
 	if logLine == "" {
 		getNamespacelimits(result, "namespace")
 	} else {
@@ -312,7 +322,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Deployment metrics
 	query = `kube_deployment_labels`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "labels", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "labels", false)
 	if logLine == "" {
 		getMidMetricString(result, "namespace", "deployment", "Deployment")
 	} else {
@@ -320,7 +330,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_deployment_spec_strategy_rollingupdate_max_surge`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "maxSurge", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "maxSurge", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "deployment", "maxSurge", "Deployment")
 	} else {
@@ -328,7 +338,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_deployment_spec_strategy_rollingupdate_max_unavailable`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "maxUnavailable", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "maxUnavailable", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "deployment", "maxUnavailable", "Deployment")
 	} else {
@@ -336,7 +346,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_deployment_metadata_generation`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "metadataGeneration", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "metadataGeneration", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "deployment", "metadataGeneration", "Deployment")
 	} else {
@@ -344,7 +354,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_deployment_created`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "deploymentCreated", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "deploymentCreated", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "deployment", "creationTime", "Deployment")
 	} else {
@@ -353,7 +363,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//ReplicaSet metrics
 	query = `kube_replicaset_labels`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "replicaSetLabels", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "replicaSetLabels", false)
 	if logLine == "" {
 		getMidMetricString(result, "namespace", "replicaset", "ReplicaSet")
 	} else {
@@ -361,7 +371,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_replicaset_created`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "replicaSetCreated", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "replicaSetCreated", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "replicaset", "creationTime", "ReplicaSet")
 	} else {
@@ -370,7 +380,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//ReplicationController metrics
 	query = `kube_replicationcontroller_created`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "replicationControllerCreated", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "replicationControllerCreated", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "replicationcontroller", "creationTime", "ReplicationController")
 	} else {
@@ -379,7 +389,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//DaemonSet metrics
 	query = `kube_daemonset_labels`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "daemonSetLabels", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "daemonSetLabels", false)
 	if logLine == "" {
 		getMidMetricString(result, "namespace", "daemonset", "DaemonSet")
 	} else {
@@ -387,7 +397,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_daemonset_created`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "daemonSetCreated", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "daemonSetCreated", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "daemonset", "creationTime", "DaemonSet")
 	} else {
@@ -396,7 +406,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//StatefulSet metrics
 	query = `kube_statefulset_labels`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "statefulSetLabels", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "statefulSetLabels", false)
 	if logLine == "" {
 		getMidMetricString(result, "namespace", "statefulset", "StatefulSet")
 	} else {
@@ -404,7 +414,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_statefulset_created`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "statefulSetCreated", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "statefulSetCreated", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "statefulset", "creationTime", "StatefulSet")
 	} else {
@@ -413,7 +423,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//Job metrics
 	query = `kube_job_info * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "jobInfo", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "jobInfo", false)
 	if logLine == "" {
 		getMidMetricString(result, "namespace", "job_name", "Job")
 	} else {
@@ -421,7 +431,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_job_labels * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "jobLabel", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "jobLabel", false)
 	if logLine == "" {
 		getMidMetricString(result, "namespace", "job_name", "Job")
 	} else {
@@ -429,7 +439,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_job_spec_completions * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "jobSpecCompletions", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "jobSpecCompletions", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "job_name", "specCompletions", "Job")
 	} else {
@@ -437,7 +447,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_job_spec_parallelism * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "jobSpecParallelism", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "jobSpecParallelism", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "job_name", "specParallelism", "Job")
 	} else {
@@ -445,7 +455,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_job_status_completion_time * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "jobStatusCompletionTime", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "jobStatusCompletionTime", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "job_name", "statusCompletionTime", "Job")
 	} else {
@@ -453,7 +463,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_job_status_start_time * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "jobStatusStartTime", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "jobStatusStartTime", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "job_name", "statusStartTime", "Job")
 	} else {
@@ -461,7 +471,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_job_created`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "jobCreated", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "jobCreated", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "job", "creationTime", "Job")
 	} else {
@@ -470,7 +480,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//CronJob metrics
 	query = `kube_cronjob_labels`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "cronJobLabels", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "cronJobLabels", false)
 	if logLine == "" {
 		getMidMetricString(result, "namespace", "cronjob", "CronJob")
 	} else {
@@ -478,7 +488,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_cronjob_info`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "cronJobInfo", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "cronJobInfo", false)
 	if logLine == "" {
 		getMidMetricString(result, "namespace", "cronjob", "CronJob")
 	} else {
@@ -486,7 +496,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_cronjob_next_schedule_time`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "cronJobNextScheduleTime", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "cronJobNextScheduleTime", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "cronjob", "nextScheduleTime", "CronJob")
 	} else {
@@ -494,7 +504,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_cronjob_status_last_schedule_time`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "cronJobStatusLastScheduleTime", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "cronJobStatusLastScheduleTime", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "cronjob", "lastScheduleTime", "CronJob")
 	} else {
@@ -502,7 +512,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_cronjob_status_active`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "cronJobStatusActive", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "cronJobStatusActive", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "cronjob", "statusActive", "CronJob")
 	} else {
@@ -510,7 +520,7 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	}
 
 	query = `kube_cronjob_created`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "cronJobCreated", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "cronJobCreated", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "cronjob", "creationTime", "CronJob")
 	} else {
@@ -519,9 +529,9 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 
 	//HPA metrics
 	query = `kube_hpa_labels`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "hpaLabels", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "hpaLabels", false)
 	if logLine == "" {
-		getHPAMetricString(result, "namespace", "hpa", clusterName, promAddr)
+		getHPAMetricString(result, "namespace", "hpa", *args.ClusterName, *args.PromAddress)
 	} else {
 		errors += logLine
 	}
@@ -534,135 +544,150 @@ func Metrics(clusterName, promProtocol, promAddr, promPort, interval string, int
 	fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,Auto Scaling - In Service Instances\n")
 
 	query = `kube_replicaset_spec_replicas`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "replicaSetSpecReplicas", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "replicaSetSpecReplicas", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "replicaset", "currentSize", "ReplicaSet")
 	} else {
 		errors += logLine
 	}
-	writeWorkloadMid(currentSizeWrite, result, "namespace", "replicaset", clusterName, promAddr, "ReplicaSet")
+	writeWorkloadMid(currentSizeWrite, result, "namespace", "replicaset", *args.ClusterName, *args.PromAddress, "ReplicaSet")
 
 	query = `kube_replicationcontroller_spec_replicas`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "replicationcontroller_spec_replicas", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "replicationcontroller_spec_replicas", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "replicationcontroller", "currentSize", "ReplicationController")
 	} else {
 		errors += logLine
 	}
-	writeWorkloadMid(currentSizeWrite, result, "namespace", "replicationcontroller", clusterName, promAddr, "ReplicationController")
+	writeWorkloadMid(currentSizeWrite, result, "namespace", "replicationcontroller", *args.ClusterName, *args.PromAddress, "ReplicationController")
 
 	query = `kube_daemonset_status_number_available`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "daemonSetStatusNumberAvailable", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "daemonSetStatusNumberAvailable", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "daemonset", "currentSize", "DaemonSet")
 	} else {
 		errors += logLine
 	}
-	writeWorkloadMid(currentSizeWrite, result, "namespace", "daemonset", clusterName, promAddr, "DaemonSet")
+	writeWorkloadMid(currentSizeWrite, result, "namespace", "daemonset", *args.ClusterName, *args.PromAddress, "DaemonSet")
 
 	query = `kube_statefulset_replicas`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "statefulSetReplicas", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "statefulSetReplicas", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "statefulset", "currentSize", "StatefulSet")
 	} else {
 		errors += logLine
 	}
-	writeWorkloadMid(currentSizeWrite, result, "namespace", "statefulset", clusterName, promAddr, "StatefulSet")
+	writeWorkloadMid(currentSizeWrite, result, "namespace", "statefulset", *args.ClusterName, *args.PromAddress, "StatefulSet")
 
 	query = `kube_job_spec_parallelism`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "jobSpecParallelism", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "jobSpecParallelism", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "job_name", "currentSize", "Job")
 	} else {
 		errors += logLine
 	}
-	writeWorkloadMid(currentSizeWrite, result, "namespace", "job_name", clusterName, promAddr, "Job")
+	writeWorkloadMid(currentSizeWrite, result, "namespace", "job_name", *args.ClusterName, *args.PromAddress, "Job")
 
 	query = `sum(max(kube_job_spec_parallelism) by (namespace,job_name) * on (namespace,job_name) group_right max(kube_job_owner) by (namespace, job_name, owner_name)) by (owner_name, namespace)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "cronJobSpecParallelism", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "cronJobSpecParallelism", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "owner_name", "currentSize", "CronJob")
 	} else {
 		errors += logLine
 	}
-	writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", clusterName, promAddr, "CronJob")
+	writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", *args.ClusterName, *args.PromAddress, "CronJob")
 
 	query = `sum(max(kube_replicaset_spec_replicas) by (namespace,replicaset) * on (namespace,replicaset) group_right max(kube_replicaset_owner) by (namespace, replicaset, owner_name)) by (owner_name, namespace)`
-	result, logLine = prometheus.MetricCollect(promaddress, query, range5Min, entityKind, "replicaSetSpecReplicas", false)
+	result, logLine = prometheus.MetricCollect(collectArgs, "replicaSetSpecReplicas", false)
 	if logLine == "" {
 		getMidMetric(result, "namespace", "owner_name", "currentSize", "Deployment")
 	} else {
 		errors += logLine
 	}
-	writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", clusterName, promAddr, "Deployment")
+	writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", *args.ClusterName, *args.PromAddress, "Deployment")
 
 	currentSizeWrite.Close()
 
-	errors += writeAttributes(clusterName, promAddr)
-	errors += writeConfig(clusterName, promAddr)
+	errors += writeAttributes(*args.ClusterName, *args.PromAddress)
+	errors += writeConfig(*args.ClusterName, *args.PromAddress)
+
+	queryPrefix := ``
+	querySuffix := ``
+	if args.LabelSuffix != "" {
+		queryPrefix = `label_replace(`
+		querySuffix = `, "pod", "$1", "pod_name", "(.*)")`
+	}
 
 	//Container workloads
-	query = `label_replace(round(sum(irate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name)*1000,1), "pod", "$1", "pod_name", "(.*)")`
-	errors += getWorkload(promaddress, "cpu_mCores_workload", "CPU Utilization in mCores", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "cpu_mCores_workload", "Prometheus CPU Utilization in mCores", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	query = queryPrefix + `round(sum(irate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)*1000,1)` + querySuffix
+	errors += getWorkload("cpu_mCores_workload", "CPU Utilization in mCores", query, "max", args)
+	errors += getWorkload("cpu_mCores_workload", "Prometheus CPU Utilization in mCores", query, "avg", args)
 
-	query = `label_replace(sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
-	errors += getWorkload(promaddress, "mem_workload", "Raw Mem Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "mem_workload", "Prometheus Raw Mem Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	query = queryPrefix + `sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
+	errors += getWorkload("mem_workload", "Raw Mem Utilization", query, "max", args)
+	errors += getWorkload("mem_workload", "Prometheus Raw Mem Utilization", query, "avg", args)
 
-	query = `label_replace(sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
-	errors += getWorkload(promaddress, "rss_workload", "Actual Memory Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "rss_workload", "Prometheus Actual Memory Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	query = queryPrefix + `sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
+	errors += getWorkload("rss_workload", "Actual Memory Utilization", query, "max", args)
+	errors += getWorkload("rss_workload", "Prometheus Actual Memory Utilization", query, "avg", args)
 
-	query = `label_replace(sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
-	errors += getWorkload(promaddress, "disk_workload", "Raw Disk Utilization", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	errors += getWorkload(promaddress, "disk_workload", "Prometheus Raw Disk Utilization", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	query = queryPrefix + `sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
+	errors += getWorkload("disk_workload", "Raw Disk Utilization", query, "max", args)
+	errors += getWorkload("disk_workload", "Prometheus Raw Disk Utilization", query, "avg", args)
 
 	/*
 		query = `label_replace(sum(irate(container_fs_read_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
-		errors += getWorkload(promaddress, "fs_read_seconds_workload", "FS Read Seconds", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-		errors += getWorkload(promaddress, "fs_read_seconds_workload", "FS Read Seconds", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+		errors += getWorkload(promaddress, "fs_read_seconds_workload", "FS Read Seconds", query, "max", *args.ClusterName, *args.PromAddress, *args.Interval, *args.IntervalSize, *args.History, currentTime)
+		errors += getWorkload(promaddress, "fs_read_seconds_workload", "FS Read Seconds", query, "avg", *args.ClusterName, *args.PromAddress, *args.Interval, *args.IntervalSize, *args.History, currentTime)
 
 		query = `label_replace(sum(irate(container_fs_write_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
-		errors += getWorkload(promaddress, "fs_write_seconds_workload", "FS Write Seconds", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-		errors += getWorkload(promaddress, "fs_write_seconds_workload", "FS Write Seconds", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+		errors += getWorkload(promaddress, "fs_write_seconds_workload", "FS Write Seconds", query, "max", *args.ClusterName, *args.PromAddress, *args.Interval, *args.IntervalSize, *args.History, currentTime)
+		errors += getWorkload(promaddress, "fs_write_seconds_workload", "FS Write Seconds", query, "avg", *args.ClusterName, *args.PromAddress, *args.Interval, *args.IntervalSize, *args.History, currentTime)
 
 		query = `label_replace(sum(irate(container_fs_io_time_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod_name,namespace,container_name), "pod", "$1", "pod_name", "(.*)")`
-		errors += getWorkload(promaddress, "fs_time_seconds_workload", "FS Time Seconds", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-		errors += getWorkload(promaddress, "fs_time_seconds_workload", "FS Time Seconds", query, "avg", clusterName, promAddr, interval, intervalSize, history, currentTime)
+		errors += getWorkload(promaddress, "fs_time_seconds_workload", "FS Time Seconds", query, "max", *args.ClusterName, *args.PromAddress, *args.Interval, *args.IntervalSize, *args.History, currentTime)
+		errors += getWorkload(promaddress, "fs_time_seconds_workload", "FS Time Seconds", query, "avg", *args.ClusterName, *args.PromAddress, *args.Interval, *args.IntervalSize, *args.History, currentTime)
 	*/
 
-	query = `label_replace(sum(irate(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}[1h])) by (instance,pod,namespace,container), "container_name", "$1", "container", "(.*)")`
-	errors += getWorkload(promaddress, "restarts", "Restarts", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
+	if args.LabelSuffix != "" {
+		queryPrefix = `label_replace(`
+		querySuffix = `, "container_name", "$1", "container", "(.*)")`
+	}
+	query = queryPrefix + `sum(irate(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}[1h])) by (instance,pod,namespace,container)` + querySuffix
+	errors += getWorkload("restarts", "Restarts", query, "max", args)
 
 	/*
 		//Deployment workloads
 		query = `kube_deployment_status_replicas_available`
-		errors += getDeploymentWorkload(promaddress, "status_replicas_available", "Status Replicas Available", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+		errors += getDeploymentWorkload(promaddress, "status_replicas_available", "Status Replicas Available", query, *args.ClusterName, *args.PromAddress, *args.Interval, *args.IntervalSize, *args.History, currentTime)
 
 		query = `kube_deployment_status_replicas`
-		errors += getDeploymentWorkload(promaddress, "status_replicas", "Status Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+		errors += getDeploymentWorkload(promaddress, "status_replicas", "Status Replicas", query, *args.ClusterName, *args.PromAddress, *args.Interval, *args.IntervalSize, *args.History, currentTime)
 
 		query = `kube_deployment_spec_replicas`
-		errors += getDeploymentWorkload(promaddress, "spec_replicas", "Spec Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+		errors += getDeploymentWorkload(promaddress, "spec_replicas", "Spec Replicas", query, *args.ClusterName, *args.PromAddress, *args.Interval, *args.IntervalSize, *args.History, currentTime)
 	*/
+
+	if args.LabelSuffix == "" {
+		query = `kube_hpa_status_condition{status="true",condition="ScalingLimited"}`
+	} else {
+		query = `kube_hpa_status_condition{status="ScalingLimited",condition="true"}`
+	}
+	errors += getHPAWorkload("condition_scaling_limited", "Scaling Limited", query, args)
 
 	//HPA workloads
 	query = `kube_hpa_spec_max_replicas`
-	errors += getHPAWorkload(promaddress, "max_replicas", "Auto Scaling - Maximum Size", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getHPAWorkload("max_replicas", "Auto Scaling - Maximum Size", query, args)
 
 	query = `kube_hpa_spec_min_replicas`
-	errors += getHPAWorkload(promaddress, "min_replicas", "Auto Scaling - Minimum Size", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
-
-	query = `kube_hpa_status_condition{status="ScalingLimited",condition="true"}`
-	errors += getHPAWorkload(promaddress, "condition_scaling_limited", "Scaling Limited", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getHPAWorkload("min_replicas", "Auto Scaling - Minimum Size", query, args)
 
 	query = `kube_hpa_status_current_replicas`
-	errors += getHPAWorkload(promaddress, "current_replicas", "Auto Scaling - Total Instances", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+	errors += getHPAWorkload("current_replicas", "Auto Scaling - Total Instances", query, args)
 
 	/*
 		query = `kube_hpa_status_desired_replicas`
-		errors += getHPAWorkload(promaddress, "desired_replicas", "Desired Replicas", query, clusterName, promAddr, interval, intervalSize, history, currentTime)
+		errors += getHPAWorkload(promaddress, "desired_replicas", "Desired Replicas", query, *args.ClusterName, *args.PromAddress, *args.Interval, *args.IntervalSize, *args.History, currentTime)
 	*/
 
 	return errors

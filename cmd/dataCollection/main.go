@@ -208,7 +208,7 @@ func parseIncludeParam(param string) string {
 
 //main function.
 func main() {
-	errors := "Version 2.1.2"
+	errors := "Version 2.1.3-beta"
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()

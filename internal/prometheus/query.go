@@ -3,6 +3,8 @@ package prometheus
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
@@ -37,9 +39,17 @@ func MetricCollect(args *CollectionArgs, metric string, vital bool) (value model
 
 	//Query prometheus with the values defined above as well as the query that was passed into the function.
 	q := v1.NewAPI(client)
-	value, _, err = q.QueryRange(ctx, *args.Query, *args.Range)
+	var warn []string
+	value, warn, err = q.QueryRange(ctx, *args.Query, *args.Range)
 	if err != nil {
 		return value, logger.LogError(map[string]string{"message": err.Error(), "query": *args.Query, "metric": metric}, "ERROR")
+	}
+
+	if *args.Query == `container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}/1024/1024` {
+		debugLog, _ := os.OpenFile("./data/debuglog.txt", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		test, _ := q.Config(ctx)
+		fmt.Fprintln(debugLog, test)
+		debugLog.Close()
 	}
 
 	//If the values from the query return no data (length of 0) then give a warning
@@ -58,6 +68,16 @@ func MetricCollect(args *CollectionArgs, metric string, vital bool) (value model
 		if vital {
 			return value, logger.LogError(map[string]string{"message": "No data returned, value.(model.Matrix) is empty", "query": *args.Query, "metric": metric}, "ERROR")
 		}
+		debugLog, _ := os.OpenFile("./data/debuglog.txt", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		fmt.Fprintln(debugLog, *args.PromURL)
+		fmt.Fprintln(debugLog, *args.Query)
+		fmt.Fprintln(debugLog, value.String)
+		fmt.Fprintln(debugLog, value.(model.Matrix))
+		fmt.Fprintln(debugLog, warn)
+		test, _, _ := q.Query(ctx, *args.Query, time.Now().UTC())
+		fmt.Fprintln(debugLog, test)
+		debugLog.Close()
+
 		return value, logger.LogError(map[string]string{"message": "No data returned", "query": *args.Query, "metric": metric}, "WARN")
 	}
 

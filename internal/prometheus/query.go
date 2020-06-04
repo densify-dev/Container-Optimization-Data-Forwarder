@@ -45,14 +45,15 @@ func MetricCollect(args *CollectionArgs, metric string, vital bool) (value model
 	//If the values from the query return no data (length of 0) then give a warning
 	if value == nil {
 		if vital {
-			return value, logger.LogError(map[string]string{"message": "No data returned from value", "query": *args.Query, "metric": metric}, "ERROR")
+			return value, logger.LogError(map[string]string{"message": "No resultset returned", "query": *args.Query, "metric": metric}, "ERROR")
 		}
-		return value, logger.LogError(map[string]string{"message": "No data returned", "query": *args.Query, "metric": metric}, "WARN")
+		return value, logger.LogError(map[string]string{"message": "No resultset returned", "query": *args.Query, "metric": metric}, "WARN")
+		//return value, logger.LogError(map[string]string{"message": "No resultset returned", "query": *args.Query, "metric": metric, "warnings": warn, "errors": err}, "WARN")
 	} else if value.(model.Matrix) == nil {
 		if vital {
-			return value, logger.LogError(map[string]string{"message": "No data returned", "query": *args.Query, "metric": metric}, "ERROR")
+			return value, logger.LogError(map[string]string{"message": "No time series data returned", "query": *args.Query, "metric": metric}, "ERROR")
 		}
-		return value, logger.LogError(map[string]string{"message": "No data returned", "query": *args.Query, "metric": metric}, "WARN")
+		return value, logger.LogError(map[string]string{"message": "No time series data returned", "query": *args.Query, "metric": metric}, "WARN")
 	} else if value.(model.Matrix).Len() == 0 {
 		if vital {
 			return value, logger.LogError(map[string]string{"message": "No data returned, value.(model.Matrix) is empty", "query": *args.Query, "metric": metric}, "ERROR")

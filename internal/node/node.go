@@ -15,7 +15,7 @@ import (
 type node struct {
 
 	//Labels & general information about each node
-	node, nodeLabel                                                               string
+	nodeLabel                                                                     string
 	labelBetaKubernetesIoArch, labelBetaKubernetesIoOs, labelKubernetesIoHostname string
 
 	//Value fields
@@ -69,7 +69,6 @@ func Metrics(args *common.Parameters) string {
 			nodes[string(rsltIndex[i].Metric["node"])] =
 				&node{
 					//String labels for node
-					node:                      string(rsltIndex[i].Metric["node"]),
 					labelBetaKubernetesIoArch: string(rsltIndex[i].Metric["label_beta_kubernetes_io_arch"]),
 					labelBetaKubernetesIoOs:   string(rsltIndex[i].Metric["label_beta_kubernetes_io_os"]),
 					labelKubernetesIoHostname: string(rsltIndex[i].Metric["label_kubernetes_io_hostname"]),

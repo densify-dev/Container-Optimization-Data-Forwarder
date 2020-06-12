@@ -1,6 +1,9 @@
 package common
 
-import "time"
+import (
+	"log"
+	"time"
+)
 
 // Parameters - Reusable structure that holds common arguments used in the project
 type Parameters struct {
@@ -9,4 +12,5 @@ type Parameters struct {
 	Debug                                                 bool
 	CurrentTime                                           *time.Time
 	LabelSuffix                                           string
+	InfoLogger, WarnLogger, ErrorLogger, DebugLogger      *log.Logger
 }

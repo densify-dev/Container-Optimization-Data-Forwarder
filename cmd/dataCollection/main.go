@@ -3,6 +3,8 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -11,7 +13,6 @@ import (
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/cluster"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
 	"github.com/spf13/viper"
 )
@@ -26,14 +27,14 @@ var include string
 //Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
 func initParameters() {
 	//Set default settings
-	var clusterName string = ""
+	var clusterName string
 	var promProtocol string = "http"
-	var promAddr string = ""
+	var promAddr string
 	var promPort string = "9090"
 	var interval string = "hours"
 	var intervalSize int = 1
 	var history int = 1
-	var offset int = 0
+	var offset int
 	var debug bool = false
 	var configFile string = "config"
 	var configPath string = "./config"
@@ -183,7 +184,24 @@ func initParameters() {
 
 	promURL := promProtocol + "://" + promAddr + ":" + promPort
 
+	logFile, err := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var infoLogger, warnLogger, errorLogger, debugLogger *log.Logger
+
+	infoLogger = log.New(logFile, "[INFO] ", log.Ldate|log.Ltime|log.Lshortfile)
+	warnLogger = log.New(logFile, "[WARN] ", log.Ldate|log.Ltime|log.Lshortfile)
+	errorLogger = log.New(logFile, "[ERROR] ", log.Ldate|log.Ltime|log.Lshortfile)
+	debugLogger = log.New(logFile, "[DEBUG] ", log.Ldate|log.Ltime|log.Lshortfile)
+
+	if clusterName == "" {
+		clusterName = promAddr
+	}
+
 	params = &common.Parameters{
+
 		ClusterName:  &clusterName,
 		PromAddress:  &promAddr,
 		PromURL:      &promURL,
@@ -192,6 +210,10 @@ func initParameters() {
 		History:      &history,
 		Offset:       &offset,
 		Debug:        debug,
+		InfoLogger:   infoLogger,
+		WarnLogger:   warnLogger,
+		ErrorLogger:  errorLogger,
+		DebugLogger:  debugLogger,
 	}
 }
 
@@ -208,11 +230,10 @@ func parseIncludeParam(param string) string {
 
 //main function.
 func main() {
-	errors := "Version 2.1.3-beta"
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
-	logger.SetPromAddr(*params.PromAddress)
+	params.InfoLogger.Println("Version 2.1.3-beta")
 
 	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
 	var t time.Time
@@ -226,26 +247,23 @@ func main() {
 		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute()-*params.Offset, 0, 0, t.Location())
 	}
 	params.CurrentTime = &currentTime
-	//Open the debug log file for writing.
-	debugLog, _ := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
-	logger.PrintLog(errors, debugLog)
 
 	if !strings.Contains(include, "container") {
-		logger.PrintLog("\nSkipping container data collection", debugLog)
+		params.InfoLogger.Println("Skipping container data collection")
+		fmt.Println("Skipping container data collection")
 	} else {
-		errors = container2.Metrics(params)
-		logger.PrintLog(errors, debugLog)
+		container2.Metrics(params)
 	}
 	if !strings.Contains(include, "node") {
-		logger.PrintLog("\nSkipping node data collection", debugLog)
+		params.InfoLogger.Println("Skipping node data collection")
+		fmt.Println("Skipping node data collection")
 	} else {
-		errors = node.Metrics(params)
-		logger.PrintLog(errors, debugLog)
+		node.Metrics(params)
 	}
 	if !strings.Contains(include, "cluster") {
-		logger.PrintLog("\nSkipping cluster data collection", debugLog)
+		params.InfoLogger.Println("Skipping cluster data collection")
+		fmt.Println("Skipping cluster data collection")
 	} else {
-		errors = cluster.Metrics(params)
-		logger.PrintLog(errors, debugLog)
+		cluster.Metrics(params)
 	}
 }

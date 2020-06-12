@@ -9,9 +9,7 @@ import (
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
-	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 )
 
@@ -30,10 +28,6 @@ var entityKind = "Cluster"
 
 //Gets cluster metrics from prometheus (and checks to see if they are valid)
 func getClusterMetric(result model.Value, metric string) {
-
-	if result == nil {
-		return
-	}
 
 	//validates that the value of the entity is set and if not will default to 0
 	var value int
@@ -58,24 +52,17 @@ func getClusterMetric(result model.Value, metric string) {
 
 }
 
-func getWorkload(fileName, metricName, query string, args *common.Parameters) string {
-	var errors = ""
-	var cluster string
-	var logLine string
-	if *args.ClusterName == "" {
-		cluster = *args.PromAddress
-	} else {
-		cluster = *args.ClusterName
-	}
+func getWorkload(fileName, metricName, query string, args *common.Parameters) {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
-	//var query string
-	var start, end time.Time
+
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/cluster/" + fileName + ".csv")
 	if err != nil {
-		return logger.LogError(map[string]string{"entity": entityKind, "metric": metricName, "query": query, "message": err.Error()}, "ERROR")
+		args.ErrorLogger.Println("entity=" + entityKind + " metric=" + metricName + " query=" + query + " message=" + err.Error())
+		fmt.Println("entity=" + entityKind + " metric=" + metricName + " query=" + query + " message=" + err.Error())
+		return
 	}
 	fmt.Fprintf(workloadWrite, "cluster,Datetime,%s\n", metricName)
 
@@ -83,31 +70,24 @@ func getWorkload(fileName, metricName, query string, args *common.Parameters) st
 	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
-		start, end = prometheus.TimeRange(*args.Interval, *args.IntervalSize, *args.CurrentTime, historyInterval)
-		range5Min := v1.Range{Start: start, End: end, Step: time.Minute * 5}
+		range5Min := prometheus.TimeRange(args, historyInterval, time.Minute*5)
 
 		prometheusARGS := &prometheus.CollectionArgs{
-			EntityKind: &entityKind,
-			PromURL:    args.PromURL,
-			Query:      &query,
-			Range:      &range5Min,
+			Query: &query,
+			Range: &range5Min,
 		}
 
-		result, logLine = prometheus.MetricCollect(prometheusARGS, metricName, false)
-		writeWorkload(workloadWrite, result, *args.PromAddress, cluster)
-		errors += logLine
+		result = prometheus.MetricCollect(args, prometheusARGS, metricName, false)
+		if result != nil {
+			writeWorkload(workloadWrite, result, args)
+		}
 	}
 	//Close the workload files.
 	workloadWrite.Close()
-
-	return errors
 }
 
 //writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
-func writeWorkload(file io.Writer, result model.Value, promAddr, clusterN string) {
-	if result == nil {
-		return
-	}
+func writeWorkload(file io.Writer, result model.Value, args *common.Parameters) {
 	//Loop through the different values over the interval and write out each one to the workload file.
 	for j := 0; j < len(result.(model.Matrix)[0].Values); j++ {
 		var val model.SampleValue
@@ -117,7 +97,7 @@ func writeWorkload(file io.Writer, result model.Value, promAddr, clusterN string
 			val = result.(model.Matrix)[0].Values[j].Value
 		}
 		fmt.Fprintf(file, "%s,%s,%f\n",
-			clusterN,
+			*args.ClusterName,
 			time.Unix(0, int64(result.(model.Matrix)[0].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"),
 			val)
 	}
@@ -125,53 +105,38 @@ func writeWorkload(file io.Writer, result model.Value, promAddr, clusterN string
 }
 
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
-func writeConfig(clusterName, promAddr string) string {
-	errors := ""
-	var cluster string
-	if clusterName == "" {
-		cluster = promAddr
-	} else {
-		cluster = clusterName
-	}
+func writeConfig(args *common.Parameters) {
 
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/cluster/config.csv")
 	if err != nil {
-		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
+		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
+		fmt.Println("entity=" + entityKind + " message=" + err.Error())
+		return
 	}
 
 	//Write out the header.
 	fmt.Fprintln(configWrite, "cluster")
-
-	fmt.Fprintf(configWrite, "%s", cluster)
-
-	fmt.Fprintf(configWrite, "\n")
-
-	return errors
-
+	fmt.Fprintf(configWrite, "%s\n", *args.ClusterName)
+	configWrite.Close()
 }
 
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
-func writeAttributes(clusterName, promAddr string) string {
-	errors := ""
-	var cluster string
-	if clusterName == "" {
-		cluster = promAddr
-	} else {
-		cluster = clusterName
-	}
+func writeAttributes(args *common.Parameters) {
 
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/cluster/attributes.csv")
 	if err != nil {
-		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
+		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
+		fmt.Println("entity=" + entityKind + " message=" + err.Error())
+		return
 	}
 
 	//Write out the header.
 	fmt.Fprintln(attributeWrite, "cluster,Virtual Technology,Virtual Domain,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request")
 
 	//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-	fmt.Fprintf(attributeWrite, "%s,Clusters,%s", cluster, cluster)
+	fmt.Fprintf(attributeWrite, "%s,Clusters,%s", *args.ClusterName, *args.ClusterName)
 
 	if clusterEntity.cpuLimit == -1 {
 		fmt.Fprintf(attributeWrite, ",")
@@ -192,117 +157,70 @@ func writeAttributes(clusterName, promAddr string) string {
 	}
 
 	if clusterEntity.memRequest == -1 {
-		fmt.Fprintf(attributeWrite, ",")
+		fmt.Fprintf(attributeWrite, ",\n")
 	} else {
-		fmt.Fprintf(attributeWrite, ",%d", clusterEntity.memRequest)
+		fmt.Fprintf(attributeWrite, ",%d\n", clusterEntity.memRequest)
 	}
 
-	fmt.Fprintf(attributeWrite, "\n")
-
-	return errors
-
+	attributeWrite.Close()
 }
 
 //Metrics a global func for collecting node level metrics in prometheus
-func Metrics(args *common.Parameters) string {
+func Metrics(args *common.Parameters) {
 	//Setup variables used in the code.
-	var errors = ""
-	var logLine string
 	var historyInterval time.Duration
 	historyInterval = 0
 	var query string
 	var result model.Value
-	var start, end time.Time
 
 	//Start and end time + the prometheus address used for querying
-	start, end = prometheus.TimeRange(*args.Interval, *args.IntervalSize, *args.CurrentTime, historyInterval)
-	range5Min := v1.Range{Start: start, End: end, Step: time.Minute * 5}
+	range5Min := prometheus.TimeRange(args, historyInterval, time.Minute*5)
 
 	collectArgs := &prometheus.CollectionArgs{
-		EntityKind: &entityKind,
-		PromURL:    args.PromURL,
-		Query:      &query,
-		Range:      &range5Min,
+		Query: &query,
+		Range: &range5Min,
 	}
 
-	//Prefix for indexing (less clutter on screen)
-	//var rsltIndex = result.(model.Matrix)
-
-	/*
-		==========START OF CLUSTER REQUEST/LIMIT METRICS==========
-		-max(kube_pod_container_resource_limits_cpu_cores)*1000
-		-avg(kube_pod_container_resource_requests_cpu_cores)*1000
-
-		-max(kube_pod_container_resource_limits_memory_bytes)/1024/1024
-		-avg(kube_pod_container_resource_requests_memory_bytes)/1024/1024
-	*/
-
 	query = `sum(kube_pod_container_resource_limits_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result, logLine = prometheus.MetricCollect(collectArgs, "cpuLimit", false)
-	if logLine == "" {
+	result = prometheus.MetricCollect(args, collectArgs, "cpuLimit", false)
+	if result != nil {
 		getClusterMetric(result, "cpuLimit")
-	} else {
-		errors += logLine
 	}
 
 	query = `sum(kube_pod_container_resource_requests_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result, logLine = prometheus.MetricCollect(collectArgs, "cpuRequest", false)
-	if logLine == "" {
+	result = prometheus.MetricCollect(args, collectArgs, "cpuRequest", false)
+	if result != nil {
 		getClusterMetric(result, "cpuRequest")
-	} else {
-		errors += logLine
 	}
 
 	query = `sum(kube_pod_container_resource_limits_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result, logLine = prometheus.MetricCollect(collectArgs, "memLimit", false)
-	if logLine == "" {
+	result = prometheus.MetricCollect(args, collectArgs, "memLimit", false)
+	if result != nil {
 		getClusterMetric(result, "memLimit")
-	} else {
-		errors += logLine
 	}
 
 	query = `sum(kube_pod_container_resource_requests_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result, logLine = prometheus.MetricCollect(collectArgs, "memRequest", false)
-	if logLine == "" {
+	result = prometheus.MetricCollect(args, collectArgs, "memRequest", false)
+	if result != nil {
 		getClusterMetric(result, "memRequest")
-	} else {
-		errors += logLine
 	}
 
-	/*
-		==========CLUSTER REQUEST/LIMIT METRICS============
-	*/
-
-	errors += writeAttributes(*args.ClusterName, *args.PromAddress)
-	errors += writeConfig(*args.ClusterName, *args.PromAddress)
-
-	/*
-		//Query and store prometheus CPU limit
-		query = `kube_pod_container_resource_limits_cpu_cores*1000`
-		errors += getWorkload(promaddress, "cpu_limit", "CPU Limit", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	*/
+	writeAttributes(args)
+	writeConfig(args)
 
 	//Query and store prometheus CPU requests
 	query = `sum((kube_pod_container_resource_requests_cpu_cores) * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	errors += getWorkload("cpu_requests", "CPU Reservation in Cores", query, args)
+	getWorkload("cpu_requests", "CPU Reservation in Cores", query, args)
 
 	//Query and store prometheus CPU requests
 	query = `sum((kube_pod_container_resource_requests_cpu_cores) * on (namespace,pod,container) group_left kube_pod_container_status_running) / sum(kube_node_status_allocatable_cpu_cores) * 100`
-	errors += getWorkload("cpu_reservation_percent", "CPU Reservation Percent", query, args)
-
-	/*
-		//Query and store prometheus Memory limit
-		query = `kube_pod_container_resource_limits_memory_bytes/1024/1024`
-		errors += getWorkload(promaddress, "memory_limit", "Memory Limit", query, "max", clusterName, promAddr, interval, intervalSize, history, currentTime)
-	*/
+	getWorkload("cpu_reservation_percent", "CPU Reservation Percent", query, args)
 
 	//Query and store prometheus Memory requests
 	query = `sum((kube_pod_container_resource_requests_memory_bytes/1024/1024) * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	errors += getWorkload("memory_requests", "Memory Reservation in MB", query, args)
+	getWorkload("memory_requests", "Memory Reservation in MB", query, args)
 
 	//Query and store prometheus Memory requests
 	query = `sum((kube_pod_container_resource_requests_memory_bytes/1024/1024) * on (namespace,pod,container) group_left kube_pod_container_status_running) / sum(kube_node_status_allocatable_memory_bytes/1024/1024) * 100`
-	errors += getWorkload("memory_reservation_percent", "Memory Reservation Percent", query, args)
-
-	return errors
+	getWorkload("memory_reservation_percent", "Memory Reservation Percent", query, args)
 }

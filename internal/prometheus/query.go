@@ -4,11 +4,10 @@ package prometheus
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
-	//"github.com/densify-dev/Container-Optimization-Data-Forwarder/cmd/datacollection"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
+
 	"github.com/prometheus/common/model"
 
 	"github.com/prometheus/client_golang/api"
@@ -17,15 +16,12 @@ import (
 
 // CollectionArgs -
 type CollectionArgs struct {
-	PromURL, Query, EntityKind *string
-	Range                      *v1.Range
+	Query *string
+	Range *v1.Range
 }
 
-var promAddLog string
-var hasClusterName = false
-
 //MetricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
-func MetricCollect(args *CollectionArgs, metric string, vital bool) (value model.Value, logLine string) {
+func MetricCollect(args *common.Parameters, promArgs *CollectionArgs, metric string, vital bool) (value model.Value) {
 
 	//setup the context to use for the API calls
 	ctx, cancel := context.WithCancel(context.Background())
@@ -34,71 +30,71 @@ func MetricCollect(args *CollectionArgs, metric string, vital bool) (value model
 	//Setup the API client connection
 	client, err := api.NewClient(api.Config{Address: *args.PromURL})
 	if err != nil {
-		return value, logger.LogError(map[string]string{"message": err.Error(), "query": *args.Query, "metric": metric}, "WARN")
+		args.WarnLogger.Println("metric=" + metric + " query=" + *promArgs.Query + " message=" + err.Error())
+		fmt.Println("metric=" + metric + " query=" + *promArgs.Query + " message=" + err.Error())
+		return value
 	}
 
 	//Query prometheus with the values defined above as well as the query that was passed into the function.
 	q := v1.NewAPI(client)
-	var warn []string
-	value, warn, err = q.QueryRange(ctx, *args.Query, *args.Range)
+	value, _, err = q.QueryRange(ctx, *promArgs.Query, *promArgs.Range)
 	if err != nil {
-		return value, logger.LogError(map[string]string{"message": err.Error(), "query": *args.Query, "metric": metric}, "ERROR")
-	}
-
-	if *args.Query == `container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}/1024/1024` {
-		debugLog, _ := os.OpenFile("./data/debuglog.txt", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-		test, _ := q.Config(ctx)
-		fmt.Fprintln(debugLog, test)
-		debugLog.Close()
+		args.ErrorLogger.Println("metric=" + metric + " query=" + *promArgs.Query + " message=" + err.Error())
+		fmt.Println("metric=" + metric + " query=" + *promArgs.Query + " message=" + err.Error())
+		return value
 	}
 
 	//If the values from the query return no data (length of 0) then give a warning
 	if value == nil {
 		if vital {
-			return value, logger.LogError(map[string]string{"message": "No resultset returned", "query": *args.Query, "metric": metric}, "ERROR")
+			args.ErrorLogger.Println("metric=" + metric + " query=" + *promArgs.Query + " message=No resultset returned")
+			fmt.Println("metric=" + metric + " query=" + *promArgs.Query + " message=No resultset returned")
+			return value
 		}
-		return value, logger.LogError(map[string]string{"message": "No resultset returned", "query": *args.Query, "metric": metric}, "WARN")
-		//return value, logger.LogError(map[string]string{"message": "No resultset returned", "query": *args.Query, "metric": metric, "warnings": warn, "errors": err}, "WARN")
+		args.WarnLogger.Println("metric=" + metric + " query=" + *promArgs.Query + " message=No resultset returned")
+		fmt.Println("metric=" + metric + " query=" + *promArgs.Query + " message=No resultset returned")
+		return value
+
 	} else if value.(model.Matrix) == nil {
 		if vital {
-			return value, logger.LogError(map[string]string{"message": "No time series data returned", "query": *args.Query, "metric": metric}, "ERROR")
+			args.ErrorLogger.Println("metric=" + metric + " query=" + *promArgs.Query + " message=No time series data returned")
+			fmt.Println("metric=" + metric + " query=" + *promArgs.Query + " message=No time series data returned")
+			return value
 		}
-		return value, logger.LogError(map[string]string{"message": "No time series data returned", "query": *args.Query, "metric": metric}, "WARN")
+		args.WarnLogger.Println("metric=" + metric + " query=" + *promArgs.Query + " message=No time series data returned")
+		fmt.Println("metric=" + metric + " query=" + *promArgs.Query + " message=No time series data returned")
+		return value
 	} else if value.(model.Matrix).Len() == 0 {
 		if vital {
-			return value, logger.LogError(map[string]string{"message": "No data returned, value.(model.Matrix) is empty", "query": *args.Query, "metric": metric}, "ERROR")
+			args.ErrorLogger.Println("metric=" + metric + " query=" + *promArgs.Query + " message=No data returned, value.(model.Matrix) is empty")
+			fmt.Println("metric=" + metric + " query=" + *promArgs.Query + " message=No data returned, value.(model.Matrix) is empty")
+			return value
 		}
-		debugLog, _ := os.OpenFile("./data/debuglog.txt", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-		fmt.Fprintln(debugLog, *args.PromURL)
-		fmt.Fprintln(debugLog, *args.Query)
-		fmt.Fprintln(debugLog, value.String)
-		fmt.Fprintln(debugLog, value.(model.Matrix))
-		fmt.Fprintln(debugLog, warn)
-		test, _, _ := q.Query(ctx, *args.Query, time.Now().UTC())
-		fmt.Fprintln(debugLog, test)
-		debugLog.Close()
+		args.WarnLogger.Println("metric=" + metric + " query=" + *promArgs.Query + " message=No data returned, value.(model.Matrix) is empty")
+		fmt.Println("metric=" + metric + " query=" + *promArgs.Query + " message=No data returned, value.(model.Matrix) is empty")
 
-		return value, logger.LogError(map[string]string{"message": "No data returned", "query": *args.Query, "metric": metric}, "WARN")
 	}
 
 	//Return the data that was received from Prometheus.
-	return value, ""
+	return value
 }
 
 //TimeRange allows you to define the start and end values of the range will pass to the Prometheus for the query.
-func TimeRange(interval string, intervalSize int, currentTime time.Time, historyInterval time.Duration) (start, end time.Time) {
-	//define the start and end times to be used for querying prometheus based on the time the script called.
-	//Depending on the Interval and interval size will determine the start and end times.
+func TimeRange(args *common.Parameters, historyInterval, step time.Duration) (promRange v1.Range) {
+
+	var start, end time.Time
+
 	//For workload metrics the historyInterval will be set depending on how far back in history we are querying currently. Note it will be 0 for all queries that are not workload related.
-	if interval == "days" {
-		start = currentTime.Add(time.Hour * -24 * time.Duration(intervalSize)).Add(time.Hour * -24 * time.Duration(intervalSize) * historyInterval)
-		end = currentTime.Add(time.Hour * -24 * time.Duration(intervalSize) * historyInterval)
-	} else if interval == "hours" {
-		start = currentTime.Add(time.Hour * -1 * time.Duration(intervalSize)).Add(time.Hour * -1 * time.Duration(intervalSize) * historyInterval)
-		end = currentTime.Add(time.Hour * -1 * time.Duration(intervalSize) * historyInterval)
+	if *args.Interval == "days" {
+		start = args.CurrentTime.Add(time.Hour * -24 * time.Duration(*args.IntervalSize)).Add(time.Hour * -24 * time.Duration(*args.IntervalSize) * historyInterval)
+		end = args.CurrentTime.Add(time.Hour * -24 * time.Duration(*args.IntervalSize) * historyInterval)
+	} else if *args.Interval == "hours" {
+		start = args.CurrentTime.Add(time.Hour * -1 * time.Duration(*args.IntervalSize)).Add(time.Hour * -1 * time.Duration(*args.IntervalSize) * historyInterval)
+		end = args.CurrentTime.Add(time.Hour * -1 * time.Duration(*args.IntervalSize) * historyInterval)
 	} else {
-		start = currentTime.Add(time.Minute * -1 * time.Duration(intervalSize)).Add(time.Minute * -1 * time.Duration(intervalSize) * historyInterval)
-		end = currentTime.Add(time.Minute * -1 * time.Duration(intervalSize) * historyInterval)
+		start = args.CurrentTime.Add(time.Minute * -1 * time.Duration(*args.IntervalSize)).Add(time.Minute * -1 * time.Duration(*args.IntervalSize) * historyInterval)
+		end = args.CurrentTime.Add(time.Minute * -1 * time.Duration(*args.IntervalSize) * historyInterval)
 	}
-	return start, end
+
+	return v1.Range{Start: start, End: end, Step: step}
 }

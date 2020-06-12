@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/prometheus/common/model"
 )
 
 //writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
-func writeWorkload(file io.Writer, result model.Value, node model.LabelName, promAddr, cluster string) {
+func writeWorkload(file io.Writer, result model.Value, node model.LabelName, args *common.Parameters) {
 	if result == nil {
 		return
 	}
@@ -38,7 +38,7 @@ func writeWorkload(file io.Writer, result model.Value, node model.LabelName, pro
 				val = result.(model.Matrix)[i].Values[j].Value
 			}
 			fmt.Fprintf(file, "%s,%s,%s,%f\n",
-				cluster, strings.Replace(string(nodeValue), ";", ".", -1),
+				*args.ClusterName, strings.Replace(string(nodeValue), ";", ".", -1),
 				time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"),
 				val)
 		}
@@ -46,19 +46,14 @@ func writeWorkload(file io.Writer, result model.Value, node model.LabelName, pro
 }
 
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
-func writeConfig(clusterName, promAddr string) string {
-	errors := ""
-	var cluster string
-	if clusterName == "" {
-		cluster = promAddr
-	} else {
-		cluster = clusterName
-	}
+func writeConfig(args *common.Parameters) {
 
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/node/config.csv")
 	if err != nil {
-		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
+		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
+		fmt.Println("entity=" + entityKind + " message=" + err.Error())
+		return
 	}
 
 	//Write out the header.
@@ -66,7 +61,7 @@ func writeConfig(clusterName, promAddr string) string {
 
 	//Loop through the nodes and write out the config data for each system.
 	for kn := range nodes {
-		fmt.Fprintf(configWrite, "%s,%s,%s", cluster, kn, nodes[kn].labelBetaKubernetesIoOs)
+		fmt.Fprintf(configWrite, "%s,%s,%s", *args.ClusterName, kn, nodes[kn].labelBetaKubernetesIoOs)
 
 		if nodes[kn].cpuCapacity == -1 {
 			fmt.Fprintf(configWrite, ",,")
@@ -79,7 +74,7 @@ func writeConfig(clusterName, promAddr string) string {
 		if nodes[kn].memCapacity == -1 {
 			fmt.Fprintf(configWrite, ",")
 		} else {
-			fmt.Fprintf(configWrite, ",%d", nodes[kn].memCapacity)
+			fmt.Fprintf(configWrite, ",%d", nodes[kn].memCapacity/1024/1024)
 		}
 
 		if nodes[kn].netSpeedBytes == -1 {
@@ -90,24 +85,17 @@ func writeConfig(clusterName, promAddr string) string {
 
 		fmt.Fprintf(configWrite, "\n")
 	}
-
-	return errors
 }
 
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
-func writeAttributes(clusterName, promAddr string) string {
-	errors := ""
-	var cluster string
-	if clusterName == "" {
-		cluster = promAddr
-	} else {
-		cluster = clusterName
-	}
+func writeAttributes(args *common.Parameters) {
 
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/node/attributes.csv")
 	if err != nil {
-		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
+		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
+		fmt.Println("entity=" + entityKind + " message=" + err.Error())
+		return
 	}
 
 	//Write out the header.
@@ -117,7 +105,7 @@ func writeAttributes(clusterName, promAddr string) string {
 	for kn := range nodes {
 
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-		fmt.Fprintf(attributeWrite, "%s,%s,Nodes,%s,%s", cluster, kn, cluster, nodes[kn].labelBetaKubernetesIoArch)
+		fmt.Fprintf(attributeWrite, "%s,%s,Nodes,%s,%s", *args.ClusterName, kn, *args.ClusterName, nodes[kn].labelBetaKubernetesIoArch)
 
 		if nodes[kn].netSpeedBytes == -1 {
 			fmt.Fprintf(attributeWrite, ",")
@@ -217,6 +205,4 @@ func writeAttributes(clusterName, promAddr string) string {
 		fmt.Fprintf(attributeWrite, "\n")
 
 	}
-
-	return errors
 }

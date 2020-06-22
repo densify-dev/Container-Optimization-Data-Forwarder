@@ -115,15 +115,10 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
-		range5Min := prometheus.TimeRange(args, historyInterval, time.Minute*5)
-
-		prometheusARGS := &prometheus.CollectionArgs{
-			Query: &query2,
-			Range: &range5Min,
-		}
+		range5Min := prometheus.TimeRange(args, historyInterval)
 
 		query2 = aggregator + "(" + aggregator + "(" + query + `) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
-		result = prometheus.MetricCollect(args, prometheusARGS, metricName, false)
+		result = prometheus.MetricCollect(args, query2, range5Min, metricName, false)
 		writeWorkload(workloadWrite, result, "node", args)
 	}
 	//Close the workload files.

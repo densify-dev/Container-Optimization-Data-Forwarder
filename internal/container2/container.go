@@ -51,28 +51,23 @@ func Metrics(args *common.Parameters) {
 	var replicaSetOwners = map[string]string{}
 	var jobOwners = map[string]string{}
 
-	range5Min := prometheus.TimeRange(args, historyInterval, time.Minute*5)
-
-	collectArgs := &prometheus.CollectionArgs{
-		Query: &query,
-		Range: &range5Min,
-	}
+	range5Min := prometheus.TimeRange(args, historyInterval)
 
 	//querys gathering hierarchy information for the containers
 	query = `sum(kube_pod_owner{owner_name!="<none>"}) by (namespace, pod, owner_name, owner_kind)`
-	result = prometheus.MetricCollect(args, collectArgs, "pods", true)
-	if result != nil {
-		rslt = result.(model.Matrix)
-		for i := 0; i < rslt.Len(); i++ {
-			podOwners[string(rslt[i].Metric["pod"])+"__"+string(rslt[i].Metric["namespace"])] = string(rslt[i].Metric["owner_name"])
-			podOwnersKind[string(rslt[i].Metric["pod"])+"__"+string(rslt[i].Metric["namespace"])] = string(rslt[i].Metric["owner_kind"])
-		}
-	} else {
+	result = prometheus.MetricCollect(args, query, range5Min, "pods", true)
+	if result == nil {
 		return
 	}
 
+	rslt = result.(model.Matrix)
+	for i := 0; i < rslt.Len(); i++ {
+		podOwners[string(rslt[i].Metric["pod"])+"__"+string(rslt[i].Metric["namespace"])] = string(rslt[i].Metric["owner_name"])
+		podOwnersKind[string(rslt[i].Metric["pod"])+"__"+string(rslt[i].Metric["namespace"])] = string(rslt[i].Metric["owner_kind"])
+	}
+
 	query = `sum(kube_replicaset_owner{owner_name!="<none>"}) by (namespace, replicaset, owner_name)`
-	result = prometheus.MetricCollect(args, collectArgs, "replicasets", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "replicasets", false)
 	if result != nil {
 		rslt = result.(model.Matrix)
 		for i := 0; i < rslt.Len(); i++ {
@@ -81,7 +76,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `sum(kube_job_owner{owner_name!="<none>"}) by (namespace, job_name, owner_name)`
-	result = prometheus.MetricCollect(args, collectArgs, "jobs", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "jobs", false)
 	if result != nil {
 		rslt = result.(model.Matrix)
 		for i := 0; i < rslt.Len(); i++ {
@@ -90,12 +85,12 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `max(kube_pod_container_info) by (container, pod, namespace)`
-	result = prometheus.MetricCollect(args, collectArgs, "containers", true)
-	if result != nil {
-		rslt = result.(model.Matrix)
-	} else {
+	result = prometheus.MetricCollect(args, query, range5Min, "containers", true)
+	if result == nil {
 		return
 	}
+
+	rslt = result.(model.Matrix)
 
 	var currentOwner string
 
@@ -185,7 +180,7 @@ func Metrics(args *common.Parameters) {
 
 	//Container metrics
 	query = `container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}/1024/1024`
-	result = prometheus.MetricCollect(args, collectArgs, "memory", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "memory", false)
 	if result != nil {
 		if args.LabelSuffix == "" && getContainerMetric(result, "namespace", "pod", "container", "memory") {
 			//Don't do anything
@@ -195,251 +190,251 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000`
-	result = prometheus.MetricCollect(args, collectArgs, "cpuLimit", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "cpuLimit", false)
 	if result != nil {
 		getContainerMetric(result, "namespace", "pod", "container", "cpuLimit")
 	}
 
 	query = `sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000`
-	result = prometheus.MetricCollect(args, collectArgs, "cpuRequest", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "cpuRequest", false)
 	if result != nil {
 		getContainerMetric(result, "namespace", "pod", "container", "cpuRequest")
 	}
 
 	query = `sum(kube_pod_container_resource_limits_memory_bytes) by (pod,namespace,container)/1024/1024`
-	result = prometheus.MetricCollect(args, collectArgs, "memLimit", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "memLimit", false)
 	if result != nil {
 		getContainerMetric(result, "namespace", "pod", "container", "memLimit")
 	}
 
 	query = `sum(kube_pod_container_resource_requests_memory_bytes) by (pod,namespace,container)/1024/1024`
-	result = prometheus.MetricCollect(args, collectArgs, "memRequest", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "memRequest", false)
 	if result != nil {
 		getContainerMetric(result, "namespace", "pod", "container", "memRequest")
 	}
 
 	query = `container_spec_cpu_shares{name!~"k8s_POD_.*"}`
-	result = prometheus.MetricCollect(args, collectArgs, "conLabel", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "conLabel", false)
 	if result != nil {
 		getContainerMetricString(result, "namespace", model.LabelName("pod"+args.LabelSuffix), model.LabelName("container"+args.LabelSuffix))
 	}
 
 	query = `kube_pod_container_info`
-	result = prometheus.MetricCollect(args, collectArgs, "conInfo", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "conInfo", false)
 	if result != nil {
 		getContainerMetricString(result, "namespace", "pod", "container")
 	}
 
 	//Pod metrics
 	query = `kube_pod_info`
-	result = prometheus.MetricCollect(args, collectArgs, "podInfo", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "podInfo", false)
 	if result != nil {
 		getMidMetricString(result, "namespace", "pod", "Pod")
 	}
 
 	query = `kube_pod_labels`
-	result = prometheus.MetricCollect(args, collectArgs, "podLabels", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "podLabels", false)
 	if result != nil {
 		getMidMetricString(result, "namespace", "pod", "Pod")
 	}
 
 	query = `sum(kube_pod_container_status_restarts_total) by (pod,namespace,container)`
-	result = prometheus.MetricCollect(args, collectArgs, "restarts", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "restarts", false)
 	if result != nil {
 		getContainerMetric(result, "namespace", "pod", "container", "restarts")
 	}
 
 	query = `sum(kube_pod_container_status_terminated) by (pod,namespace,container)`
-	result = prometheus.MetricCollect(args, collectArgs, "powerState", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "powerState", false)
 	if result != nil {
 		getContainerMetric(result, "namespace", "pod", "container", "powerState")
 	}
 
 	query = `kube_pod_created`
-	result = prometheus.MetricCollect(args, collectArgs, "podCreationTime", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "podCreationTime", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "pod", "creationTime", "Pod")
 	}
 
 	//Namespace metrics
 	query = `kube_namespace_labels`
-	result = prometheus.MetricCollect(args, collectArgs, "namespaceLabels", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "namespaceLabels", false)
 	if result != nil {
 		getNamespaceMetricString(result, "namespace")
 	}
 
 	query = `kube_namespace_annotations`
-	result = prometheus.MetricCollect(args, collectArgs, "namespaceAnnotations", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "namespaceAnnotations", false)
 	if result != nil {
 		getNamespaceMetricString(result, "namespace")
 	}
 
 	query = `kube_limitrange`
-	result = prometheus.MetricCollect(args, collectArgs, "nameSpaceLimitrange", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "nameSpaceLimitrange", false)
 	if result != nil {
 		getNamespacelimits(result, "namespace")
 	}
 
 	//Deployment metrics
 	query = `kube_deployment_labels`
-	result = prometheus.MetricCollect(args, collectArgs, "labels", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "labels", false)
 	if result != nil {
 		getMidMetricString(result, "namespace", "deployment", "Deployment")
 	}
 
 	query = `kube_deployment_spec_strategy_rollingupdate_max_surge`
-	result = prometheus.MetricCollect(args, collectArgs, "maxSurge", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "maxSurge", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "deployment", "maxSurge", "Deployment")
 	}
 
 	query = `kube_deployment_spec_strategy_rollingupdate_max_unavailable`
-	result = prometheus.MetricCollect(args, collectArgs, "maxUnavailable", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "maxUnavailable", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "deployment", "maxUnavailable", "Deployment")
 	}
 
 	query = `kube_deployment_metadata_generation`
-	result = prometheus.MetricCollect(args, collectArgs, "metadataGeneration", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "metadataGeneration", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "deployment", "metadataGeneration", "Deployment")
 	}
 
 	query = `kube_deployment_created`
-	result = prometheus.MetricCollect(args, collectArgs, "deploymentCreated", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "deploymentCreated", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "deployment", "creationTime", "Deployment")
 	}
 
 	//ReplicaSet metrics
 	query = `kube_replicaset_labels`
-	result = prometheus.MetricCollect(args, collectArgs, "replicaSetLabels", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "replicaSetLabels", false)
 	if result != nil {
 		getMidMetricString(result, "namespace", "replicaset", "ReplicaSet")
 	}
 
 	query = `kube_replicaset_created`
-	result = prometheus.MetricCollect(args, collectArgs, "replicaSetCreated", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "replicaSetCreated", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "replicaset", "creationTime", "ReplicaSet")
 	}
 
 	//ReplicationController metrics
 	query = `kube_replicationcontroller_created`
-	result = prometheus.MetricCollect(args, collectArgs, "replicationControllerCreated", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "replicationControllerCreated", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "replicationcontroller", "creationTime", "ReplicationController")
 	}
 
 	//DaemonSet metrics
 	query = `kube_daemonset_labels`
-	result = prometheus.MetricCollect(args, collectArgs, "daemonSetLabels", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "daemonSetLabels", false)
 	if result != nil {
 		getMidMetricString(result, "namespace", "daemonset", "DaemonSet")
 	}
 
 	query = `kube_daemonset_created`
-	result = prometheus.MetricCollect(args, collectArgs, "daemonSetCreated", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "daemonSetCreated", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "daemonset", "creationTime", "DaemonSet")
 	}
 
 	//StatefulSet metrics
 	query = `kube_statefulset_labels`
-	result = prometheus.MetricCollect(args, collectArgs, "statefulSetLabels", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "statefulSetLabels", false)
 	if result != nil {
 		getMidMetricString(result, "namespace", "statefulset", "StatefulSet")
 	}
 
 	query = `kube_statefulset_created`
-	result = prometheus.MetricCollect(args, collectArgs, "statefulSetCreated", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "statefulSetCreated", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "statefulset", "creationTime", "StatefulSet")
 	}
 
 	//Job metrics
 	query = `kube_job_info * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result = prometheus.MetricCollect(args, collectArgs, "jobInfo", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "jobInfo", false)
 	if result != nil {
 		getMidMetricString(result, "namespace", "job_name", "Job")
 	}
 
 	query = `kube_job_labels * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result = prometheus.MetricCollect(args, collectArgs, "jobLabel", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "jobLabel", false)
 	if result != nil {
 		getMidMetricString(result, "namespace", "job_name", "Job")
 	}
 
 	query = `kube_job_spec_completions * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result = prometheus.MetricCollect(args, collectArgs, "jobSpecCompletions", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "jobSpecCompletions", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "job_name", "specCompletions", "Job")
 	}
 
 	query = `kube_job_spec_parallelism * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result = prometheus.MetricCollect(args, collectArgs, "jobSpecParallelism", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "jobSpecParallelism", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "job_name", "specParallelism", "Job")
 	}
 
 	query = `kube_job_status_completion_time * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result = prometheus.MetricCollect(args, collectArgs, "jobStatusCompletionTime", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "jobStatusCompletionTime", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "job_name", "statusCompletionTime", "Job")
 	}
 
 	query = `kube_job_status_start_time * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result = prometheus.MetricCollect(args, collectArgs, "jobStatusStartTime", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "jobStatusStartTime", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "job_name", "statusStartTime", "Job")
 	}
 
 	query = `kube_job_created`
-	result = prometheus.MetricCollect(args, collectArgs, "jobCreated", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "jobCreated", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "job", "creationTime", "Job")
 	}
 
 	//CronJob metrics
 	query = `kube_cronjob_labels`
-	result = prometheus.MetricCollect(args, collectArgs, "cronJobLabels", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "cronJobLabels", false)
 	if result != nil {
 		getMidMetricString(result, "namespace", "cronjob", "CronJob")
 	}
 
 	query = `kube_cronjob_info`
-	result = prometheus.MetricCollect(args, collectArgs, "cronJobInfo", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "cronJobInfo", false)
 	if result != nil {
 		getMidMetricString(result, "namespace", "cronjob", "CronJob")
 	}
 
 	query = `kube_cronjob_next_schedule_time`
-	result = prometheus.MetricCollect(args, collectArgs, "cronJobNextScheduleTime", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "cronJobNextScheduleTime", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "cronjob", "nextScheduleTime", "CronJob")
 	}
 
 	query = `kube_cronjob_status_last_schedule_time`
-	result = prometheus.MetricCollect(args, collectArgs, "cronJobStatusLastScheduleTime", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "cronJobStatusLastScheduleTime", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "cronjob", "lastScheduleTime", "CronJob")
 	}
 
 	query = `kube_cronjob_status_active`
-	result = prometheus.MetricCollect(args, collectArgs, "cronJobStatusActive", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "cronJobStatusActive", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "cronjob", "statusActive", "CronJob")
 	}
 
 	query = `kube_cronjob_created`
-	result = prometheus.MetricCollect(args, collectArgs, "cronJobCreated", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "cronJobCreated", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "cronjob", "creationTime", "CronJob")
 	}
 
 	//HPA metrics
 	query = `kube_hpa_labels`
-	result = prometheus.MetricCollect(args, collectArgs, "hpaLabels", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "hpaLabels", false)
 	if result != nil {
 		getHPAMetricString(result, "namespace", "hpa", args)
 	}
@@ -454,49 +449,49 @@ func Metrics(args *common.Parameters) {
 	fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,Auto Scaling - In Service Instances\n")
 
 	query = `kube_replicaset_spec_replicas`
-	result = prometheus.MetricCollect(args, collectArgs, "replicaSetSpecReplicas", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "replicaSetSpecReplicas", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "replicaset", "currentSize", "ReplicaSet")
 	}
 	writeWorkloadMid(currentSizeWrite, result, "namespace", "replicaset", args, "ReplicaSet")
 
 	query = `kube_replicationcontroller_spec_replicas`
-	result = prometheus.MetricCollect(args, collectArgs, "replicationcontroller_spec_replicas", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "replicationcontroller_spec_replicas", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "replicationcontroller", "currentSize", "ReplicationController")
 	}
 	writeWorkloadMid(currentSizeWrite, result, "namespace", "replicationcontroller", args, "ReplicationController")
 
 	query = `kube_daemonset_status_number_available`
-	result = prometheus.MetricCollect(args, collectArgs, "daemonSetStatusNumberAvailable", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "daemonSetStatusNumberAvailable", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "daemonset", "currentSize", "DaemonSet")
 	}
 	writeWorkloadMid(currentSizeWrite, result, "namespace", "daemonset", args, "DaemonSet")
 
 	query = `kube_statefulset_replicas`
-	result = prometheus.MetricCollect(args, collectArgs, "statefulSetReplicas", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "statefulSetReplicas", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "statefulset", "currentSize", "StatefulSet")
 	}
 	writeWorkloadMid(currentSizeWrite, result, "namespace", "statefulset", args, "StatefulSet")
 
 	query = `kube_job_spec_parallelism`
-	result = prometheus.MetricCollect(args, collectArgs, "jobSpecParallelism", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "jobSpecParallelism", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "job_name", "currentSize", "Job")
 	}
 	writeWorkloadMid(currentSizeWrite, result, "namespace", "job_name", args, "Job")
 
 	query = `sum(max(kube_job_spec_parallelism) by (namespace,job_name) * on (namespace,job_name) group_right max(kube_job_owner) by (namespace, job_name, owner_name)) by (owner_name, namespace)`
-	result = prometheus.MetricCollect(args, collectArgs, "cronJobSpecParallelism", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "cronJobSpecParallelism", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "owner_name", "currentSize", "CronJob")
 	}
 	writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", args, "CronJob")
 
 	query = `sum(max(kube_replicaset_spec_replicas) by (namespace,replicaset) * on (namespace,replicaset) group_right max(kube_replicaset_owner) by (namespace, replicaset, owner_name)) by (owner_name, namespace)`
-	result = prometheus.MetricCollect(args, collectArgs, "replicaSetSpecReplicas", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "replicaSetSpecReplicas", false)
 	if result != nil {
 		getMidMetric(result, "namespace", "owner_name", "currentSize", "Deployment")
 	}
@@ -515,7 +510,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//Container workloads
-	query = queryPrefix + `round(sum(irate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[5m])) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)*1000,1)` + querySuffix
+	query = queryPrefix + `round(sum(irate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[` + args.SampleRateString + `m])) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)*1000,1)` + querySuffix
 	getWorkload("cpu_mCores_workload", "CPU Utilization in mCores", query, "max", args)
 	getWorkload("cpu_mCores_workload", "Prometheus CPU Utilization in mCores", query, "avg", args)
 
@@ -535,7 +530,7 @@ func Metrics(args *common.Parameters) {
 		queryPrefix = `label_replace(`
 		querySuffix = `, "container_name", "$1", "container", "(.*)")`
 	}
-	query = queryPrefix + `sum(irate(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}[1h])) by (instance,pod,namespace,container)` + querySuffix
+	query = queryPrefix + `sum(irate(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}[` + args.SampleRateString + `m])) by (instance,pod,namespace,container)` + querySuffix
 	getWorkload("restarts", "Restarts", query, "max", args)
 
 	if args.LabelSuffix == "" {

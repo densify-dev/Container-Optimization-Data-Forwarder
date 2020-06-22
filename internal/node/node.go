@@ -39,16 +39,11 @@ func Metrics(args *common.Parameters) {
 	var haveNodeExport = true
 
 	//Start and end time + the prometheus address used for querying
-	range5Min := prometheus.TimeRange(args, historyInterval, time.Minute*5)
-
-	collectArgs := &prometheus.CollectionArgs{
-		Query: &query,
-		Range: &range5Min,
-	}
+	range5Min := prometheus.TimeRange(args, historyInterval)
 
 	//Query and store kubernetes node information/labels
 	query = "max(kube_node_labels) by (instance, label_beta_kubernetes_io_arch, label_beta_kubernetes_io_os, label_kubernetes_io_hostname, node)"
-	result = prometheus.MetricCollect(args, collectArgs, "nodes", true)
+	result = prometheus.MetricCollect(args, query, range5Min, "nodes", true)
 	if result == nil {
 		return
 	}
@@ -74,17 +69,17 @@ func Metrics(args *common.Parameters) {
 
 	//Additonal config/attribute queries
 	query = `kube_node_labels`
-	result = prometheus.MetricCollect(args, collectArgs, "nodeLabels", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "nodeLabels", false)
 	getNodeMetricString(result, "node", "nodeLabel")
 
 	//Additonal config/attribute queries
 	query = `kube_node_info`
-	result = prometheus.MetricCollect(args, collectArgs, "nodeInfo", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "nodeInfo", false)
 	getNodeMetricString(result, "node", "nodeInfo")
 
 	//Gets the network speed in bytes as an attribute/config value for each node
 	query = `label_replace(node_network_speed_bytes, "pod_ip", "$1", "instance", "(.*):.*")`
-	result = prometheus.MetricCollect(args, collectArgs, "networkSpeedBytes", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "networkSpeedBytes", false)
 	getNodeMetric(result, "node", "netSpeedBytes")
 
 	if result.(model.Matrix).Len() == 0 {
@@ -93,7 +88,7 @@ func Metrics(args *common.Parameters) {
 
 	//Queries the capacity fields of all nodes
 	query = `kube_node_status_capacity`
-	result = prometheus.MetricCollect(args, collectArgs, "statusCapacity", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "statusCapacity", false)
 
 	/*
 	  Some older versions of kube-state-metrics don't support kube_node_status_capacity.
@@ -107,21 +102,21 @@ func Metrics(args *common.Parameters) {
 	if result.(model.Matrix).Len() == 0 {
 		//capacity_cpu_cores query
 		query = `kube_node_status_capacity_cpu_cores`
-		result = prometheus.MetricCollect(args, collectArgs, "statusCapacityCpuCores", false)
+		result = prometheus.MetricCollect(args, query, range5Min, "statusCapacityCpuCores", false)
 		if result != nil {
 			getNodeMetric(result, "node", "capacity_cpu")
 		}
 
 		//capacity_memory_bytes query
 		query = `kube_node_status_capacity_memory_bytes`
-		result = prometheus.MetricCollect(args, collectArgs, "statusCapacityMemoryBytes", false)
+		result = prometheus.MetricCollect(args, query, range5Min, "statusCapacityMemoryBytes", false)
 		if result != nil {
 			getNodeMetric(result, "node", "capacity_mem")
 		}
 
 		//capacity_pods query
 		query = `kube_node_status_capacity_pods`
-		result = prometheus.MetricCollect(args, collectArgs, "statusCapacityPods", false)
+		result = prometheus.MetricCollect(args, query, range5Min, "statusCapacityPods", false)
 		if result != nil {
 			getNodeMetric(result, "node", "capacity_pod")
 		}
@@ -134,7 +129,7 @@ func Metrics(args *common.Parameters) {
 
 	//Queries the allocatable metric fields of all the nodes
 	query = `kube_node_status_allocatable`
-	result = prometheus.MetricCollect(args, collectArgs, "statusAllocatable", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "statusAllocatable", false)
 
 	/*
 	  Some older versions of kube-state-metrics don't support kube_node_status_allocatable.
@@ -147,19 +142,19 @@ func Metrics(args *common.Parameters) {
 	*/
 	if result.(model.Matrix).Len() == 0 {
 		query = `kube_node_status_allocatable_cpu_cores`
-		result = prometheus.MetricCollect(args, collectArgs, "statusAllocatableCpuCores", false)
+		result = prometheus.MetricCollect(args, query, range5Min, "statusAllocatableCpuCores", false)
 		if result != nil {
 			getNodeMetric(result, "node", "allocatable_cpu")
 		}
 
 		query = `kube_node_status_allocatable_memory_bytes`
-		result = prometheus.MetricCollect(args, collectArgs, "statusAllocatableMemoryBytes", false)
+		result = prometheus.MetricCollect(args, query, range5Min, "statusAllocatableMemoryBytes", false)
 		if result != nil {
 			getNodeMetric(result, "node", "allocatable_mem")
 		}
 
 		query = `kube_node_status_allocatable_pods`
-		result = prometheus.MetricCollect(args, collectArgs, "statusAllocatablePods", false)
+		result = prometheus.MetricCollect(args, query, range5Min, "statusAllocatablePods", false)
 		if result != nil {
 			getNodeMetric(result, "node", "allocatable_pod")
 		}
@@ -171,25 +166,25 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `sum(kube_pod_container_resource_limits_cpu_cores * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)*1000`
-	result = prometheus.MetricCollect(args, collectArgs, "cpuLimit", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "cpuLimit", false)
 	if result != nil {
 		getNodeMetric(result, "node", "cpuLimit")
 	}
 
 	query = `sum(kube_pod_container_resource_requests_cpu_cores * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)*1000`
-	result = prometheus.MetricCollect(args, collectArgs, "cpuRequest", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "cpuRequest", false)
 	if result != nil {
 		getNodeMetric(result, "node", "cpuRequest")
 	}
 
 	query = `sum(kube_pod_container_resource_limits_memory_bytes * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)/1024/1024`
-	result = prometheus.MetricCollect(args, collectArgs, "memLimit", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "memLimit", false)
 	if result != nil {
 		getNodeMetric(result, "node", "memLimit")
 	}
 
 	query = `sum(kube_pod_container_resource_requests_memory_bytes * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)/1024/1024`
-	result = prometheus.MetricCollect(args, collectArgs, "memRequest", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "memRequest", false)
 	if result != nil {
 		getNodeMetric(result, "node", "memRequest")
 	}
@@ -206,7 +201,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//Query and store prometheus total cpu uptime in seconds
-	query = `label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[5m])) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100, "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}` + args.SampleRateString + `)) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100, "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("cpu_utilization", "CPU Utilization", query, "max", args)
 
 	//Query and store prometheus node memory total in bytes
@@ -218,35 +213,35 @@ func Metrics(args *common.Parameters) {
 	getWorkload("memory_actual_workload", "Actual Memory Utilization", query, "max", args)
 
 	//Query and store prometheus node disk write in bytes
-	query = `label_replace(irate(node_disk_written_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_disk_written_bytes_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("disk_write_bytes", "Raw Disk Write Utilization", query, "max", args)
 
 	//Query and store prometheus node disk read in bytes
-	query = `label_replace(irate(node_disk_read_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_disk_read_bytes_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("disk_read_bytes", "Raw Disk Read Utilization", query, "max", args)
 
 	//Query and store prometheus total disk read uptime as a percentage
-	query = `label_replace(irate(node_disk_read_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_disk_read_time_seconds_total` + args.SampleRateString + `) / irate(node_disk_io_time_seconds_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("disk_read_ops", "Disk Read Operations", query, "max", args)
 
 	//Query and store prometheus total disk write uptime as a percentage
-	query = `label_replace(irate(node_disk_write_time_seconds_total[5m]) / irate(node_disk_io_time_seconds_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_disk_write_time_seconds_total` + args.SampleRateString + `) / irate(node_disk_io_time_seconds_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("disk_write_ops", "Disk Write Operations", query, "max", args)
 
 	//Query and store prometheus node recieved network data in bytes
-	query = `label_replace(irate(node_network_receive_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_network_receive_bytes_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("net_received_bytes", "Raw Net Received Utilization", query, "max", args)
 
 	//Query and store prometheus recieved network data in packets
-	query = `label_replace(irate(node_network_receive_packets_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_network_receive_packets_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("net_received_packets", "Network Packets Received", query, "max", args)
 
 	//Query and store prometheus total transmitted network data in bytes
-	query = `label_replace(irate(node_network_transmit_bytes_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_network_transmit_bytes_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("net_sent_bytes", "Raw Net Sent Utilization", query, "max", args)
 
 	//Query and store prometheus total transmitted network data in packets
-	query = `label_replace(irate(node_network_transmit_packets_total[5m]), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_network_transmit_packets_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("net_sent_packets", "Network Packets Sent", query, "max", args)
 
 }

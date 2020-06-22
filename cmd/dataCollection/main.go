@@ -28,21 +28,22 @@ var include string
 func initParameters() {
 	//Set default settings
 	var clusterName string
-	var promProtocol string = "http"
+	var promProtocol = "http"
 	var promAddr string
-	var promPort string = "9090"
-	var interval string = "hours"
-	var intervalSize int = 1
-	var history int = 1
+	var promPort = "9090"
+	var interval = "hours"
+	var intervalSize = 1
+	var history = 1
 	var offset int
-	var debug bool = false
-	var configFile string = "config"
-	var configPath string = "./config"
+	var debug = false
+	var configFile = "config"
+	var configPath = "./config"
+	var sampleRate = 5
 	include = "container,node,cluster"
 
 	//Temporary variables for procassing flags
 	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp string
-	var intervalSizeTemp, historyTemp, offsetTemp int
+	var intervalSizeTemp, historyTemp, offsetTemp, sampleRateTemp int
 	var debugTemp bool
 	var includeTemp string
 
@@ -71,6 +72,13 @@ func initParameters() {
 		intervalSizeTemp, err := strconv.ParseInt(tempEnvVar, 10, 64)
 		if err == nil {
 			intervalSize = int(intervalSizeTemp)
+		}
+	}
+
+	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_SAMPLERATE"); ok {
+		sampleRateTemp, err := strconv.ParseInt(tempEnvVar, 10, 64)
+		if err == nil {
+			sampleRate = int(sampleRateTemp)
 		}
 	}
 
@@ -116,6 +124,7 @@ func initParameters() {
 	flag.IntVar(&intervalSizeTemp, "intervalSize", intervalSize, "Interval size to be used for querying. eg. default of 1 with default interval of hours queries 1 last hour of info")
 	flag.IntVar(&historyTemp, "history", history, "Amount of time to go back for data collection works with the interval and intervalSize settings")
 	flag.IntVar(&offsetTemp, "offset", offset, "Amount of units (based on interval value) to offset the data collection backwards in time")
+	flag.IntVar(&sampleRateTemp, "sampleRate", sampleRate, "Rate of sample points to collect. default is 5 for 1 sample for every 5 minutes.")
 	flag.BoolVar(&debugTemp, "debug", debug, "Enable debug logging")
 	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
 	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
@@ -131,6 +140,7 @@ func initParameters() {
 		viper.SetDefault("prometheus_port", promPort)
 		viper.SetDefault("interval", interval)
 		viper.SetDefault("interval_size", intervalSize)
+		viper.SetDefault("sample_rate", sampleRate)
 		viper.SetDefault("history", history)
 		viper.SetDefault("offset", offset)
 		viper.SetDefault("debug", debug)
@@ -148,6 +158,7 @@ func initParameters() {
 			promPort = viper.GetString("prometheus_port")
 			interval = viper.GetString("interval")
 			intervalSize = viper.GetInt("interval_size")
+			sampleRate = viper.GetInt("sample_rate")
 			history = viper.GetInt("history")
 			offset = viper.GetInt("offset")
 			debug = viper.GetBool("debug")
@@ -169,6 +180,8 @@ func initParameters() {
 			interval = intervalTemp
 		case "intervalSize":
 			intervalSize = intervalSizeTemp
+		case "sampleRate":
+			sampleRate = sampleRateTemp
 		case "history":
 			history = historyTemp
 		case "offset":
@@ -202,18 +215,20 @@ func initParameters() {
 
 	params = &common.Parameters{
 
-		ClusterName:  &clusterName,
-		PromAddress:  &promAddr,
-		PromURL:      &promURL,
-		Interval:     &interval,
-		IntervalSize: &intervalSize,
-		History:      &history,
-		Offset:       &offset,
-		Debug:        debug,
-		InfoLogger:   infoLogger,
-		WarnLogger:   warnLogger,
-		ErrorLogger:  errorLogger,
-		DebugLogger:  debugLogger,
+		ClusterName:      &clusterName,
+		PromAddress:      &promAddr,
+		PromURL:          &promURL,
+		Interval:         &interval,
+		IntervalSize:     &intervalSize,
+		History:          &history,
+		Offset:           &offset,
+		Debug:            debug,
+		InfoLogger:       infoLogger,
+		WarnLogger:       warnLogger,
+		ErrorLogger:      errorLogger,
+		DebugLogger:      debugLogger,
+		SampleRate:       sampleRate,
+		SampleRateString: strconv.Itoa(sampleRate),
 	}
 }
 

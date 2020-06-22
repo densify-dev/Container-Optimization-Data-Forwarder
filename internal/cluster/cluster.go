@@ -70,14 +70,9 @@ func getWorkload(fileName, metricName, query string, args *common.Parameters) {
 	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
-		range5Min := prometheus.TimeRange(args, historyInterval, time.Minute*5)
+		range5Min := prometheus.TimeRange(args, historyInterval)
 
-		prometheusARGS := &prometheus.CollectionArgs{
-			Query: &query,
-			Range: &range5Min,
-		}
-
-		result = prometheus.MetricCollect(args, prometheusARGS, metricName, false)
+		result = prometheus.MetricCollect(args, query, range5Min, metricName, false)
 		if result != nil {
 			writeWorkload(workloadWrite, result, args)
 		}
@@ -174,33 +169,28 @@ func Metrics(args *common.Parameters) {
 	var result model.Value
 
 	//Start and end time + the prometheus address used for querying
-	range5Min := prometheus.TimeRange(args, historyInterval, time.Minute*5)
-
-	collectArgs := &prometheus.CollectionArgs{
-		Query: &query,
-		Range: &range5Min,
-	}
+	range5Min := prometheus.TimeRange(args, historyInterval)
 
 	query = `sum(kube_pod_container_resource_limits_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result = prometheus.MetricCollect(args, collectArgs, "cpuLimit", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "cpuLimit", false)
 	if result != nil {
 		getClusterMetric(result, "cpuLimit")
 	}
 
 	query = `sum(kube_pod_container_resource_requests_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result = prometheus.MetricCollect(args, collectArgs, "cpuRequest", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "cpuRequest", false)
 	if result != nil {
 		getClusterMetric(result, "cpuRequest")
 	}
 
 	query = `sum(kube_pod_container_resource_limits_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result = prometheus.MetricCollect(args, collectArgs, "memLimit", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "memLimit", false)
 	if result != nil {
 		getClusterMetric(result, "memLimit")
 	}
 
 	query = `sum(kube_pod_container_resource_requests_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result = prometheus.MetricCollect(args, collectArgs, "memRequest", false)
+	result = prometheus.MetricCollect(args, query, range5Min, "memRequest", false)
 	if result != nil {
 		getClusterMetric(result, "memRequest")
 	}

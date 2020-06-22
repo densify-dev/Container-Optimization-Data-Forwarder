@@ -13,4 +13,6 @@ type Parameters struct {
 	CurrentTime                                           *time.Time
 	LabelSuffix                                           string
 	InfoLogger, WarnLogger, ErrorLogger, DebugLogger      *log.Logger
+	SampleRate                                            int
+	SampleRateString                                      string
 }

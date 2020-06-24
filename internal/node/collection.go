@@ -96,8 +96,7 @@ func getNodeMetric(result model.Value, node model.LabelName, metric string) {
 	}
 }
 
-func getWorkload(fileName, metricName, query, aggregator string, args *common.Parameters) {
-	var query2 string
+func getWorkload(fileName, metricName, query string, metricfield model.LabelName, args *common.Parameters) {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
@@ -116,9 +115,8 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
 		range5Min := prometheus.TimeRange(args, historyInterval)
 
-		query2 = aggregator + "(" + aggregator + "(" + query + `) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
-		result = prometheus.MetricCollect(args, query2, range5Min, metricName, false)
-		writeWorkload(workloadWrite, result, "node", args)
+		result = prometheus.MetricCollect(args, query, range5Min, metricName, false)
+		writeWorkload(workloadWrite, result, metricfield, args)
 	}
 	//Close the workload files.
 	workloadWrite.Close()

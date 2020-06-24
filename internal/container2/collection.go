@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
@@ -109,7 +108,7 @@ func getContainerMetricString(result model.Value, namespace model.LabelName, pod
 		}
 		//loop through all the labels for an entity and store them in a map. For controller based entities where there will be multiple copies of containers they will have there values concatinated together.
 		for key, value := range result.(model.Matrix)[i].Metric {
-			addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].labelMap)
+			common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].labelMap)
 		}
 	}
 }
@@ -155,7 +154,7 @@ func getMidMetric(result model.Value, namespace model.LabelName, mid model.Label
 		case "creationTime":
 			systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].creationTime = value
 		default:
-			addToLabelMap(metric, strconv.FormatInt(value, 10), systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
+			common.AddToLabelMap(metric, strconv.FormatInt(value, 10), systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
 		}
 	}
 }
@@ -186,7 +185,7 @@ func getMidMetricString(result model.Value, namespace model.LabelName, mid model
 		}
 		//loop through all the labels for an entity and store them in a map. For controller based entities where there will be multiple copies of containers they will have there values concatinated together.
 		for key, value := range result.(model.Matrix)[i].Metric {
-			addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
+			common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
 		}
 	}
 }
@@ -214,20 +213,20 @@ func getHPAMetricString(result model.Value, namespace model.LabelName, hpa model
 		}
 		if _, ok := systems[string(namespaceValue)].pointers["Deployment__"+string(hpaValue)]; ok {
 			for key, value := range result.(model.Matrix)[i].Metric {
-				addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["Deployment__"+string(hpaValue)].labelMap)
+				common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["Deployment__"+string(hpaValue)].labelMap)
 			}
 		} else if _, ok := systems[string(namespaceValue)].pointers["ReplicaSet__"+string(hpaValue)]; ok {
 			for key, value := range result.(model.Matrix)[i].Metric {
-				addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["ReplicaSet__"+string(hpaValue)].labelMap)
+				common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["ReplicaSet__"+string(hpaValue)].labelMap)
 			}
 		} else if _, ok := systems[string(namespaceValue)].pointers["ReplicationController__"+string(hpaValue)]; ok {
 			for key, value := range result.(model.Matrix)[i].Metric {
-				addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["ReplicationController__"+string(hpaValue)].labelMap)
+				common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["ReplicationController__"+string(hpaValue)].labelMap)
 			}
 		} else {
 			hpas[string(hpaValue)] = map[string]string{}
 			for key, value := range result.(model.Matrix)[i].Metric {
-				addToLabelMap(string(key), string(value), hpas[string(hpaValue)])
+				common.AddToLabelMap(string(key), string(value), hpas[string(hpaValue)])
 			}
 		}
 	}
@@ -294,7 +293,7 @@ func getNamespaceMetricString(result model.Value, namespace model.LabelName) {
 		}
 		//loop through all the labels for an entity and store them in a map.
 		for key, value := range result.(model.Matrix)[i].Metric {
-			addToLabelMap(string(key), string(value), systems[string(namespaceValue)].labelMap)
+			common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].labelMap)
 		}
 	}
 }
@@ -477,49 +476,4 @@ func getHPAWorkload(fileName, metricName, query string, args *common.Parameters)
 		}
 	}
 	workloadWriteExtra.Close()
-}
-
-func addToLabelMap(key string, value string, labelPath map[string]string) {
-	if _, ok := labelPath[key]; !ok {
-		value = strings.Replace(value, "\n", "", -1)
-		if len(value) > 255 {
-			labelPath[key] = value[:255]
-		} else {
-			labelPath[key] = value
-		}
-		return
-	}
-
-	if strings.Contains(value, ";") {
-		currValue := ""
-		for _, l := range value {
-			currValue = currValue + string(l)
-			if l == ';' {
-				addToLabelMap(key, currValue[:len(currValue)-1], labelPath)
-				currValue = ""
-			}
-		}
-		addToLabelMap(key, currValue, labelPath)
-		return
-	}
-
-	currValue := ""
-	notPresent := true
-	for _, l := range labelPath[key] {
-		currValue = currValue + string(l)
-		if l == ';' {
-			if currValue[:len(currValue)-1] == value {
-				notPresent = false
-				break
-			}
-			currValue = ""
-		}
-	}
-	if currValue != value && notPresent {
-		if len(value) > 255 {
-			labelPath[key] = labelPath[key] + ";" + value[:255]
-		} else {
-			labelPath[key] = labelPath[key] + ";" + value
-		}
-	}
 }

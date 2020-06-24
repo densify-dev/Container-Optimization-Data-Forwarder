@@ -14,8 +14,7 @@ import (
 type node struct {
 
 	//Labels & general information about each node
-	nodeLabel                                                                     string
-	labelBetaKubernetesIoArch, labelBetaKubernetesIoOs, labelKubernetesIoHostname string
+	labelMap map[string]string
 
 	//Value fields
 	netSpeedBytes, cpuCapacity, memCapacity, ephemeralStorageCapacity, podsCapacity, hugepages2MiCapacity int
@@ -42,7 +41,7 @@ func Metrics(args *common.Parameters) {
 	range5Min := prometheus.TimeRange(args, historyInterval)
 
 	//Query and store kubernetes node information/labels
-	query = "max(kube_node_labels) by (instance, label_beta_kubernetes_io_arch, label_beta_kubernetes_io_os, label_kubernetes_io_hostname, node)"
+	query = "max(kube_node_labels) by (instance, node)"
 	result = prometheus.MetricCollect(args, query, range5Min, "nodes", true)
 	if result == nil {
 		return
@@ -51,11 +50,7 @@ func Metrics(args *common.Parameters) {
 	for i := 0; i < rsltIndex.Len(); i++ {
 		nodes[string(rsltIndex[i].Metric["node"])] =
 			&node{
-				//String labels for node
-				labelBetaKubernetesIoArch: string(rsltIndex[i].Metric["label_beta_kubernetes_io_arch"]),
-				labelBetaKubernetesIoOs:   string(rsltIndex[i].Metric["label_beta_kubernetes_io_os"]),
-				labelKubernetesIoHostname: string(rsltIndex[i].Metric["label_kubernetes_io_hostname"]),
-				nodeLabel:                 "",
+				labelMap: map[string]string{},
 
 				//Network speed attribute (set to -1 by default to make error checking more easy)
 				netSpeedBytes: -1,
@@ -201,7 +196,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//Query and store prometheus total cpu uptime in seconds
-	query = `label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}` + args.SampleRateString + `)) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100, "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[` + args.SampleRateString + `m])) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100, "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("cpu_utilization", "CPU Utilization", query, "max", args)
 
 	//Query and store prometheus node memory total in bytes
@@ -213,35 +208,35 @@ func Metrics(args *common.Parameters) {
 	getWorkload("memory_actual_workload", "Actual Memory Utilization", query, "max", args)
 
 	//Query and store prometheus node disk write in bytes
-	query = `label_replace(irate(node_disk_written_bytes_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_disk_written_bytes_total[` + args.SampleRateString + `m]), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("disk_write_bytes", "Raw Disk Write Utilization", query, "max", args)
 
 	//Query and store prometheus node disk read in bytes
-	query = `label_replace(irate(node_disk_read_bytes_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_disk_read_bytes_total[` + args.SampleRateString + `m]), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("disk_read_bytes", "Raw Disk Read Utilization", query, "max", args)
 
 	//Query and store prometheus total disk read uptime as a percentage
-	query = `label_replace(irate(node_disk_read_time_seconds_total` + args.SampleRateString + `) / irate(node_disk_io_time_seconds_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_disk_read_time_seconds_total[` + args.SampleRateString + `m]) / irate(node_disk_io_time_seconds_total[` + args.SampleRateString + `m]), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("disk_read_ops", "Disk Read Operations", query, "max", args)
 
 	//Query and store prometheus total disk write uptime as a percentage
-	query = `label_replace(irate(node_disk_write_time_seconds_total` + args.SampleRateString + `) / irate(node_disk_io_time_seconds_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_disk_write_time_seconds_total[` + args.SampleRateString + `m]) / irate(node_disk_io_time_seconds_total[` + args.SampleRateString + `m]), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("disk_write_ops", "Disk Write Operations", query, "max", args)
 
 	//Query and store prometheus node recieved network data in bytes
-	query = `label_replace(irate(node_network_receive_bytes_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_network_receive_bytes_total[` + args.SampleRateString + `m]), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("net_received_bytes", "Raw Net Received Utilization", query, "max", args)
 
 	//Query and store prometheus recieved network data in packets
-	query = `label_replace(irate(node_network_receive_packets_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_network_receive_packets_total[` + args.SampleRateString + `m]), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("net_received_packets", "Network Packets Received", query, "max", args)
 
 	//Query and store prometheus total transmitted network data in bytes
-	query = `label_replace(irate(node_network_transmit_bytes_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_network_transmit_bytes_total[` + args.SampleRateString + `m]), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("net_sent_bytes", "Raw Net Sent Utilization", query, "max", args)
 
 	//Query and store prometheus total transmitted network data in packets
-	query = `label_replace(irate(node_network_transmit_packets_total` + args.SampleRateString + `), "pod_ip", "$1", "instance", "(.*):.*")`
+	query = `label_replace(irate(node_network_transmit_packets_total[` + args.SampleRateString + `m]), "pod_ip", "$1", "instance", "(.*):.*")`
 	getWorkload("net_sent_packets", "Network Packets Sent", query, "max", args)
 
 }

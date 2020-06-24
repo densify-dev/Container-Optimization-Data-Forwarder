@@ -57,11 +57,26 @@ func writeConfig(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "cluster,node,OS Name,HW Total CPUs,HW Total Physical CPUs,HW Cores Per CPU,HW Threads Per Core,HW Total Memory,BM Max Network IO Bps")
+	fmt.Fprintln(configWrite, "cluster,node,HW Model,OS Name,HW Total CPUs,HW Total Physical CPUs,HW Cores Per CPU,HW Threads Per Core,HW Total Memory,BM Max Network IO Bps")
 
 	//Loop through the nodes and write out the config data for each system.
 	for kn := range nodes {
-		fmt.Fprintf(configWrite, "%s,%s,%s", *args.ClusterName, kn, nodes[kn].labelBetaKubernetesIoOs)
+		var os, instance string
+		if _, ok := nodes[kn].labelMap["label_kubernetes_io_os"]; ok {
+			os = "label_kubernetes_io_os"
+		} else {
+			os = "label_beta_kubernetes_io_os"
+		}
+
+		if value, ok := nodes[kn].labelMap["label_node_kubernetes_io_instance_type"]; ok {
+			instance = value
+		} else if value, ok := nodes[kn].labelMap["label_beta_kubernetes_io_instance_type"]; ok {
+			instance = value
+		} else {
+			instance = ""
+		}
+
+		fmt.Fprintf(configWrite, "%s,%s,%s,%s", *args.ClusterName, kn, instance, nodes[kn].labelMap[os])
 
 		if nodes[kn].cpuCapacity == -1 {
 			fmt.Fprintf(configWrite, ",,")
@@ -99,13 +114,36 @@ func writeAttributes(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,node,Virtual Technology,Virtual Domain,OS Architecture,Network Speed,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Capacity Pods,Capacity CPU,Capacity Memory,Capacity Ephemeral Storage,Capacity Huge Pages,Allocatable Pods,Allocatable CPU,Allocatable Memory,Allocatable Ephemeral Storage,Allocatable Huge Pages,Node Labels")
+	fmt.Fprintln(attributeWrite, "cluster,node,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,OS Architecture,Network Speed,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Capacity Pods,Capacity CPU,Capacity Memory,Capacity Ephemeral Storage,Capacity Huge Pages,Allocatable Pods,Allocatable CPU,Allocatable Memory,Allocatable Ephemeral Storage,Allocatable Huge Pages,Node Labels")
 
 	//Loop through the nodes and write out the attributes data for each system.
 	for kn := range nodes {
 
+		var beta, region, zone string
+		if _, ok := nodes[kn].labelMap["label_kubernetes_io_arch"]; ok {
+			beta = ""
+		} else {
+			beta = "beta_"
+		}
+
+		if value, ok := nodes[kn].labelMap["label_topology_kubernetes_io_region"]; ok {
+			region = value
+		} else if value, ok := nodes[kn].labelMap["label_failure_domain_beta_kubernetes_io_region"]; ok {
+			region = value
+		} else {
+			region = ""
+		}
+
+		if value, ok := nodes[kn].labelMap["label_topology_kubernetes_io_zone"]; ok {
+			zone = value
+		} else if value, ok := nodes[kn].labelMap["label_failure_domain_beta_kubernetes_io_zone"]; ok {
+			zone = value
+		} else {
+			zone = ""
+		}
+
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-		fmt.Fprintf(attributeWrite, "%s,%s,Nodes,%s,%s", *args.ClusterName, kn, *args.ClusterName, nodes[kn].labelBetaKubernetesIoArch)
+		fmt.Fprintf(attributeWrite, "%s,%s,Nodes,%s,%s,%s,%s", *args.ClusterName, kn, *args.ClusterName, region, zone, nodes[kn].labelMap["label_"+beta+"kubernetes_io_arch"])
 
 		if nodes[kn].netSpeedBytes == -1 {
 			fmt.Fprintf(attributeWrite, ",")
@@ -192,15 +230,22 @@ func writeAttributes(args *common.Parameters) {
 		}
 
 		if nodes[kn].hugepages2MiAllocatable == -1 {
-			fmt.Fprintf(attributeWrite, ",")
+			fmt.Fprintf(attributeWrite, ",,")
 		} else {
-			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].hugepages2MiAllocatable)
+			fmt.Fprintf(attributeWrite, ",%d,", nodes[kn].hugepages2MiAllocatable)
 		}
 
-		if nodes[kn].nodeLabel == "" {
-			fmt.Fprintf(attributeWrite, ",")
-		} else {
-			fmt.Fprintf(attributeWrite, ",%s", nodes[kn].nodeLabel)
+		for key, value := range nodes[kn].labelMap {
+			if len(key) >= 250 {
+				continue
+			}
+			value = strings.Replace(value, ",", " ", -1)
+			if len(value)+3+len(key) < 256 {
+				fmt.Fprintf(attributeWrite, key+" : "+value+"|")
+			} else {
+				templength := 256 - 3 - len(key)
+				fmt.Fprintf(attributeWrite, key+" : "+value[:templength]+"|")
+			}
 		}
 		fmt.Fprintf(attributeWrite, "\n")
 

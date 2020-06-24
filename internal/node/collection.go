@@ -9,7 +9,6 @@ package node
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
@@ -127,7 +126,6 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 
 //getNodeMetricString is used to parse the label based results from Prometheus related to Container Entities and store them in the systems data structure.
 func getNodeMetricString(result model.Value, node model.LabelName, metric string) {
-	var tempSystems = map[string]map[string]string{}
 	//Validate there is data in the results.
 	if result == nil {
 		return
@@ -141,37 +139,8 @@ func getNodeMetricString(result model.Value, node model.LabelName, metric string
 		if _, ok := nodes[string(nodeValue)]; !ok {
 			continue
 		}
-		if _, ok := tempSystems[string(nodeValue)]; !ok {
-			tempSystems[string(nodeValue)] = map[string]string{}
-		}
 		for key, value := range result.(model.Matrix)[i].Metric {
-			if _, ok := tempSystems[string(nodeValue)][string(key)]; !ok {
-				tempSystems[string(nodeValue)][string(key)] = strings.Replace(string(value), ",", ";", -1)
-			} else if strings.Contains(tempSystems[string(nodeValue)][string(key)], strings.Replace(string(value), ",", ";", -1)) {
-				tempSystems[string(nodeValue)][string(key)] += ";" + strings.Replace(string(value), ",", ";", -1)
-			}
+			common.AddToLabelMap(string(key), string(value), nodes[string(nodeValue)].labelMap)
 		}
-	}
-	//Process the temp data structure to produce 1 string that will written into specific variable in the system data structure.
-	for kn := range tempSystems {
-		tempAttr := ""
-		for key, value := range tempSystems[kn] {
-			//Validate the length of the key and value to be less then 256 characters when combined together per value in the attribute to be loaded.
-			if len(key) >= 250 {
-				continue
-			}
-			if len(value)+3+len(key) < 256 {
-				tempAttr += key + " : " + value + "|"
-			} else {
-				templength := 256 - 3 - len(key)
-				tempAttr += key + " : " + value[:templength] + "|"
-			}
-
-		}
-		//Write out the combined string into the variable in the systems data structure based on which metric you provided.
-		if metric == "nodeInfo" {
-			tempAttr = tempAttr[:len(tempAttr)-1]
-		}
-		nodes[kn].nodeLabel += tempAttr
 	}
 }

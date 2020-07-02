@@ -322,4 +322,22 @@ func Metrics(args *common.Parameters) {
 	query = `avg((sum(kube_pod_container_resource_requests_memory_bytes * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)/1024/1024) * on (node) group_right kube_node_labels{` + nodeGroupLabel + `=~".+"}) by (` + nodeGroupLabel + `)`
 	result = prometheus.MetricCollect(args, query, range5Min, "nodeGroupCPULimit", false)
 	getNodeGroupWorkload("memory_request_bytes", "Average Memory Request(Bytes) per Node Group", query, model.LabelName(nodeGroupLabel), args)
+
+	// Simple version: avg(label_replace(node_memory_MemTotal_bytes - node_memory_MemFree_bytes, "node", "$1", "instance", "(.*):*") * on (node) group_right kube_node_labels{label_agentpool=~".+"}) by (label_agentpool)
+	// Complicated version: avg((max(max(label_replace(node_memory_MemTotal_bytes - node_memory_MemFree_bytes, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)) * on (node) group_right kube_node_labels{label_cloud_google_com_gke_nodepool=~".+"}) by (label_cloud_google_com_gke_nodepool)
+
+	//Check to see which disk queries to use if instance is IP address that need to link to pod to get name or if instance = node name.
+	query = `max(max(label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[` + args.SampleRateString + `m])) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
+	result = prometheus.MetricCollect(args, query, range5Min, "testNodeWorkload", false)
+
+	var metricfield model.LabelName
+	queryPrefix := `avg(label_replace(`
+	querySuffix := `, "node", "$1", "instance", "(.*):*") * on (node) group_right kube_node_labels{` + nodeGroupLabel + `=~".+"}) by (` + nodeGroupLabel + `)`
+	if result.(model.Matrix).Len() != 0 {
+		queryPrefix = `avg((max(max(label_replace(`
+		querySuffix = `, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)) * on (node) group_right kube_node_labels{` + nodeGroupLabel + `=~".+"}) by (` + nodeGroupLabel + `)`
+	}
+	// // //Query and store prometheus node memory total in bytes
+	query = queryPrefix + `node_memory_MemTotal_bytes - node_memory_MemFree_bytes` + querySuffix
+	getNodeGroupWorkload("memory_raw_bytes", "Avg Node Group Raw Utilization", query, metricfield, args)
 }

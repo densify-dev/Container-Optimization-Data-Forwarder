@@ -276,7 +276,6 @@ func Metrics(args *common.Parameters) {
 	query = `avg(kube_node_labels) by (label_cloud_google_com_gke_nodepool,label_eks_amazonaws_com_nodegroup, label_agentpool, label_pool_name)`
 	result = prometheus.MetricCollect(args, query, range5Min, "nodeGroupingLabelLookup", false)
 	if result == nil {
-		fmt.Println("empty label resp")
 		return
 	}
 
@@ -287,7 +286,6 @@ func Metrics(args *common.Parameters) {
 	}
 
 	if nodeGroupLabel == "" {
-		fmt.Println("no label found")
 		return
 	}
 

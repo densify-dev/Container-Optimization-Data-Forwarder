@@ -21,6 +21,13 @@ type clusterStruct struct {
 	cpuLimit, cpuRequest, memLimit, memRequest int
 }
 
+type nodeGroupStruct struct {
+	nodes                                      []string
+	cpuLimit, cpuRequest, memLimit, memRequest int
+}
+
+var nodeGroups = map[string]*nodeGroupStruct{}
+
 //Map that labels and values will be stored in
 var clusterEntity = clusterStruct{}
 
@@ -51,6 +58,38 @@ func getClusterMetric(result model.Value, metric string) {
 		clusterEntity.memRequest = int(value)
 	}
 
+}
+
+//Gets node metrics from prometheus (and checks to see if they are valid)
+func getNodeGroupMetric(result model.Value, nodeGroupLabel model.LabelName, metric string) {
+
+	//Loop through the different entities in the results.
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
+		nodeGroup, ok := result.(model.Matrix)[i].Metric[nodeGroupLabel]
+		if !ok {
+			continue
+		}
+		if _, ok := nodeGroups[string(nodeGroup)]; !ok {
+			continue
+		}
+		//validates that the value of the entity is set and if not will default to 0
+		var value int
+		if len(result.(model.Matrix)[i].Values) != 0 {
+			value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+		}
+
+		switch metric {
+		case "cpuLimit":
+			nodeGroups[string(nodeGroup)].cpuLimit = int(value)
+		case "cpuRequest":
+			nodeGroups[string(nodeGroup)].cpuRequest = int(value)
+		case "memLimit":
+			nodeGroups[string(nodeGroup)].memLimit = int(value)
+		case "memRequest":
+			nodeGroups[string(nodeGroup)].memRequest = int(value)
+		}
+
+	}
 }
 
 func getWorkload(fileName, metricName, query string, args *common.Parameters) {
@@ -170,6 +209,26 @@ func writeConfig(args *common.Parameters) {
 	configWrite.Close()
 }
 
+//writeNodeGroupConfig will create the config.csv file that is will be sent Densify by the Forwarder.
+func writeNodeGroupConfig(args *common.Parameters) {
+
+	//Create the config file and open it for writing.
+	configWrite, err := os.Create("./data/node_group/config.csv")
+	if err != nil {
+		args.ErrorLogger.Println("entity=node_group message=" + err.Error())
+		fmt.Println("entity=node_group message=" + err.Error())
+		return
+	}
+
+	//Write out the header.
+	fmt.Fprintln(configWrite, "cluster,node_group,# of Nodes")
+
+	for nodeGroupName, nodeGroup := range nodeGroups {
+		fmt.Fprintf(configWrite, "%s,%s,%d\n", *args.ClusterName, nodeGroupName, len(nodeGroup.nodes))
+	}
+	configWrite.Close()
+}
+
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
 func writeAttributes(args *common.Parameters) {
 
@@ -209,6 +268,52 @@ func writeAttributes(args *common.Parameters) {
 		fmt.Fprintf(attributeWrite, ",\n")
 	} else {
 		fmt.Fprintf(attributeWrite, ",%d\n", clusterEntity.memRequest)
+	}
+
+	attributeWrite.Close()
+}
+
+//writeNodeGroupAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
+func writeNodeGroupAttributes(args *common.Parameters) {
+
+	//Create the attributes file and open it for writing
+	attributeWrite, err := os.Create("./data/node_group/attributes.csv")
+	if err != nil {
+		args.ErrorLogger.Println("entity=node_group message=" + err.Error())
+		fmt.Println("entity=node_group message=" + err.Error())
+		return
+	}
+
+	//Write out the header.
+	fmt.Fprintln(attributeWrite, "cluster,node_group,Virtual Technology,Virtual Domain,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request")
+
+	for nodeGroupName, nodeGroup := range nodeGroups {
+		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
+		fmt.Fprintf(attributeWrite, "%s,%s,Clusters,%s", *args.ClusterName, nodeGroupName, *args.ClusterName)
+
+		if clusterEntity.cpuLimit == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodeGroup.cpuLimit)
+		}
+
+		if clusterEntity.cpuRequest == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodeGroup.cpuRequest)
+		}
+
+		if clusterEntity.memLimit == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", nodeGroup.memLimit)
+		}
+
+		if clusterEntity.memRequest == -1 {
+			fmt.Fprintf(attributeWrite, ",\n")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d\n", nodeGroup.memRequest)
+		}
 	}
 
 	attributeWrite.Close()
@@ -271,8 +376,6 @@ func Metrics(args *common.Parameters) {
 	// Node group set of queries
 	var nodeGroupLabel string = ""
 
-	var nodeGroups map[string][]string = make(map[string][]string)
-
 	query = `avg(kube_node_labels) by (label_cloud_google_com_gke_nodepool,label_eks_amazonaws_com_nodegroup, label_agentpool, label_pool_name)`
 	result = prometheus.MetricCollect(args, query, range5Min, "nodeGroupingLabelLookup", false)
 	if result == nil {
@@ -297,23 +400,49 @@ func Metrics(args *common.Parameters) {
 	for i := range result.(model.Matrix) {
 		nodeGroup := string(result.(model.Matrix)[i].Metric[model.LabelName(nodeGroupLabel)])
 		node := string(result.(model.Matrix)[i].Metric[`node`])
-		nodeGroups[nodeGroup] = append(nodeGroups[nodeGroup], node)
+		if _, ok := nodeGroups[nodeGroup]; !ok {
+			nodeGroups[nodeGroup] = &nodeGroupStruct{cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
+		}
+		nodeGroups[nodeGroup].nodes = append(nodeGroups[nodeGroup].nodes, node)
 	}
 
+	query = `sum(sum(kube_pod_container_resource_limits_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node) * on (node) group_right kube_node_labels{` + nodeGroupLabel + `=~".+"}) by (` + nodeGroupLabel + `)`
+	result = prometheus.MetricCollect(args, query, range5Min, "cpuLimit", false)
+	if result != nil {
+		getNodeGroupMetric(result, model.LabelName(nodeGroupLabel), "cpuLimit")
+	}
+
+	query = `sum(sum(kube_pod_container_resource_requests_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node) * on (node) group_right kube_node_labels{` + nodeGroupLabel + `=~".+"}) by (` + nodeGroupLabel + `)`
+	result = prometheus.MetricCollect(args, query, range5Min, "cpuRequest", false)
+	if result != nil {
+		getNodeGroupMetric(result, model.LabelName(nodeGroupLabel), "cpuRequest")
+	}
+
+	query = `sum(sum(kube_pod_container_resource_limits_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node) * on (node) group_right kube_node_labels{` + nodeGroupLabel + `=~".+"}) by (` + nodeGroupLabel + `)`
+	result = prometheus.MetricCollect(args, query, range5Min, "memLimit", false)
+	if result != nil {
+		getNodeGroupMetric(result, model.LabelName(nodeGroupLabel), "memLimit")
+	}
+
+	query = `sum(sum(kube_pod_container_resource_requests_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node) * on (node) group_right kube_node_labels{` + nodeGroupLabel + `=~".+"}) by (` + nodeGroupLabel + `)`
+	result = prometheus.MetricCollect(args, query, range5Min, "memRequest", false)
+	if result != nil {
+		getNodeGroupMetric(result, model.LabelName(nodeGroupLabel), "memRequest")
+	}
+
+	writeNodeGroupAttributes(args)
+	writeNodeGroupConfig(args)
+
 	query = `avg((sum(kube_pod_container_resource_limits_cpu_cores * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)*1000) * on  (node) group_right kube_node_labels{` + nodeGroupLabel + `=~".+"}) by (` + nodeGroupLabel + `)`
-	result = prometheus.MetricCollect(args, query, range5Min, "nodeGroupCPULimit", false)
 	getNodeGroupWorkload("cpu_core_limit", "Average CPU Core Limit per Node Group", query, model.LabelName(nodeGroupLabel), args)
 
 	query = `avg((sum(kube_pod_container_resource_requests_cpu_cores * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)*1000) * on (node) group_right kube_node_labels{` + nodeGroupLabel + `=~".+"}) by (` + nodeGroupLabel + `)`
-	result = prometheus.MetricCollect(args, query, range5Min, "nodeGroupCPULimit", false)
 	getNodeGroupWorkload("cpu_core_request", "Average CPU Core Request per Node Group", query, model.LabelName(nodeGroupLabel), args)
 
 	query = `avg((sum(kube_pod_container_resource_limits_memory_bytes * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)/1024/1024) * on (node) group_right kube_node_labels{` + nodeGroupLabel + `=~".+"}) by (` + nodeGroupLabel + `)`
-	result = prometheus.MetricCollect(args, query, range5Min, "nodeGroupCPULimit", false)
 	getNodeGroupWorkload("memory_limit_bytes", "Average Memory Limit(Bytes) per Node Group", query, model.LabelName(nodeGroupLabel), args)
 
 	query = `avg((sum(kube_pod_container_resource_requests_memory_bytes * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)/1024/1024) * on (node) group_right kube_node_labels{` + nodeGroupLabel + `=~".+"}) by (` + nodeGroupLabel + `)`
-	result = prometheus.MetricCollect(args, query, range5Min, "nodeGroupCPULimit", false)
 	getNodeGroupWorkload("memory_request_bytes", "Average Memory Request(Bytes) per Node Group", query, model.LabelName(nodeGroupLabel), args)
 
 	//Check to see which disk queries to use if instance is IP address that need to link to pod to get name or if instance = node name.

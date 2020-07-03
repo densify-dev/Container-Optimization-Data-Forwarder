@@ -7,43 +7,11 @@ package node
 
 import (
 	"fmt"
-	"io"
-	"math"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
-	"github.com/prometheus/common/model"
 )
-
-//writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
-func writeWorkload(file io.Writer, result model.Value, node model.LabelName, args *common.Parameters) {
-	if result == nil {
-		return
-	}
-	//Loop through the results for the workload and validate that contains the required labels and that the entity exists in the systems data structure once validated will write out the workload for the system.
-	for i := 0; i < result.(model.Matrix).Len(); i++ {
-		nodeValue, ok := result.(model.Matrix)[i].Metric[node]
-		if !ok {
-			continue
-		}
-		if _, ok := nodes[string(nodeValue)]; !ok {
-			continue
-		}
-		//Loop through the different values over the interval and write out each one to the workload file.
-		for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-			var val model.SampleValue = 0
-			if !math.IsNaN(float64(result.(model.Matrix)[i].Values[j].Value)) && !math.IsInf(float64(result.(model.Matrix)[i].Values[j].Value), 0) {
-				val = result.(model.Matrix)[i].Values[j].Value
-			}
-			fmt.Fprintf(file, "%s,%s,%s,%f\n",
-				*args.ClusterName, strings.Replace(string(nodeValue), ";", ".", -1),
-				time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"),
-				val)
-		}
-	}
-}
 
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
 func writeConfig(args *common.Parameters) {

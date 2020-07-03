@@ -7,12 +7,7 @@ Used for collecting metric data. Mostly the same as the container collection but
 package node
 
 import (
-	"fmt"
-	"os"
-	"time"
-
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 )
 
@@ -94,32 +89,6 @@ func getNodeMetric(result model.Value, node model.LabelName, metric string) {
 			}
 		}
 	}
-}
-
-func getWorkload(fileName, metricName, query string, metricfield model.LabelName, args *common.Parameters) {
-	var historyInterval time.Duration
-	historyInterval = 0
-	var result model.Value
-	//Open the files that will be used for the workload data types and write out there headers.
-	workloadWrite, err := os.Create("./data/node/" + fileName + ".csv")
-	if err != nil {
-		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
-		fmt.Println("entity=" + entityKind + " message=" + err.Error())
-		return
-	}
-	fmt.Fprintf(workloadWrite, "cluster,node,Datetime,%s\n", metricName)
-
-	//If the History parameter is set to anything but default 1 then will loop through the calls starting with the current day\hour\minute interval and work backwards.
-	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
-	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
-	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
-		range5Min := prometheus.TimeRange(args, historyInterval)
-
-		result = prometheus.MetricCollect(args, query, range5Min, metricName, false)
-		writeWorkload(workloadWrite, result, metricfield, args)
-	}
-	//Close the workload files.
-	workloadWrite.Close()
 }
 
 //getNodeMetricString is used to parse the label based results from Prometheus related to Container Entities and store them in the systems data structure.

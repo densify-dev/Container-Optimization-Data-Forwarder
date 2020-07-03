@@ -8,13 +8,12 @@ import (
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 )
 
 //getContainerMetric is used to parse the results from Prometheus related to Container Entities and store them in the systems data structure.
 func getContainerMetric(result model.Value, namespace, pod, container model.LabelName, metric string) bool {
-	var status bool = false
+	var status = false
 	//Validate there is data in the results.
 	if result == nil {
 		return status
@@ -253,7 +252,7 @@ func getNamespacelimits(result model.Value, namespace model.LabelName) {
 			continue
 		}
 		//validates that the value of the entity is set and if not will default to 0
-		var value int = 0
+		var value int
 		if len(result.(model.Matrix)[i].Values) != 0 {
 			value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
 		}
@@ -317,26 +316,26 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
-		range5Min := prometheus.TimeRange(args, historyInterval)
+		range5Min := common.TimeRange(args, historyInterval)
 
 		//query containers under a pod with no owner
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left max(kube_pod_owner{owner_name="<none>"}) by (namespace, pod, container` + args.LabelSuffix + `)) by (pod,namespace,container` + args.LabelSuffix + `)`
-		result = prometheus.MetricCollect(args, query2, range5Min, "pod_"+metricName, false)
+		result = common.MetricCollect(args, query2, range5Min, "pod_"+metricName, false)
 		writeWorkload(workloadWrite, result, "namespace", "pod", model.LabelName("container"+args.LabelSuffix), args, "Pod")
 
 		//query containers under a controller with no owner
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (owner_name,owner_kind) max(kube_pod_owner) by (namespace, pod, owner_name, owner_kind)) by (owner_kind,owner_name,namespace,container` + args.LabelSuffix + `)`
-		result = prometheus.MetricCollect(args, query2, range5Min, "controller_"+metricName, false)
+		result = common.MetricCollect(args, query2, range5Min, "controller_"+metricName, false)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "")
 
 		//query containers under a deployment
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) max(label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)")) by (namespace, pod, replicaset) * on (replicaset, namespace) group_left (owner_name) max(kube_replicaset_owner{owner_kind="Deployment"}) by (namespace, replicaset, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
-		result = prometheus.MetricCollect(args, query2, range5Min, "deployment_"+metricName, false)
+		result = common.MetricCollect(args, query2, range5Min, "deployment_"+metricName, false)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "Deployment")
 
 		//query containers under a cron job
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) max(label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)")) by (namespace, pod, job) * on (job, namespace) group_left (owner_name) max(label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (namespace, job, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
-		result = prometheus.MetricCollect(args, query2, range5Min, "cronJob_"+metricName, false)
+		result = common.MetricCollect(args, query2, range5Min, "cronJob_"+metricName, false)
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "CronJob")
 
 	}
@@ -362,9 +361,9 @@ func getDeploymentWorkload(fileName, metricName, query string, args *common.Para
 
 	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
 		tempMap[int(historyInterval)] = map[string]map[string][]model.SamplePair{}
-		range5Min := prometheus.TimeRange(args, historyInterval)
+		range5Min := common.TimeRange(args, historyInterval)
 
-		result = prometheus.MetricCollect(args, query, range5Min, metricName, false)
+		result = common.MetricCollect(args, query, range5Min, metricName, false)
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
 				if _, ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]; !ok {
@@ -420,9 +419,9 @@ func getHPAWorkload(fileName, metricName, query string, args *common.Parameters)
 
 	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
 		tempMap[int(historyInterval)] = map[string]map[string][]model.SamplePair{}
-		range5Min := prometheus.TimeRange(args, historyInterval)
+		range5Min := common.TimeRange(args, historyInterval)
 
-		result = prometheus.MetricCollect(args, query, range5Min, metricName, false)
+		result = common.MetricCollect(args, query, range5Min, metricName, false)
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
 				if _, ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]; !ok {

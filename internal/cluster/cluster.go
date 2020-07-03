@@ -22,8 +22,8 @@ type clusterStruct struct {
 }
 
 type nodeGroupStruct struct {
-	nodes                                      []string
-	cpuLimit, cpuRequest, memLimit, memRequest int
+	nodes                                                                []string
+	cpuLimit, cpuRequest, cpuCapacity, memLimit, memRequest, memCapacity int
 }
 
 var nodeGroups = map[string]*nodeGroupStruct{}
@@ -83,10 +83,14 @@ func getNodeGroupMetric(result model.Value, nodeGroupLabel model.LabelName, metr
 			nodeGroups[string(nodeGroup)].cpuLimit = int(value)
 		case "cpuRequest":
 			nodeGroups[string(nodeGroup)].cpuRequest = int(value)
+		case "cpuCapacity":
+			nodeGroups[string(nodeGroup)].cpuCapacity = int(value)
 		case "memLimit":
 			nodeGroups[string(nodeGroup)].memLimit = int(value)
 		case "memRequest":
 			nodeGroups[string(nodeGroup)].memRequest = int(value)
+		case "memCapacity":
+			nodeGroups[string(nodeGroup)].memCapacity = int(value)
 		}
 
 	}
@@ -221,10 +225,23 @@ func writeNodeGroupConfig(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "cluster,node_group,# of Nodes")
+	fmt.Fprintln(configWrite, "cluster,node_group,# of Nodes,Total CPUs,Total Physical CPUs,Total Memory MB")
 
 	for nodeGroupName, nodeGroup := range nodeGroups {
-		fmt.Fprintf(configWrite, "%s,%s,%d\n", *args.ClusterName, nodeGroupName, len(nodeGroup.nodes))
+		fmt.Fprintf(configWrite, "%s,%s,%d", *args.ClusterName, nodeGroupName, len(nodeGroup.nodes))
+
+		if nodeGroup.cpuCapacity == -1 {
+			fmt.Fprintf(configWrite, ",,")
+		} else {
+			fmt.Fprintf(configWrite, ",%d,%d", nodeGroup.cpuCapacity, nodeGroup.cpuCapacity)
+		}
+
+		if nodeGroup.memCapacity == -1 {
+			fmt.Fprintf(configWrite, ",")
+		} else {
+			fmt.Fprintf(configWrite, ",%d", nodeGroup.memCapacity)
+		}
+		fmt.Fprintf(configWrite, "\n")
 	}
 	configWrite.Close()
 }
@@ -401,7 +418,7 @@ func Metrics(args *common.Parameters) {
 		nodeGroup := string(result.(model.Matrix)[i].Metric[model.LabelName(nodeGroupLabel)])
 		node := string(result.(model.Matrix)[i].Metric[`node`])
 		if _, ok := nodeGroups[nodeGroup]; !ok {
-			nodeGroups[nodeGroup] = &nodeGroupStruct{cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1}
+			nodeGroups[nodeGroup] = &nodeGroupStruct{cpuLimit: -1, cpuRequest: -1, cpuCapacity: -1, memLimit: -1, memRequest: -1, memCapacity: -1}
 		}
 		nodeGroups[nodeGroup].nodes = append(nodeGroups[nodeGroup].nodes, node)
 	}
@@ -428,6 +445,18 @@ func Metrics(args *common.Parameters) {
 	result = prometheus.MetricCollect(args, query, range5Min, "memRequest", false)
 	if result != nil {
 		getNodeGroupMetric(result, model.LabelName(nodeGroupLabel), "memRequest")
+	}
+
+	query = `sum(kube_node_status_capacity_cpu_cores * on (node) group_right kube_node_labels{` + nodeGroupLabel + `=~".+"}) by (` + nodeGroupLabel + `)`
+	result = prometheus.MetricCollect(args, query, range5Min, "cpuCapacity", false)
+	if result != nil {
+		getNodeGroupMetric(result, model.LabelName(nodeGroupLabel), "cpuCapacity")
+	}
+
+	query = `sum(kube_node_status_capacity_memory_bytes/1024/1024* on (node) group_right kube_node_labels{` + nodeGroupLabel + `=~".+"}) by (` + nodeGroupLabel + `)`
+	result = prometheus.MetricCollect(args, query, range5Min, "memCapacity", false)
+	if result != nil {
+		getNodeGroupMetric(result, model.LabelName(nodeGroupLabel), "memCapacity")
 	}
 
 	writeNodeGroupAttributes(args)

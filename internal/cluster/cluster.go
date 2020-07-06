@@ -165,23 +165,22 @@ func writeNodeGroupConfig(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "cluster,node_group,# of Nodes,Total CPUs,Total Physical CPUs,Total Memory MB")
+	fmt.Fprintln(configWrite, "cluster,node_group,HW Total CPUs,HW Total Physical CPUs,HW Cores Per CPU,HW Threads Per Core,HW Total Memory")
 
 	for nodeGroupName, nodeGroup := range nodeGroups {
-		fmt.Fprintf(configWrite, "%s,%s,%d", *args.ClusterName, nodeGroupName, len(nodeGroup.nodes))
+		fmt.Fprintf(configWrite, "%s,%s,", *args.ClusterName, nodeGroupName)
 
 		if nodeGroup.cpuCapacity == -1 {
-			fmt.Fprintf(configWrite, ",,")
+			fmt.Fprintf(configWrite, ",,1,1,")
 		} else {
-			fmt.Fprintf(configWrite, ",%d,%d", nodeGroup.cpuCapacity, nodeGroup.cpuCapacity)
+			fmt.Fprintf(configWrite, "%d,%d,1,1,", nodeGroup.cpuCapacity, nodeGroup.cpuCapacity)
 		}
 
 		if nodeGroup.memCapacity == -1 {
-			fmt.Fprintf(configWrite, ",")
+			fmt.Fprintf(configWrite, "\n")
 		} else {
-			fmt.Fprintf(configWrite, ",%d", nodeGroup.memCapacity)
+			fmt.Fprintf(configWrite, "%d\n", nodeGroup.memCapacity)
 		}
-		fmt.Fprintf(configWrite, "\n")
 	}
 	configWrite.Close()
 }
@@ -198,34 +197,34 @@ func writeNodeGroupAttributes(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,node_group,Virtual Technology,Virtual Domain,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request")
+	fmt.Fprintln(attributeWrite, "cluster,node_group,Virtual Technology,Virtual Domain,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Current Size")
 
 	for nodeGroupName, nodeGroup := range nodeGroups {
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-		fmt.Fprintf(attributeWrite, "%s,%s,Clusters,%s", *args.ClusterName, nodeGroupName, *args.ClusterName)
+		fmt.Fprintf(attributeWrite, "%s,%s,NodeGroup,%s,", *args.ClusterName, nodeGroupName, *args.ClusterName)
 
 		if clusterEntity.cpuLimit == -1 {
 			fmt.Fprintf(attributeWrite, ",")
 		} else {
-			fmt.Fprintf(attributeWrite, ",%d", nodeGroup.cpuLimit)
+			fmt.Fprintf(attributeWrite, "%d,", nodeGroup.cpuLimit)
 		}
 
 		if clusterEntity.cpuRequest == -1 {
 			fmt.Fprintf(attributeWrite, ",")
 		} else {
-			fmt.Fprintf(attributeWrite, ",%d", nodeGroup.cpuRequest)
+			fmt.Fprintf(attributeWrite, "%d,", nodeGroup.cpuRequest)
 		}
 
 		if clusterEntity.memLimit == -1 {
 			fmt.Fprintf(attributeWrite, ",")
 		} else {
-			fmt.Fprintf(attributeWrite, ",%d", nodeGroup.memLimit)
+			fmt.Fprintf(attributeWrite, "%d,", nodeGroup.memLimit)
 		}
 
 		if clusterEntity.memRequest == -1 {
-			fmt.Fprintf(attributeWrite, ",\n")
+			fmt.Fprintf(attributeWrite, "%d\n", len(nodeGroup.nodes))
 		} else {
-			fmt.Fprintf(attributeWrite, ",%d\n", nodeGroup.memRequest)
+			fmt.Fprintf(attributeWrite, "%d,%d\n", nodeGroup.memRequest, len(nodeGroup.nodes))
 		}
 	}
 

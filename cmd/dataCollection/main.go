@@ -14,14 +14,15 @@ import (
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/nodegroup"
 	"github.com/spf13/viper"
 )
 
 // Global structure used to store Forwarder instance parameters
 var params *common.Parameters
 
-// Parameter that allows user to control what levels they want to collect data on (cluster, node, container)
-var include string
+// Parameters that allows user to control what levels they want to collect data on (cluster, node, container)
+var includeContainer, includeNode, includeNodeGroup, includeCluster bool
 
 //initParamters will look for settings defined on the command line or in config.properties file and update accordingly. Also defines the default values for these variables.
 //Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
@@ -39,7 +40,7 @@ func initParameters() {
 	var configFile = "config"
 	var configPath = "./config"
 	var sampleRate = 5
-	include = "container,node,cluster"
+	var include = "container,node,cluster,nodegroup"
 
 	//Temporary variables for procassing flags
 	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp string
@@ -112,7 +113,7 @@ func initParameters() {
 	}
 
 	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_INCLUDE"); ok {
-		include = parseIncludeParam(tempEnvVar)
+		include = tempEnvVar
 	}
 
 	//Get the settings passed in from the command line and update the variables as required.
@@ -162,7 +163,7 @@ func initParameters() {
 			history = viper.GetInt("history")
 			offset = viper.GetInt("offset")
 			debug = viper.GetBool("debug")
-			include = parseIncludeParam(viper.GetString("include_list"))
+			include = viper.GetString("include_list")
 		}
 	}
 
@@ -189,7 +190,7 @@ func initParameters() {
 		case "debug":
 			debug = debugTemp
 		case "include-list":
-			include = parseIncludeParam(includeTemp)
+			include = includeTemp
 		}
 	}
 
@@ -230,17 +231,22 @@ func initParameters() {
 		SampleRate:       sampleRate,
 		SampleRateString: strconv.Itoa(sampleRate),
 	}
+	parseIncludeParam(include)
 }
 
-func parseIncludeParam(param string) string {
+func parseIncludeParam(param string) {
 	param = strings.ToLower(param)
-	var list string
 	for _, elem := range strings.Split(param, ",") {
-		if strings.Compare(elem, "cluster") == 0 || strings.Compare(elem, "node") == 0 || strings.Compare(elem, "container") == 0 || strings.Compare(elem, "") == 0 {
-			list += elem + ","
+		if strings.Compare(elem, "cluster") == 0 {
+			includeCluster = true
+		} else if strings.Compare(elem, "node") == 0 {
+			includeNode = true
+		} else if strings.Compare(elem, "container") == 0 {
+			includeContainer = true
+		} else if strings.Compare(elem, "nodegroup") == 0 {
+			includeNodeGroup = true
 		}
 	}
-	return list
 }
 
 //main function.
@@ -263,22 +269,28 @@ func main() {
 	}
 	params.CurrentTime = &currentTime
 
-	if !strings.Contains(include, "container") {
+	if includeContainer {
+		container2.Metrics(params)
+	} else {
 		params.InfoLogger.Println("Skipping container data collection")
 		fmt.Println("Skipping container data collection")
-	} else {
-		container2.Metrics(params)
 	}
-	if !strings.Contains(include, "node") {
+	if includeNode {
+		node.Metrics(params)
+	} else {
 		params.InfoLogger.Println("Skipping node data collection")
 		fmt.Println("Skipping node data collection")
-	} else {
-		node.Metrics(params)
 	}
-	if !strings.Contains(include, "cluster") {
+	if includeNodeGroup {
+		nodegroup.Metrics(params)
+	} else {
+		params.InfoLogger.Println("Skipping node group data collection")
+		fmt.Println("Skipping node group data collection")
+	}
+	if includeCluster {
+		cluster.Metrics(params)
+	} else {
 		params.InfoLogger.Println("Skipping cluster data collection")
 		fmt.Println("Skipping cluster data collection")
-	} else {
-		cluster.Metrics(params)
 	}
 }

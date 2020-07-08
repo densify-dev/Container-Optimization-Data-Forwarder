@@ -180,37 +180,37 @@ func Metrics(args *common.Parameters) {
 
 	var nodeGroupSuffix = ` * on (node) group_right kube_node_labels{` + string(nodeGroupLabel) + `=~".+"}) by (` + string(nodeGroupLabel) + `)`
 
-	query = `sum(sum(kube_pod_container_resource_limits_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)` + nodeGroupSuffix
+	query = `avg(sum(kube_pod_container_resource_limits_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)` + nodeGroupSuffix
 	result = common.MetricCollect(args, query, range5Min, "cpuLimit", false)
 	if result != nil {
 		getNodeGroupMetric(result, nodeGroupLabel, "cpuLimit")
 	}
 
-	query = `sum(sum(kube_pod_container_resource_requests_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)` + nodeGroupSuffix
+	query = `avg(sum(kube_pod_container_resource_requests_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)` + nodeGroupSuffix
 	result = common.MetricCollect(args, query, range5Min, "cpuRequest", false)
 	if result != nil {
 		getNodeGroupMetric(result, nodeGroupLabel, "cpuRequest")
 	}
 
-	query = `sum(sum(kube_pod_container_resource_limits_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)` + nodeGroupSuffix
+	query = `avg(sum(kube_pod_container_resource_limits_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)` + nodeGroupSuffix
 	result = common.MetricCollect(args, query, range5Min, "memLimit", false)
 	if result != nil {
 		getNodeGroupMetric(result, nodeGroupLabel, "memLimit")
 	}
 
-	query = `sum(sum(kube_pod_container_resource_requests_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)` + nodeGroupSuffix
+	query = `avg(sum(kube_pod_container_resource_requests_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)` + nodeGroupSuffix
 	result = common.MetricCollect(args, query, range5Min, "memRequest", false)
 	if result != nil {
 		getNodeGroupMetric(result, nodeGroupLabel, "memRequest")
 	}
 
-	query = `sum(kube_node_status_capacity_cpu_cores` + nodeGroupSuffix
+	query = `avg(kube_node_status_capacity_cpu_cores` + nodeGroupSuffix
 	result = common.MetricCollect(args, query, range5Min, "cpuCapacity", false)
 	if result != nil {
 		getNodeGroupMetric(result, nodeGroupLabel, "cpuCapacity")
 	}
 
-	query = `sum(kube_node_status_capacity_memory_bytes/1024/1024` + nodeGroupSuffix
+	query = `avg(kube_node_status_capacity_memory_bytes/1024/1024` + nodeGroupSuffix
 	result = common.MetricCollect(args, query, range5Min, "memCapacity", false)
 	if result != nil {
 		getNodeGroupMetric(result, nodeGroupLabel, "memCapacity")
@@ -244,9 +244,9 @@ func Metrics(args *common.Parameters) {
 	querySuffix := `, "node", "$1", "instance", "(.*):*")` + nodeGroupSuffix
 	querySuffixSum := `) by (instance), "node", "$1", "instance", "(.*):*")` + nodeGroupSuffix
 	if result.(model.Matrix).Len() != 0 {
-		queryPrefix = `avg((max(max(label_replace(`
-		queryPrefixSum = `avg((max(sum(label_replace(`
-		querySuffix = `, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node))` + nodeGroupSuffix
+		queryPrefix = `avg(max(label_replace(`
+		queryPrefixSum = `avg(sum(label_replace(`
+		querySuffix = `, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}` + nodeGroupSuffix
 		querySuffixSum = querySuffix
 	}
 

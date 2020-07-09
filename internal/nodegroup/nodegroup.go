@@ -4,6 +4,7 @@ package nodegroup
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
@@ -11,14 +12,36 @@ import (
 )
 
 type nodeGroupStruct struct {
-	nodes                                                                []string
-	cpuLimit, cpuRequest, cpuCapacity, memLimit, memRequest, memCapacity int
+	nodes                                                                             string
+	cpuLimit, cpuRequest, cpuCapacity, memLimit, memRequest, memCapacity, currentSize int
+	labelMap                                                                          map[string]string
 }
 
 var nodeGroups = map[string]*nodeGroupStruct{}
 
 //Hard-coded string for log file warnings
 var entityKind = "node_group"
+
+//getNodeMetricString is used to parse the label based results from Prometheus related to Container Entities and store them in the systems data structure.
+func getNodeMetricString(result model.Value, nodeGroup model.LabelName) {
+	//Validate there is data in the results.
+	if result == nil {
+		return
+	}
+	//Loop through the different entities in the results.
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
+		nodeGroupValue, ok := result.(model.Matrix)[i].Metric[nodeGroup]
+		if !ok {
+			continue
+		}
+		if _, ok := nodeGroups[string(nodeGroupValue)]; !ok {
+			continue
+		}
+		for key, value := range result.(model.Matrix)[i].Metric {
+			common.AddToLabelMap(string(key), string(value), nodeGroups[string(nodeGroupValue)].labelMap)
+		}
+	}
+}
 
 //Gets node metrics from prometheus (and checks to see if they are valid)
 func getNodeGroupMetric(result model.Value, nodeGroupLabel model.LabelName, metric string) {
@@ -57,7 +80,7 @@ func getNodeGroupMetric(result model.Value, nodeGroupLabel model.LabelName, metr
 }
 
 //writeNodeGroupConfig will create the config.csv file that is will be sent Densify by the Forwarder.
-func writeNodeGroupConfig(args *common.Parameters) {
+func writeConfig(args *common.Parameters) {
 
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/node_group/config.csv")
@@ -68,17 +91,31 @@ func writeNodeGroupConfig(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "cluster,node_group,HW Total CPUs,HW Total Physical CPUs,HW Cores Per CPU,HW Threads Per Core,HW Total Memory")
+	fmt.Fprintln(configWrite, "cluster,node_group,HW Total CPUs,HW Total Physical CPUs,HW Cores Per CPU,HW Threads Per Core,HW Total Memory,HW Model,OS Name")
 
 	for nodeGroupName, nodeGroup := range nodeGroups {
-		fmt.Fprintf(configWrite, "%s,%s,", *args.ClusterName, nodeGroupName)
+		var os, instance string
+		if _, ok := nodeGroup.labelMap["label_kubernetes_io_os"]; ok {
+			os = "label_kubernetes_io_os"
+		} else {
+			os = "label_beta_kubernetes_io_os"
+		}
+
+		if value, ok := nodeGroup.labelMap["label_node_kubernetes_io_instance_type"]; ok {
+			instance = value
+		} else if value, ok := nodeGroup.labelMap["label_beta_kubernetes_io_instance_type"]; ok {
+			instance = value
+		} else {
+			instance = ""
+		}
+
+		fmt.Fprintf(configWrite, "%s,%s,%s,%s,", *args.ClusterName, nodeGroupName, instance, nodeGroup.labelMap[os])
 
 		if nodeGroup.cpuCapacity == -1 {
 			fmt.Fprintf(configWrite, ",,1,1,")
 		} else {
 			fmt.Fprintf(configWrite, "%d,%d,1,1,", nodeGroup.cpuCapacity, nodeGroup.cpuCapacity)
 		}
-
 		if nodeGroup.memCapacity == -1 {
 			fmt.Fprintf(configWrite, "\n")
 		} else {
@@ -89,7 +126,7 @@ func writeNodeGroupConfig(args *common.Parameters) {
 }
 
 //writeNodeGroupAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
-func writeNodeGroupAttributes(args *common.Parameters) {
+func writeAttributes(args *common.Parameters) {
 
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/node_group/attributes.csv")
@@ -100,7 +137,7 @@ func writeNodeGroupAttributes(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,node_group,Virtual Technology,Virtual Domain,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Current Size")
+	fmt.Fprintln(attributeWrite, "cluster,node_group,Virtual Technology,Virtual Domain,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Current Size,Current Nodes,Node Labels")
 
 	for nodeGroupName, nodeGroup := range nodeGroups {
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
@@ -125,10 +162,23 @@ func writeNodeGroupAttributes(args *common.Parameters) {
 		}
 
 		if nodeGroup.memRequest == -1 {
-			fmt.Fprintf(attributeWrite, "%d\n", len(nodeGroup.nodes))
+			fmt.Fprintf(attributeWrite, "%d,%s,", nodeGroup.currentSize, nodeGroup.nodes[:len(nodeGroup.nodes)-1])
 		} else {
-			fmt.Fprintf(attributeWrite, "%d,%d\n", nodeGroup.memRequest, len(nodeGroup.nodes))
+			fmt.Fprintf(attributeWrite, "%d,%d,%s,", nodeGroup.memRequest, nodeGroup.currentSize, nodeGroup.nodes[:len(nodeGroup.nodes)-1])
 		}
+		for key, value := range nodeGroup.labelMap {
+			if len(key) >= 250 {
+				continue
+			}
+			value = strings.Replace(value, ",", " ", -1)
+			if len(value)+3+len(key) < 256 {
+				fmt.Fprintf(attributeWrite, key+" : "+value+"|")
+			} else {
+				templength := 256 - 3 - len(key)
+				fmt.Fprintf(attributeWrite, key+" : "+value[:templength]+"|")
+			}
+		}
+		fmt.Fprintf(attributeWrite, "\n")
 	}
 
 	attributeWrite.Close()
@@ -173,10 +223,13 @@ func Metrics(args *common.Parameters) {
 		nodeGroup := string(result.(model.Matrix)[i].Metric[model.LabelName(nodeGroupLabel)])
 		node := string(result.(model.Matrix)[i].Metric[`node`])
 		if _, ok := nodeGroups[nodeGroup]; !ok {
-			nodeGroups[nodeGroup] = &nodeGroupStruct{cpuLimit: -1, cpuRequest: -1, cpuCapacity: -1, memLimit: -1, memRequest: -1, memCapacity: -1}
+			nodeGroups[nodeGroup] = &nodeGroupStruct{cpuLimit: -1, cpuRequest: -1, cpuCapacity: -1, memLimit: -1, memRequest: -1, memCapacity: -1, labelMap: map[string]string{}}
 		}
-		nodeGroups[nodeGroup].nodes = append(nodeGroups[nodeGroup].nodes, node)
+		nodeGroups[nodeGroup].nodes = nodeGroups[nodeGroup].nodes + node + ";"
+		nodeGroups[nodeGroup].currentSize++
 	}
+
+	getNodeMetricString(result, nodeGroupLabel)
 
 	var nodeGroupSuffix = ` * on (node) group_right kube_node_labels{` + string(nodeGroupLabel) + `=~".+"}) by (` + string(nodeGroupLabel) + `)`
 
@@ -216,8 +269,8 @@ func Metrics(args *common.Parameters) {
 		getNodeGroupMetric(result, nodeGroupLabel, "memCapacity")
 	}
 
-	writeNodeGroupAttributes(args)
-	writeNodeGroupConfig(args)
+	writeAttributes(args)
+	writeConfig(args)
 
 	//Query and store prometheus CPU requests
 	query = `avg(sum((kube_pod_container_resource_requests_cpu_cores) * on (namespace,pod,container) group_left kube_pod_container_status_running)  by (node)` + nodeGroupSuffix

@@ -129,7 +129,7 @@ func initParameters() {
 	flag.BoolVar(&debugTemp, "debug", debug, "Enable debug logging")
 	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
 	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
-	flag.StringVar(&includeTemp, "include-list", include, "Comma separated list of data to include in collection (cluster, node, container) Ex: \"node,cluster\"")
+	flag.StringVar(&includeTemp, "includeList", include, "Comma separated list of data to include in collection (cluster, node, container) Ex: \"node,cluster\"")
 	flag.Parse()
 
 	//Set defaults for viper to use if setting not found in the config.properties file.
@@ -254,7 +254,7 @@ func main() {
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
-	params.InfoLogger.Println("Version 2.1.3-beta")
+	params.InfoLogger.Println("Version 2.2.0")
 
 	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
 	var t time.Time

@@ -12,7 +12,9 @@ THe order of precedence is Command Line, Config File, Environment Variables.
 | Interval | hours | PROMETHEUS_INTERVAL | interval | interval |
 | Interval Size | 1 | PROMETHEUS_INTERVALSIZE | interval_size | intervalSize |
 | History | 1 | PROMETHEUS_HISTORY | history | history | 
+| Sample Rate | 5 | PROMETHEUS_SAMPLERATE | sample_rate | sampleRate |
 | Offset | 0 | PROMETHEUS_OFFSET | offset | offset | 
+| Include List | container,node,nodegroup,cluster | INCLUDE_LIST | include_list | includeList |
 | Debug | false | PROMETHEUS_DEBUG | debug | debug |
 | Config File | config | PROMETHEUS_CONFIGFILE | N/A | file |
 | Config Path | ./config | PROMETHEUS_CONFIGPATH | N/A | path |

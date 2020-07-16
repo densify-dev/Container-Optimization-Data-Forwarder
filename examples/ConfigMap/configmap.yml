@@ -35,6 +35,8 @@ data :
    #interval <days|hours|minutes>
    #interval_size 1
    #history 1
+   #include_list container,node,nodegroup,cluster
+   #sample_rate 5
 
    ###################################################################
    # \ Client transfer settings / options

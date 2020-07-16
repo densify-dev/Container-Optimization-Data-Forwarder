@@ -5,19 +5,15 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
-	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 )
 
 //getContainerMetric is used to parse the results from Prometheus related to Container Entities and store them in the systems data structure.
 func getContainerMetric(result model.Value, namespace, pod, container model.LabelName, metric string) bool {
-	var status bool = false
+	var status = false
 	//Validate there is data in the results.
 	if result == nil {
 		return status
@@ -111,7 +107,7 @@ func getContainerMetricString(result model.Value, namespace model.LabelName, pod
 		}
 		//loop through all the labels for an entity and store them in a map. For controller based entities where there will be multiple copies of containers they will have there values concatinated together.
 		for key, value := range result.(model.Matrix)[i].Metric {
-			addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].labelMap)
+			common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].labelMap)
 		}
 	}
 }
@@ -157,7 +153,7 @@ func getMidMetric(result model.Value, namespace model.LabelName, mid model.Label
 		case "creationTime":
 			systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].creationTime = value
 		default:
-			addToLabelMap(metric, strconv.FormatInt(value, 10), systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
+			common.AddToLabelMap(metric, strconv.FormatInt(value, 10), systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
 		}
 	}
 }
@@ -188,13 +184,13 @@ func getMidMetricString(result model.Value, namespace model.LabelName, mid model
 		}
 		//loop through all the labels for an entity and store them in a map. For controller based entities where there will be multiple copies of containers they will have there values concatinated together.
 		for key, value := range result.(model.Matrix)[i].Metric {
-			addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
+			common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].labelMap)
 		}
 	}
 }
 
 //getHPAMetricString is used to parse the label based results from Prometheus related to mid Entities and store them in the systems data structure.
-func getHPAMetricString(result model.Value, namespace model.LabelName, hpa model.LabelName, clusterName string, promAddr string) {
+func getHPAMetricString(result model.Value, namespace model.LabelName, hpa model.LabelName, args *common.Parameters) {
 	hpas := map[string]map[string]string{}
 	//Validate there is data in the results.
 	if result == nil {
@@ -216,26 +212,26 @@ func getHPAMetricString(result model.Value, namespace model.LabelName, hpa model
 		}
 		if _, ok := systems[string(namespaceValue)].pointers["Deployment__"+string(hpaValue)]; ok {
 			for key, value := range result.(model.Matrix)[i].Metric {
-				addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["Deployment__"+string(hpaValue)].labelMap)
+				common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["Deployment__"+string(hpaValue)].labelMap)
 			}
 		} else if _, ok := systems[string(namespaceValue)].pointers["ReplicaSet__"+string(hpaValue)]; ok {
 			for key, value := range result.(model.Matrix)[i].Metric {
-				addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["ReplicaSet__"+string(hpaValue)].labelMap)
+				common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["ReplicaSet__"+string(hpaValue)].labelMap)
 			}
 		} else if _, ok := systems[string(namespaceValue)].pointers["ReplicationController__"+string(hpaValue)]; ok {
 			for key, value := range result.(model.Matrix)[i].Metric {
-				addToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["ReplicationController__"+string(hpaValue)].labelMap)
+				common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].pointers["ReplicationController__"+string(hpaValue)].labelMap)
 			}
 		} else {
 			hpas[string(hpaValue)] = map[string]string{}
 			for key, value := range result.(model.Matrix)[i].Metric {
-				addToLabelMap(string(key), string(value), hpas[string(hpaValue)])
+				common.AddToLabelMap(string(key), string(value), hpas[string(hpaValue)])
 			}
 		}
 	}
 	if len(hpas) > 0 {
-		writeHPAAttributes(clusterName, promAddr, hpas)
-		writeHPAConfig(clusterName, promAddr, hpas)
+		writeHPAAttributes(args, hpas)
+		writeHPAConfig(args, hpas)
 	}
 }
 
@@ -256,7 +252,7 @@ func getNamespacelimits(result model.Value, namespace model.LabelName) {
 			continue
 		}
 		//validates that the value of the entity is set and if not will default to 0
-		var value int = 0
+		var value int
 		if len(result.(model.Matrix)[i].Values) != 0 {
 			value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
 		}
@@ -296,29 +292,23 @@ func getNamespaceMetricString(result model.Value, namespace model.LabelName) {
 		}
 		//loop through all the labels for an entity and store them in a map.
 		for key, value := range result.(model.Matrix)[i].Metric {
-			addToLabelMap(string(key), string(value), systems[string(namespaceValue)].labelMap)
+			common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].labelMap)
 		}
 	}
 }
 
-func getWorkload(fileName, metricName, query, aggregator string, args *common.Parameters) string {
+func getWorkload(fileName, metricName, query, aggregator string, args *common.Parameters) {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
-	var start, end time.Time
 	var query2 string
-	var logLine string
-	var step time.Duration
-	if metricName == "Restarts" {
-		step = time.Hour
-	} else {
-		step = time.Minute * 5
-	}
-	errors := ""
+
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/" + aggregator + `_` + fileName + ".csv")
 	if err != nil {
-		return logger.LogError(map[string]string{"entity": entityKind, "metric": metricName, "query": query, "message": err.Error()}, "ERROR")
+		args.ErrorLogger.Println("entity=" + entityKind + " metric=" + metricName + " query=" + query + " message=" + err.Error())
+		fmt.Println("entity=" + entityKind + " metric=" + metricName + " query=" + query + " message=" + err.Error())
+		return
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,%s\n", metricName)
 
@@ -326,63 +316,44 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
-		start, end = prometheus.TimeRange(*args.Interval, *args.IntervalSize, *args.CurrentTime, historyInterval)
-		range5Min := v1.Range{Start: start, End: end, Step: step}
-
-		prometheusARGS := &prometheus.CollectionArgs{
-			EntityKind: &entityKind,
-			PromURL:    args.PromURL,
-			Query:      &query2,
-			Range:      &range5Min,
-		}
+		range5Min := common.TimeRange(args, historyInterval)
 
 		//query containers under a pod with no owner
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left max(kube_pod_owner{owner_name="<none>"}) by (namespace, pod, container` + args.LabelSuffix + `)) by (pod,namespace,container` + args.LabelSuffix + `)`
-		result, logLine = prometheus.MetricCollect(prometheusARGS, "pod_"+metricName, false)
-		writeWorkload(workloadWrite, result, "namespace", "pod", model.LabelName("container"+args.LabelSuffix), *args.ClusterName, *args.PromAddress, "Pod")
-		errors += logLine
+		result = common.MetricCollect(args, query2, range5Min, "pod_"+metricName, false)
+		writeWorkload(workloadWrite, result, "namespace", "pod", model.LabelName("container"+args.LabelSuffix), args, "Pod")
 
 		//query containers under a controller with no owner
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (owner_name,owner_kind) max(kube_pod_owner) by (namespace, pod, owner_name, owner_kind)) by (owner_kind,owner_name,namespace,container` + args.LabelSuffix + `)`
-		result, logLine = prometheus.MetricCollect(prometheusARGS, "controller_"+metricName, false)
-		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), *args.ClusterName, *args.PromAddress, "")
-		errors += logLine
+		result = common.MetricCollect(args, query2, range5Min, "controller_"+metricName, false)
+		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "")
 
 		//query containers under a deployment
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) max(label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)")) by (namespace, pod, replicaset) * on (replicaset, namespace) group_left (owner_name) max(kube_replicaset_owner{owner_kind="Deployment"}) by (namespace, replicaset, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
-		result, logLine = prometheus.MetricCollect(prometheusARGS, "deployment_"+metricName, false)
-		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), *args.ClusterName, *args.PromAddress, "Deployment")
-		errors += logLine
+		result = common.MetricCollect(args, query2, range5Min, "deployment_"+metricName, false)
+		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "Deployment")
 
 		//query containers under a cron job
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) max(label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)")) by (namespace, pod, job) * on (job, namespace) group_left (owner_name) max(label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (namespace, job, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
-		result, logLine = prometheus.MetricCollect(prometheusARGS, "cronJob_"+metricName, false)
-		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), *args.ClusterName, *args.PromAddress, "CronJob")
-		errors += logLine
+		result = common.MetricCollect(args, query2, range5Min, "cronJob_"+metricName, false)
+		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "CronJob")
 
 	}
 	//Close the workload files.
 	workloadWrite.Close()
-	return errors
 }
 
-func getDeploymentWorkload(fileName, metricName, query string, args *common.Parameters) string {
+func getDeploymentWorkload(fileName, metricName, query string, args *common.Parameters) {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
-	var start, end time.Time
-	var cluster, logLine string
-	errors := ""
 
-	if *args.ClusterName == "" {
-		cluster = *args.PromAddress
-	} else {
-		cluster = *args.ClusterName
-	}
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/deployment_" + fileName + ".csv")
 	if err != nil {
-		return logger.LogError(map[string]string{"query": query, "metric": metricName, "message": "File not found"}, "ERROR")
+		args.ErrorLogger.Println("metric=" + metricName + " query=" + query + " message=File not found")
+		fmt.Println("metric=" + metricName + " query=" + query + " message=File not found")
+		return
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,%s\n", metricName)
 
@@ -390,17 +361,9 @@ func getDeploymentWorkload(fileName, metricName, query string, args *common.Para
 
 	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
 		tempMap[int(historyInterval)] = map[string]map[string][]model.SamplePair{}
-		start, end = prometheus.TimeRange(*args.Interval, *args.IntervalSize, *args.CurrentTime, historyInterval)
-		range5Min := v1.Range{Start: start, End: end, Step: time.Minute * 5}
+		range5Min := common.TimeRange(args, historyInterval)
 
-		prometheusARGS := &prometheus.CollectionArgs{
-			EntityKind: &entityKind,
-			PromURL:    args.PromURL,
-			Query:      &query,
-			Range:      &range5Min,
-		}
-		result, logLine = prometheus.MetricCollect(prometheusARGS, metricName, false)
-		errors += logLine
+		result = common.MetricCollect(args, query, range5Min, metricName, false)
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
 				if _, ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]; !ok {
@@ -422,37 +385,32 @@ func getDeploymentWorkload(fileName, metricName, query string, args *common.Para
 			for c := range systems[n].midLevels[m].containers {
 				for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
 					for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
-						fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%f\n", cluster, n, midVal.name, midVal.kind, c, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+						fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%f\n", *args.ClusterName, n, midVal.name, midVal.kind, c, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
 					}
 				}
 			}
 		}
 	}
 	workloadWrite.Close()
-	return errors
 }
 
-func getHPAWorkload(fileName, metricName, query string, args *common.Parameters) string {
+func getHPAWorkload(fileName, metricName, query string, args *common.Parameters) {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
-	var start, end time.Time
-	var logLine string
-	var step time.Duration
-	if metricName == "Scaling Limited" {
-		step = time.Hour
-	} else {
-		step = time.Minute * 5
-	}
-	errors := ""
+
 	//Open the files that will be used for the workload data types and write out there headers.
 	workloadWrite, err := os.Create("./data/container/hpa_" + fileName + ".csv")
 	if err != nil {
-		return logger.LogError(map[string]string{"query": query, "metric": metricName, "message": "File not found"}, "ERROR")
+		args.ErrorLogger.Println("metric=" + metricName + " query=" + query + " message=File not found")
+		fmt.Println("metric=" + metricName + " query=" + query + " message=File not found")
+		return
 	}
 	workloadWriteExtra, err := os.Create("./data/hpa/hpa_extra_" + fileName + ".csv")
 	if err != nil {
-		return logger.LogError(map[string]string{"query": query, "metric": metricName, "message": "File not found"}, "ERROR")
+		args.ErrorLogger.Println("metric=" + metricName + " query=" + query + " message=File not found")
+		fmt.Println("metric=" + metricName + " query=" + query + " message=File not found")
+		return
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,HPA Name,Datetime,%s\n", metricName)
 	fmt.Fprintf(workloadWriteExtra, "cluster,namespace,entity_name,entity_type,container,HPA Name,Datetime,%s\n", metricName)
@@ -461,18 +419,9 @@ func getHPAWorkload(fileName, metricName, query string, args *common.Parameters)
 
 	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
 		tempMap[int(historyInterval)] = map[string]map[string][]model.SamplePair{}
-		start, end = prometheus.TimeRange(*args.Interval, *args.IntervalSize, *args.CurrentTime, historyInterval)
-		range5Min := v1.Range{Start: start, End: end, Step: step}
+		range5Min := common.TimeRange(args, historyInterval)
 
-		prometheusARGS := &prometheus.CollectionArgs{
-			EntityKind: &entityKind,
-			PromURL:    args.PromURL,
-			Query:      &query,
-			Range:      &range5Min,
-		}
-
-		result, logLine = prometheus.MetricCollect(prometheusARGS, metricName, false)
-		errors += logLine
+		result = common.MetricCollect(args, query, range5Min, metricName, false)
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
 				if _, ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]; !ok {
@@ -485,12 +434,6 @@ func getHPAWorkload(fileName, metricName, query string, args *common.Parameters)
 			}
 		}
 	}
-	var cluster string
-	if *args.ClusterName == "" {
-		cluster = *args.PromAddress
-	} else {
-		cluster = *args.ClusterName
-	}
 
 	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
 		for n := range systems {
@@ -499,19 +442,19 @@ func getHPAWorkload(fileName, metricName, query string, args *common.Parameters)
 				case "Deployment":
 					for c := range systems[n].pointers[m].containers {
 						for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
-							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", cluster, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", *args.ClusterName, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
 						}
 					}
 				case "ReplicaSet":
 					for c := range systems[n].pointers[m].containers {
 						for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
-							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", cluster, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", *args.ClusterName, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
 						}
 					}
 				case "ReplicationController":
 					for c := range systems[n].pointers[m].containers {
 						for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
-							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", cluster, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", *args.ClusterName, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
 						}
 					}
 				}
@@ -525,57 +468,11 @@ func getHPAWorkload(fileName, metricName, query string, args *common.Parameters)
 			for n := range tempMap[i] {
 				for m := range tempMap[i][n] {
 					for _, val := range tempMap[int(historyInterval)][n][m] {
-						fmt.Fprintf(workloadWriteExtra, "%s,%s,,,,%s,%s,%f\n", cluster, n, m, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+						fmt.Fprintf(workloadWriteExtra, "%s,%s,,,,%s,%s,%f\n", *args.ClusterName, n, m, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
 					}
 				}
 			}
 		}
 	}
 	workloadWriteExtra.Close()
-	return errors
-}
-
-func addToLabelMap(key string, value string, labelPath map[string]string) {
-	if _, ok := labelPath[key]; !ok {
-		value = strings.Replace(value, "\n", "", -1)
-		if len(value) > 255 {
-			labelPath[key] = value[:255]
-		} else {
-			labelPath[key] = value
-		}
-		return
-	}
-
-	if strings.Contains(value, ";") {
-		currValue := ""
-		for _, l := range value {
-			currValue = currValue + string(l)
-			if l == ';' {
-				addToLabelMap(key, currValue[:len(currValue)-1], labelPath)
-				currValue = ""
-			}
-		}
-		addToLabelMap(key, currValue, labelPath)
-		return
-	}
-
-	currValue := ""
-	notPresent := true
-	for _, l := range labelPath[key] {
-		currValue = currValue + string(l)
-		if l == ';' {
-			if currValue[:len(currValue)-1] == value {
-				notPresent = false
-				break
-			}
-			currValue = ""
-		}
-	}
-	if currValue != value && notPresent {
-		if len(value) > 255 {
-			labelPath[key] = labelPath[key] + ";" + value[:255]
-		} else {
-			labelPath[key] = labelPath[key] + ";" + value
-		}
-	}
 }

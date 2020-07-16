@@ -3,6 +3,8 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -11,37 +13,38 @@ import (
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/cluster"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/nodegroup"
 	"github.com/spf13/viper"
 )
 
 // Global structure used to store Forwarder instance parameters
 var params *common.Parameters
 
-// Parameter that allows user to control what levels they want to collect data on (cluster, node, container)
-var include string
+// Parameters that allows user to control what levels they want to collect data on (cluster, node, container)
+var includeContainer, includeNode, includeNodeGroup, includeCluster bool
 
 //initParamters will look for settings defined on the command line or in config.properties file and update accordingly. Also defines the default values for these variables.
 //Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
 func initParameters() {
 	//Set default settings
-	var clusterName string = ""
-	var promProtocol string = "http"
-	var promAddr string = ""
-	var promPort string = "9090"
-	var interval string = "hours"
-	var intervalSize int = 1
-	var history int = 1
-	var offset int = 0
-	var debug bool = false
-	var configFile string = "config"
-	var configPath string = "./config"
-	include = "container,node,cluster"
+	var clusterName string
+	var promProtocol = "http"
+	var promAddr string
+	var promPort = "9090"
+	var interval = "hours"
+	var intervalSize = 1
+	var history = 1
+	var offset int
+	var debug = false
+	var configFile = "config"
+	var configPath = "./config"
+	var sampleRate = 5
+	var include = "container,node,cluster,nodegroup"
 
 	//Temporary variables for procassing flags
 	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp string
-	var intervalSizeTemp, historyTemp, offsetTemp int
+	var intervalSizeTemp, historyTemp, offsetTemp, sampleRateTemp int
 	var debugTemp bool
 	var includeTemp string
 
@@ -70,6 +73,13 @@ func initParameters() {
 		intervalSizeTemp, err := strconv.ParseInt(tempEnvVar, 10, 64)
 		if err == nil {
 			intervalSize = int(intervalSizeTemp)
+		}
+	}
+
+	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_SAMPLERATE"); ok {
+		sampleRateTemp, err := strconv.ParseInt(tempEnvVar, 10, 64)
+		if err == nil {
+			sampleRate = int(sampleRateTemp)
 		}
 	}
 
@@ -103,7 +113,7 @@ func initParameters() {
 	}
 
 	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_INCLUDE"); ok {
-		include = parseIncludeParam(tempEnvVar)
+		include = tempEnvVar
 	}
 
 	//Get the settings passed in from the command line and update the variables as required.
@@ -115,10 +125,11 @@ func initParameters() {
 	flag.IntVar(&intervalSizeTemp, "intervalSize", intervalSize, "Interval size to be used for querying. eg. default of 1 with default interval of hours queries 1 last hour of info")
 	flag.IntVar(&historyTemp, "history", history, "Amount of time to go back for data collection works with the interval and intervalSize settings")
 	flag.IntVar(&offsetTemp, "offset", offset, "Amount of units (based on interval value) to offset the data collection backwards in time")
+	flag.IntVar(&sampleRateTemp, "sampleRate", sampleRate, "Rate of sample points to collect. default is 5 for 1 sample for every 5 minutes.")
 	flag.BoolVar(&debugTemp, "debug", debug, "Enable debug logging")
 	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
 	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
-	flag.StringVar(&includeTemp, "include-list", include, "Comma separated list of data to include in collection (cluster, node, container) Ex: \"node,cluster\"")
+	flag.StringVar(&includeTemp, "includeList", include, "Comma separated list of data to include in collection (cluster, node, container) Ex: \"node,cluster\"")
 	flag.Parse()
 
 	//Set defaults for viper to use if setting not found in the config.properties file.
@@ -130,6 +141,7 @@ func initParameters() {
 		viper.SetDefault("prometheus_port", promPort)
 		viper.SetDefault("interval", interval)
 		viper.SetDefault("interval_size", intervalSize)
+		viper.SetDefault("sample_rate", sampleRate)
 		viper.SetDefault("history", history)
 		viper.SetDefault("offset", offset)
 		viper.SetDefault("debug", debug)
@@ -147,10 +159,11 @@ func initParameters() {
 			promPort = viper.GetString("prometheus_port")
 			interval = viper.GetString("interval")
 			intervalSize = viper.GetInt("interval_size")
+			sampleRate = viper.GetInt("sample_rate")
 			history = viper.GetInt("history")
 			offset = viper.GetInt("offset")
 			debug = viper.GetBool("debug")
-			include = parseIncludeParam(viper.GetString("include_list"))
+			include = viper.GetString("include_list")
 		}
 	}
 
@@ -168,6 +181,8 @@ func initParameters() {
 			interval = intervalTemp
 		case "intervalSize":
 			intervalSize = intervalSizeTemp
+		case "sampleRate":
+			sampleRate = sampleRateTemp
 		case "history":
 			history = historyTemp
 		case "offset":
@@ -175,7 +190,7 @@ func initParameters() {
 		case "debug":
 			debug = debugTemp
 		case "include-list":
-			include = parseIncludeParam(includeTemp)
+			include = includeTemp
 		}
 	}
 
@@ -183,36 +198,63 @@ func initParameters() {
 
 	promURL := promProtocol + "://" + promAddr + ":" + promPort
 
-	params = &common.Parameters{
-		ClusterName:  &clusterName,
-		PromAddress:  &promAddr,
-		PromURL:      &promURL,
-		Interval:     &interval,
-		IntervalSize: &intervalSize,
-		History:      &history,
-		Offset:       &offset,
-		Debug:        debug,
+	logFile, err := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		log.Fatal(err)
 	}
+
+	var infoLogger, warnLogger, errorLogger, debugLogger *log.Logger
+
+	infoLogger = log.New(logFile, "[INFO] ", log.Ldate|log.Ltime|log.Lshortfile)
+	warnLogger = log.New(logFile, "[WARN] ", log.Ldate|log.Ltime|log.Lshortfile)
+	errorLogger = log.New(logFile, "[ERROR] ", log.Ldate|log.Ltime|log.Lshortfile)
+	debugLogger = log.New(logFile, "[DEBUG] ", log.Ldate|log.Ltime|log.Lshortfile)
+
+	if clusterName == "" {
+		clusterName = promAddr
+	}
+
+	params = &common.Parameters{
+
+		ClusterName:      &clusterName,
+		PromAddress:      &promAddr,
+		PromURL:          &promURL,
+		Interval:         &interval,
+		IntervalSize:     &intervalSize,
+		History:          &history,
+		Offset:           &offset,
+		Debug:            debug,
+		InfoLogger:       infoLogger,
+		WarnLogger:       warnLogger,
+		ErrorLogger:      errorLogger,
+		DebugLogger:      debugLogger,
+		SampleRate:       sampleRate,
+		SampleRateString: strconv.Itoa(sampleRate),
+	}
+	parseIncludeParam(include)
 }
 
-func parseIncludeParam(param string) string {
+func parseIncludeParam(param string) {
 	param = strings.ToLower(param)
-	var list string
 	for _, elem := range strings.Split(param, ",") {
-		if strings.Compare(elem, "cluster") == 0 || strings.Compare(elem, "node") == 0 || strings.Compare(elem, "container") == 0 || strings.Compare(elem, "") == 0 {
-			list += elem + ","
+		if strings.Compare(elem, "cluster") == 0 {
+			includeCluster = true
+		} else if strings.Compare(elem, "node") == 0 {
+			includeNode = true
+		} else if strings.Compare(elem, "container") == 0 {
+			includeContainer = true
+		} else if strings.Compare(elem, "nodegroup") == 0 {
+			includeNodeGroup = true
 		}
 	}
-	return list
 }
 
 //main function.
 func main() {
-	errors := "Version 2.1.2"
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
-	logger.SetPromAddr(*params.PromAddress)
+	params.InfoLogger.Println("Version 2.2.0")
 
 	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
 	var t time.Time
@@ -226,26 +268,29 @@ func main() {
 		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute()-*params.Offset, 0, 0, t.Location())
 	}
 	params.CurrentTime = &currentTime
-	//Open the debug log file for writing.
-	debugLog, _ := os.OpenFile("./data/log.txt", os.O_WRONLY|os.O_CREATE, 0644)
-	logger.PrintLog(errors, debugLog)
 
-	if !strings.Contains(include, "container") {
-		logger.PrintLog("\nSkipping container data collection", debugLog)
+	if includeContainer {
+		container2.Metrics(params)
 	} else {
-		errors = container2.Metrics(params)
-		logger.PrintLog(errors, debugLog)
+		params.InfoLogger.Println("Skipping container data collection")
+		fmt.Println("Skipping container data collection")
 	}
-	if !strings.Contains(include, "node") {
-		logger.PrintLog("\nSkipping node data collection", debugLog)
+	if includeNode {
+		node.Metrics(params)
 	} else {
-		errors = node.Metrics(params)
-		logger.PrintLog(errors, debugLog)
+		params.InfoLogger.Println("Skipping node data collection")
+		fmt.Println("Skipping node data collection")
 	}
-	if !strings.Contains(include, "cluster") {
-		logger.PrintLog("\nSkipping cluster data collection", debugLog)
+	if includeNodeGroup {
+		nodegroup.Metrics(params)
 	} else {
-		errors = cluster.Metrics(params)
-		logger.PrintLog(errors, debugLog)
+		params.InfoLogger.Println("Skipping node group data collection")
+		fmt.Println("Skipping node group data collection")
+	}
+	if includeCluster {
+		cluster.Metrics(params)
+	} else {
+		params.InfoLogger.Println("Skipping cluster data collection")
+		fmt.Println("Skipping cluster data collection")
 	}
 }

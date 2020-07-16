@@ -67,6 +67,7 @@ The following table lists Prometheus metrics and their usage.
 | Metric | Usage |
 |--------|-------|
 | kube_node_labels | Node labels |
+| kube_node_info | Node info |
 | node_network_speed_bytes | Network speed |
 | kube_node_status_capacity | Node capacity |
 | kube_node_status_capacity_cpu_cores | Node capacity CPU cores |
@@ -76,21 +77,47 @@ The following table lists Prometheus metrics and their usage.
 | kube_node_status_allocatable_cpu_cores | Node allocatable CPU cores |
 | kube_node_status_allocatable_memory_bytes | Node allocatable memory bytes |
 | kube_node_status_allocatable_pods | Node allocatable pods |
-| node_disk_written_bytes_total | Disk write bytes total (avg & max) |
-| node_disk_read_bytes_total | Disk read bytes total (avg & max) |
-| node_disk_write_time_seconds_total | Disk write operations (avg & max) |
-| node_disk_read_time_seconds_total | Disk read operations (avg & max) |
-| node_disk_io_time_seconds_total | Disk write operations (avg & max) & Disk read operations (avg & max) |
-| node_memory_MemTotal_bytes | Total memory bytes (avg & max) & Raw memory utilization (avg & max) & Actual memory utilization (avg & max) |
-| node_memory_MemFree_bytes | Raw memory utilization (avg & max) & Actual memory utilization (avg & max) |
-| node_memory_Cached_bytes | Actual memory utilization (avg & max) |
-| node_memory_Buffrees_bytes | Actual memory utilization (avg & max) |
-| node_memory_Active_bytes | Actual memory bytes (avg & max) |
-| node_network_recieve_bytes_total | Raw net received utilization (avg & max) |
-| node_network_recieve_packets_total | Network packets received (avg & max) |
-| node_network_transmit_bytes_total | Raw net sent utilization (avg & max) |
-| node_network_transmit_packets_total | Network packets sent (avg & max) |
-| node_cpu_seconds_total | CPU utilization (avg & max) |
+| node_disk_written_bytes_total | Disk write bytes total |
+| node_disk_read_bytes_total | Disk read bytes total |
+| node_disk_write_time_seconds_total | Disk write operations |
+| node_disk_read_time_seconds_total | Disk read operations |
+| node_disk_io_time_seconds_total | Disk write operations & Disk read operations |
+| node_memory_MemTotal_bytes | Total memory bytes & Raw memory utilization & Actual memory utilization |
+| node_memory_MemFree_bytes | Raw memory utilization & Actual memory utilization |
+| node_memory_Cached_bytes | Actual memory utilization |
+| node_memory_Buffrees_bytes | Actual memory utilization |
+| node_memory_Active_bytes | Actual memory bytes |
+| node_network_recieve_bytes_total | Raw net received utilization |
+| node_network_recieve_packets_total | Network packets received |
+| node_network_transmit_bytes_total | Raw net sent utilization |
+| node_network_transmit_packets_total | Network packets sent |
+| node_cpu_seconds_total | CPU utilization |
+
+## Node Group Metrics
+| Metric | Usage |
+|--------|-------|
+| kube_node_labels | Node Group labels |
+| kube_pod_container_resource_limits_cpu_cores | CPU limit (used for workload and attribute) |
+| kube_pod_container_resource_requests_cpu_cores | CPU requests (used for workload and attribute) |
+| kube_pod_container_resource_limits_memory_bytes | Memory limit (used for workload and attribute) |
+| kube_pod_container_resource_requests_memory_bytes | Memory requests (used for workload and attribute) |
+| kube_node_status_capacity_cpu_cores | Node Group avg capacity CPU cores |
+| kube_node_status_capacity_memory_bytes | Node Group avg capacity memory bytes |
+| node_disk_written_bytes_total | Disk write bytes total (avg) |
+| node_disk_read_bytes_total | Disk read bytes total (avg) |
+| node_disk_write_time_seconds_total | Disk write operations (avg) |
+| node_disk_read_time_seconds_total | Disk read operations (avg) |
+| node_disk_io_time_seconds_total | Disk write operations (avg) & Disk read operations (avg) |
+| node_memory_MemTotal_bytes | Total memory bytes (avg) & Raw memory utilization (avg) & Actual memory utilization (avg) |
+| node_memory_MemFree_bytes | Raw memory utilization (avg) & Actual memory utilization (avg) |
+| node_memory_Cached_bytes | Actual memory utilization (avg) |
+| node_memory_Buffrees_bytes | Actual memory utilization (avg) |
+| node_memory_Active_bytes | Actual memory bytes (avg) |
+| node_network_recieve_bytes_total | Raw net received utilization (avg) |
+| node_network_recieve_packets_total | Network packets received (avg) |
+| node_network_transmit_bytes_total | Raw net sent utilization (avg) |
+| node_network_transmit_packets_total | Network packets sent (avg) |
+| node_cpu_seconds_total | CPU utilization (avg) |
 
 ## Cluster Metrics
 | Metric | Usage |

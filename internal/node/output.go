@@ -7,66 +7,44 @@ package node
 
 import (
 	"fmt"
-	"io"
-	"math"
 	"os"
 	"strings"
-	"time"
 
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/logger"
-	"github.com/prometheus/common/model"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 )
 
-//writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
-func writeWorkload(file io.Writer, result model.Value, node model.LabelName, promAddr, cluster string) {
-	if result == nil {
-		return
-	}
-	//Loop through the results for the workload and validate that contains the required labels and that the entity exists in the systems data structure once validated will write out the workload for the system.
-	for i := 0; i < result.(model.Matrix).Len(); i++ {
-		nodeValue, ok := result.(model.Matrix)[i].Metric[node]
-		if !ok {
-			continue
-		}
-		if _, ok := nodes[string(nodeValue)]; !ok {
-			continue
-		}
-		//Loop through the different values over the interval and write out each one to the workload file.
-		for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-			var val model.SampleValue = 0
-			if !math.IsNaN(float64(result.(model.Matrix)[i].Values[j].Value)) && !math.IsInf(float64(result.(model.Matrix)[i].Values[j].Value), 0) {
-				val = result.(model.Matrix)[i].Values[j].Value
-			}
-			fmt.Fprintf(file, "%s,%s,%s,%f\n",
-				cluster, strings.Replace(string(nodeValue), ";", ".", -1),
-				time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"),
-				val)
-		}
-	}
-}
-
 //writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
-func writeConfig(clusterName, promAddr string) string {
-	errors := ""
-	var cluster string
-	if clusterName == "" {
-		cluster = promAddr
-	} else {
-		cluster = clusterName
-	}
+func writeConfig(args *common.Parameters) {
 
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/node/config.csv")
 	if err != nil {
-		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
+		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
+		fmt.Println("entity=" + entityKind + " message=" + err.Error())
+		return
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "cluster,node,OS Name,HW Total CPUs,HW Total Physical CPUs,HW Cores Per CPU,HW Threads Per Core,HW Total Memory,BM Max Network IO Bps")
+	fmt.Fprintln(configWrite, "cluster,node,HW Model,OS Name,HW Total CPUs,HW Total Physical CPUs,HW Cores Per CPU,HW Threads Per Core,HW Total Memory,BM Max Network IO Bps")
 
 	//Loop through the nodes and write out the config data for each system.
 	for kn := range nodes {
-		fmt.Fprintf(configWrite, "%s,%s,%s", cluster, kn, nodes[kn].labelBetaKubernetesIoOs)
+		var os, instance string
+		if _, ok := nodes[kn].labelMap["label_kubernetes_io_os"]; ok {
+			os = "label_kubernetes_io_os"
+		} else {
+			os = "label_beta_kubernetes_io_os"
+		}
+
+		if value, ok := nodes[kn].labelMap["label_node_kubernetes_io_instance_type"]; ok {
+			instance = value
+		} else if value, ok := nodes[kn].labelMap["label_beta_kubernetes_io_instance_type"]; ok {
+			instance = value
+		} else {
+			instance = ""
+		}
+
+		fmt.Fprintf(configWrite, "%s,%s,%s,%s", *args.ClusterName, kn, instance, nodes[kn].labelMap[os])
 
 		if nodes[kn].cpuCapacity == -1 {
 			fmt.Fprintf(configWrite, ",,")
@@ -79,7 +57,7 @@ func writeConfig(clusterName, promAddr string) string {
 		if nodes[kn].memCapacity == -1 {
 			fmt.Fprintf(configWrite, ",")
 		} else {
-			fmt.Fprintf(configWrite, ",%d", nodes[kn].memCapacity)
+			fmt.Fprintf(configWrite, ",%d", nodes[kn].memCapacity/1024/1024)
 		}
 
 		if nodes[kn].netSpeedBytes == -1 {
@@ -90,34 +68,50 @@ func writeConfig(clusterName, promAddr string) string {
 
 		fmt.Fprintf(configWrite, "\n")
 	}
-
-	return errors
 }
 
 //writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
-func writeAttributes(clusterName, promAddr string) string {
-	errors := ""
-	var cluster string
-	if clusterName == "" {
-		cluster = promAddr
-	} else {
-		cluster = clusterName
-	}
+func writeAttributes(args *common.Parameters) {
 
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/node/attributes.csv")
 	if err != nil {
-		return logger.LogError(map[string]string{"entity": entityKind, "message": err.Error()}, "ERROR")
+		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
+		fmt.Println("entity=" + entityKind + " message=" + err.Error())
+		return
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,node,Virtual Technology,Virtual Domain,OS Architecture,Network Speed,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Capacity Pods,Capacity CPU,Capacity Memory,Capacity Ephemeral Storage,Capacity Huge Pages,Allocatable Pods,Allocatable CPU,Allocatable Memory,Allocatable Ephemeral Storage,Allocatable Huge Pages,Node Labels")
+	fmt.Fprintln(attributeWrite, "cluster,node,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,OS Architecture,Network Speed,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Capacity Pods,Capacity CPU,Capacity Memory,Capacity Ephemeral Storage,Capacity Huge Pages,Allocatable Pods,Allocatable CPU,Allocatable Memory,Allocatable Ephemeral Storage,Allocatable Huge Pages,Node Labels")
 
 	//Loop through the nodes and write out the attributes data for each system.
 	for kn := range nodes {
 
+		var beta, region, zone string
+		if _, ok := nodes[kn].labelMap["label_kubernetes_io_arch"]; ok {
+			beta = ""
+		} else {
+			beta = "beta_"
+		}
+
+		if value, ok := nodes[kn].labelMap["label_topology_kubernetes_io_region"]; ok {
+			region = value
+		} else if value, ok := nodes[kn].labelMap["label_failure_domain_beta_kubernetes_io_region"]; ok {
+			region = value
+		} else {
+			region = ""
+		}
+
+		if value, ok := nodes[kn].labelMap["label_topology_kubernetes_io_zone"]; ok {
+			zone = value
+		} else if value, ok := nodes[kn].labelMap["label_failure_domain_beta_kubernetes_io_zone"]; ok {
+			zone = value
+		} else {
+			zone = ""
+		}
+
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-		fmt.Fprintf(attributeWrite, "%s,%s,Nodes,%s,%s", cluster, kn, cluster, nodes[kn].labelBetaKubernetesIoArch)
+		fmt.Fprintf(attributeWrite, "%s,%s,Nodes,%s,%s,%s,%s", *args.ClusterName, kn, *args.ClusterName, region, zone, nodes[kn].labelMap["label_"+beta+"kubernetes_io_arch"])
 
 		if nodes[kn].netSpeedBytes == -1 {
 			fmt.Fprintf(attributeWrite, ",")
@@ -204,19 +198,24 @@ func writeAttributes(clusterName, promAddr string) string {
 		}
 
 		if nodes[kn].hugepages2MiAllocatable == -1 {
-			fmt.Fprintf(attributeWrite, ",")
+			fmt.Fprintf(attributeWrite, ",,")
 		} else {
-			fmt.Fprintf(attributeWrite, ",%d", nodes[kn].hugepages2MiAllocatable)
+			fmt.Fprintf(attributeWrite, ",%d,", nodes[kn].hugepages2MiAllocatable)
 		}
 
-		if nodes[kn].nodeLabel == "" {
-			fmt.Fprintf(attributeWrite, ",")
-		} else {
-			fmt.Fprintf(attributeWrite, ",%s", nodes[kn].nodeLabel)
+		for key, value := range nodes[kn].labelMap {
+			if len(key) >= 250 {
+				continue
+			}
+			value = strings.Replace(value, ",", " ", -1)
+			if len(value)+3+len(key) < 256 {
+				fmt.Fprintf(attributeWrite, key+" : "+value+"|")
+			} else {
+				templength := 256 - 3 - len(key)
+				fmt.Fprintf(attributeWrite, key+" : "+value[:templength]+"|")
+			}
 		}
 		fmt.Fprintf(attributeWrite, "\n")
 
 	}
-
-	return errors
 }

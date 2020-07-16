@@ -1,14 +1,14 @@
 This section describes the prerequisites for Densify's Container Optimization data collection.
 
-- Densify account, which is provided with a Densify subscription or through a free trial. See www.densify.com/service/signup. 
-- Kubernetes or OpenShift 
+- Densify account. Contact Densify for details of your subscription or sign up for a free trial. See www.densify.com/service/signup. 
+- Kubernetes or OpenShift must be deployed
   - Running cAdvisor as part of the kubelet that by default, provides the workload and configuration data required by Densify. 
 - Prometheus
   - Provides monitoring/data aggregation layer. 
   - https://prometheus.io/
 - kube-state-metrics
   - Requires version 1.5.0 or newer. 
-  - Collects additional metrics from the Kubernetes API allowing Densify to get a complete picture of how the containers are setup. i.e. Replica Sets, Deployments, Pod and Container Labels.
+  - The collected metrics allow Densify to get a complete picture of how your containers are setup. i.e. Replica Sets, Deployments, Pod and Container Labels.
   - https://github.com/kubernetes/kube-state-metrics.
 The following item is not mandatory, but does provide additional environment information for Densify container optimization.
 - Node Exporter

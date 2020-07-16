@@ -1,3 +1,21 @@
+## 2.2.0
+* Add support for node groups
+* Use default logger
+* Add node info metric
+* Bug fix for network and disk rates on nodes
+
+## 2.1.2
+
+* Refactor and update to support new and older versions of Kubernetes for number of metrics. 
+
+## 2.1.1
+
+* Fix node memory metric name
+
+## 2.1.0
+
+* Added additional workloads
+
 ## 2.0.2
 
 * Update to permissions of data directory for when running as other users.

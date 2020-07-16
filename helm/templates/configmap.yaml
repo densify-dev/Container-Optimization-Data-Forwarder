@@ -36,7 +36,7 @@ data:
    ###################################################################
    prometheus_address {{ .Values.config.prometheus.hostname }}
    prometheus_port {{ .Values.config.prometheus.port }}
-   prometheus_protocol {{ .Values.config.prometheus.protocol }}   
+   #prometheus_protocol {{ .Values.config.prometheus.protocol }}
 {{- if .Values.config.prometheus.clustername }}      
     #<optional parameter that allows you to specify name to show for cluster in Densify. If not specified will use the prometheus_address>
    cluster_name {{ .Values.config.prometheus.clustername }}

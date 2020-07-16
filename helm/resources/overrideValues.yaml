@@ -19,6 +19,11 @@ config:
     hostname: <prometheus host name>
     port: <prometheus port>
 #    clustername: <cluster name>
+#    interval: <hours|days>
+#    intervalSize: 1
+#    history: 1
+#    sampleRate: 5
+#    includeList: container,node,nodegroup,cluster
 #===================
 # proxy settings    
 #===================

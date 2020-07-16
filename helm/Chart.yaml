@@ -1,7 +1,7 @@
 apiVersion: v1
 description: Densify Container Optimization Data Forwarder Utility
 name: container-optimization-data-forwarder
-version: 1.0.0
+version: 1.0.1
 keywords:
 - densify
 - container

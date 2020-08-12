@@ -92,7 +92,7 @@ func getNodeMetric(result model.Value, node model.LabelName, metric string) {
 }
 
 //getNodeMetricString is used to parse the label based results from Prometheus related to Container Entities and store them in the systems data structure.
-func getNodeMetricString(result model.Value, node model.LabelName, metric string) {
+func getNodeMetricString(result model.Value, node model.LabelName) {
 	//Validate there is data in the results.
 	if result == nil {
 		return

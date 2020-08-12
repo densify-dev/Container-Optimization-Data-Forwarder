@@ -14,14 +14,15 @@ import (
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/nodegroup"
 	"github.com/spf13/viper"
 )
 
 // Global structure used to store Forwarder instance parameters
 var params *common.Parameters
 
-// Parameter that allows user to control what levels they want to collect data on (cluster, node, container)
-var include string
+// Parameters that allows user to control what levels they want to collect data on (cluster, node, container)
+var includeContainer, includeNode, includeNodeGroup, includeCluster bool
 
 //initParamters will look for settings defined on the command line or in config.properties file and update accordingly. Also defines the default values for these variables.
 //Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
@@ -39,8 +40,8 @@ func initParameters() {
 	var configFile = "config"
 	var configPath = "./config"
 	var sampleRate = 5
+	var include = "container,node,cluster,nodegroup"
 	var oAuthTokenPath = ""
-	include = "container,node,cluster"
 
 	//Temporary variables for procassing flags
 	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp string
@@ -113,7 +114,7 @@ func initParameters() {
 	}
 
 	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_INCLUDE"); ok {
-		include = parseIncludeParam(tempEnvVar)
+		include = tempEnvVar
 	}
 
 	//Get the settings passed in from the command line and update the variables as required.
@@ -129,7 +130,7 @@ func initParameters() {
 	flag.BoolVar(&debugTemp, "debug", debug, "Enable debug logging")
 	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
 	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
-	flag.StringVar(&includeTemp, "include-list", include, "Comma separated list of data to include in collection (cluster, node, container) Ex: \"node,cluster\"")
+	flag.StringVar(&includeTemp, "includeList", include, "Comma separated list of data to include in collection (cluster, node, container) Ex: \"node,cluster\"")
 	flag.Parse()
 
 	//Set defaults for viper to use if setting not found in the config.properties file.
@@ -164,7 +165,7 @@ func initParameters() {
 			history = viper.GetInt("history")
 			offset = viper.GetInt("offset")
 			debug = viper.GetBool("debug")
-			include = parseIncludeParam(viper.GetString("include_list"))
+			include = viper.GetString("include_list")
 			oAuthTokenPath = viper.GetString("oauth_token_path")
 		}
 	}
@@ -192,7 +193,7 @@ func initParameters() {
 		case "debug":
 			debug = debugTemp
 		case "include-list":
-			include = parseIncludeParam(includeTemp)
+			include = includeTemp
 		}
 	}
 
@@ -234,17 +235,22 @@ func initParameters() {
 		SampleRateString: strconv.Itoa(sampleRate),
 		OAuthTokenPath:   oAuthTokenPath,
 	}
+	parseIncludeParam(include)
 }
 
-func parseIncludeParam(param string) string {
+func parseIncludeParam(param string) {
 	param = strings.ToLower(param)
-	var list string
 	for _, elem := range strings.Split(param, ",") {
-		if strings.Compare(elem, "cluster") == 0 || strings.Compare(elem, "node") == 0 || strings.Compare(elem, "container") == 0 || strings.Compare(elem, "") == 0 {
-			list += elem + ","
+		if strings.Compare(elem, "cluster") == 0 {
+			includeCluster = true
+		} else if strings.Compare(elem, "node") == 0 {
+			includeNode = true
+		} else if strings.Compare(elem, "container") == 0 {
+			includeContainer = true
+		} else if strings.Compare(elem, "nodegroup") == 0 {
+			includeNodeGroup = true
 		}
 	}
-	return list
 }
 
 //main function.
@@ -252,7 +258,7 @@ func main() {
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
-	params.InfoLogger.Println("Version 2.1.3-beta")
+	params.InfoLogger.Println("Version 2.2.0")
 
 	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
 	var t time.Time
@@ -267,22 +273,28 @@ func main() {
 	}
 	params.CurrentTime = &currentTime
 
-	if !strings.Contains(include, "container") {
+	if includeContainer {
+		container2.Metrics(params)
+	} else {
 		params.InfoLogger.Println("Skipping container data collection")
 		fmt.Println("Skipping container data collection")
-	} else {
-		container2.Metrics(params)
 	}
-	if !strings.Contains(include, "node") {
+	if includeNode {
+		node.Metrics(params)
+	} else {
 		params.InfoLogger.Println("Skipping node data collection")
 		fmt.Println("Skipping node data collection")
-	} else {
-		node.Metrics(params)
 	}
-	if !strings.Contains(include, "cluster") {
+	if includeNodeGroup {
+		nodegroup.Metrics(params)
+	} else {
+		params.InfoLogger.Println("Skipping node group data collection")
+		fmt.Println("Skipping node group data collection")
+	}
+	if includeCluster {
+		cluster.Metrics(params)
+	} else {
 		params.InfoLogger.Println("Skipping cluster data collection")
 		fmt.Println("Skipping cluster data collection")
-	} else {
-		cluster.Metrics(params)
 	}
 }

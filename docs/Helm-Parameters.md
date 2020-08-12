@@ -9,10 +9,15 @@ The following table lists the configurable parameters of the container-optimizat
 | `config.densify.protocol`        | Protocol for Densify server connectivity (http/https)           |                 |
 | `config.densify.user`            | Username to access Densify server                               |                 |
 | `config.densify.password`        | Password to access Densify server                               |                 |
-| `config.densify.epassword`       | Encrypted password for Densify server                             |                 |
+| `config.densify.epassword`       | Encrypted password for Densify server                           |                 |
 | `config.prometheus.hostname`     | Host Name / IP of the Prometheus server                         |                 |
 | `config.prometheus.port`         | Port to connect in Prometheus server                            |                 |
 | `config.prometheus.clustername`  | Prometheus cluster name (optional)                              |                 |
+| `config.prometheus.interval`     | Prometheus interval (hours/days) (optional)                     |                 |
+| `config.prometheus.intervalSize` | Prometheus interval size (optional)                             |                 |
+| `config.prometheus.history`      | Prometheus history (optional)                                   |                 |
+| `config.prometheus.sampleRate`   | Prometheus sample rate (optional)                               |                 |
+| `config.prometheus.includeList`  | Prometheus include list (container,node,nodegroup,cluster) (optional)                              |                 |
 | `config.zipEnabled`              | Controls whether contents are zipped before transmission        | true            |
 | `config.zipname`                 | Name of the zip file that archives the content                  |                 |
 | `config.proxy.host`              | Host Name of Proxy server                                   |                 |

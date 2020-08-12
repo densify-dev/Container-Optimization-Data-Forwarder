@@ -64,12 +64,12 @@ func Metrics(args *common.Parameters) {
 	//Additonal config/attribute queries
 	query = `kube_node_labels`
 	result = common.MetricCollect(args, query, range5Min, "nodeLabels", false)
-	getNodeMetricString(result, "node", "nodeLabel")
+	getNodeMetricString(result, "node")
 
 	//Additonal config/attribute queries
 	query = `kube_node_info`
 	result = common.MetricCollect(args, query, range5Min, "nodeInfo", false)
-	getNodeMetricString(result, "node", "nodeInfo")
+	getNodeMetricString(result, "node")
 
 	//Gets the network speed in bytes as an attribute/config value for each node
 	query = `label_replace(node_network_speed_bytes, "pod_ip", "$1", "instance", "(.*):.*")`

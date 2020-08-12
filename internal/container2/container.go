@@ -509,19 +509,19 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//Container workloads
-	query = queryPrefix + `round(sum(irate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[` + args.SampleRateString + `m])) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)*1000,1)` + querySuffix
+	query = queryPrefix + `round(max(irate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[` + args.SampleRateString + `m])) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)*1000,1)` + querySuffix
 	getWorkload("cpu_mCores_workload", "CPU Utilization in mCores", query, "max", args)
 	getWorkload("cpu_mCores_workload", "Prometheus CPU Utilization in mCores", query, "avg", args)
 
-	query = queryPrefix + `sum(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
+	query = queryPrefix + `max(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
 	getWorkload("mem_workload", "Raw Mem Utilization", query, "max", args)
 	getWorkload("mem_workload", "Prometheus Raw Mem Utilization", query, "avg", args)
 
-	query = queryPrefix + `sum(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
+	query = queryPrefix + `max(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
 	getWorkload("rss_workload", "Actual Memory Utilization", query, "max", args)
 	getWorkload("rss_workload", "Prometheus Actual Memory Utilization", query, "avg", args)
 
-	query = queryPrefix + `sum(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
+	query = queryPrefix + `max(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
 	getWorkload("disk_workload", "Raw Disk Utilization", query, "max", args)
 	getWorkload("disk_workload", "Prometheus Raw Disk Utilization", query, "avg", args)
 
@@ -529,7 +529,7 @@ func Metrics(args *common.Parameters) {
 		queryPrefix = `label_replace(`
 		querySuffix = `, "container_name", "$1", "container", "(.*)")`
 	}
-	query = queryPrefix + `sum(irate(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}[` + args.SampleRateString + `m])) by (instance,pod,namespace,container)` + querySuffix
+	query = queryPrefix + `max(irate(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}[` + args.SampleRateString + `m])) by (instance,pod,namespace,container)` + querySuffix
 	getWorkload("restarts", "Restarts", query, "max", args)
 
 	if args.LabelSuffix == "" {

@@ -24,6 +24,7 @@ config:
   prometheus:
     hostname:
     port:
+    protocol: http
 # controls whether contents are zipped before transmission    
   zipEnabled: true    
 # Name of the zip file that archives the content

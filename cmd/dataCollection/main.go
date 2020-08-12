@@ -166,7 +166,7 @@ func initParameters() {
 			offset = viper.GetInt("offset")
 			debug = viper.GetBool("debug")
 			include = viper.GetString("include_list")
-			oAuthTokenPath = viper.GetString("oauth_token_path")
+			oAuthTokenPath = viper.GetString("prometheus_oauth_token")
 		}
 	}
 

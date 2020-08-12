@@ -39,6 +39,7 @@ func initParameters() {
 	var configFile = "config"
 	var configPath = "./config"
 	var sampleRate = 5
+	var oAuthTokenPath = ""
 	include = "container,node,cluster"
 
 	//Temporary variables for procassing flags
@@ -145,6 +146,7 @@ func initParameters() {
 		viper.SetDefault("offset", offset)
 		viper.SetDefault("debug", debug)
 		viper.SetDefault("include_list", include)
+		viper.SetDefault("prometheus_oauth_token", oAuthTokenPath)
 		// Config import setup.
 		viper.SetConfigName(configFile)
 		viper.AddConfigPath(configPath)
@@ -163,6 +165,7 @@ func initParameters() {
 			offset = viper.GetInt("offset")
 			debug = viper.GetBool("debug")
 			include = parseIncludeParam(viper.GetString("include_list"))
+			oAuthTokenPath = viper.GetString("oauth_token_path")
 		}
 	}
 
@@ -229,6 +232,7 @@ func initParameters() {
 		DebugLogger:      debugLogger,
 		SampleRate:       sampleRate,
 		SampleRateString: strconv.Itoa(sampleRate),
+		OAuthTokenPath:   oAuthTokenPath,
 	}
 }
 

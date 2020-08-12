@@ -6,12 +6,14 @@ import (
 	"io"
 	"log"
 	"math"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 )
 
@@ -25,6 +27,7 @@ type Parameters struct {
 	InfoLogger, WarnLogger, ErrorLogger, DebugLogger      *log.Logger
 	SampleRate                                            int
 	SampleRateString                                      string
+	OAuthTokenPath                                        string
 }
 
 // Prometheus Objects
@@ -36,8 +39,12 @@ func MetricCollect(args *Parameters, query string, range5m v1.Range, metric stri
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	var roundTripper http.RoundTripper = &http.Transport{}
+	if args.OAuthTokenPath != "" {
+		roundTripper = config.NewBearerAuthFileRoundTripper(args.OAuthTokenPath, roundTripper)
+	}
 	//Setup the API client connection
-	client, err := api.NewClient(api.Config{Address: *args.PromURL})
+	client, err := api.NewClient(api.Config{Address: *args.PromURL, RoundTripper: roundTripper})
 	if err != nil {
 		args.WarnLogger.Println("metric=" + metric + " query=" + query + " message=" + err.Error())
 		fmt.Println("metric=" + metric + " query=" + query + " message=" + err.Error())

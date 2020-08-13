@@ -3,10 +3,8 @@ package common
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
@@ -45,16 +43,15 @@ func MetricCollect(args *Parameters, query string, range5m v1.Range, metric stri
 
 	tlsClientConfig := &tls.Config{}
 	if args.CaCertPath != "" {
-		cert, err := ioutil.ReadFile(args.CaCertPath)
+		tmpTLSConfig, err := config.NewTLSConfig(&config.TLSConfig{
+			CAFile: args.CaCertPath,
+		})
 		if err != nil {
-			log.Fatalf("Could not read CA file:%v", err)
+			log.Fatalf("Failed to generate TLS config:%v", err)
 		}
-
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(cert)
-
-		tlsClientConfig.ClientCAs = caCertPool
+		tlsClientConfig = tmpTLSConfig
 	}
+
 	var roundTripper http.RoundTripper = &http.Transport{
 		TLSClientConfig: tlsClientConfig,
 	}

@@ -2,8 +2,11 @@ package common
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
@@ -28,6 +31,7 @@ type Parameters struct {
 	SampleRate                                            int
 	SampleRateString                                      string
 	OAuthTokenPath                                        string
+	CaCertPath                                            string
 }
 
 // Prometheus Objects
@@ -39,7 +43,22 @@ func MetricCollect(args *Parameters, query string, range5m v1.Range, metric stri
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var roundTripper http.RoundTripper = &http.Transport{}
+	tlsClientConfig := &tls.Config{}
+	if args.CaCertPath != "" {
+		cert, err := ioutil.ReadFile(args.CaCertPath)
+		if err != nil {
+			log.Fatalf("Could not read CA file:%v", err)
+		}
+
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(cert)
+
+		tlsClientConfig.ClientCAs = caCertPool
+	}
+	var roundTripper http.RoundTripper = &http.Transport{
+		TLSClientConfig: tlsClientConfig,
+	}
+
 	if args.OAuthTokenPath != "" {
 		roundTripper = config.NewBearerAuthFileRoundTripper(args.OAuthTokenPath, roundTripper)
 	}

@@ -42,6 +42,7 @@ func initParameters() {
 	var sampleRate = 5
 	var include = "container,node,cluster,nodegroup"
 	var oAuthTokenPath = ""
+	var caCertPath = ""
 
 	//Temporary variables for procassing flags
 	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp string
@@ -148,6 +149,7 @@ func initParameters() {
 		viper.SetDefault("debug", debug)
 		viper.SetDefault("include_list", include)
 		viper.SetDefault("prometheus_oauth_token", oAuthTokenPath)
+		viper.SetDefault("ca_certificate", caCertPath)
 		// Config import setup.
 		viper.SetConfigName(configFile)
 		viper.AddConfigPath(configPath)
@@ -167,6 +169,7 @@ func initParameters() {
 			debug = viper.GetBool("debug")
 			include = viper.GetString("include_list")
 			oAuthTokenPath = viper.GetString("prometheus_oauth_token")
+			caCertPath = viper.GetString("ca_certificate")
 		}
 	}
 
@@ -234,6 +237,7 @@ func initParameters() {
 		SampleRate:       sampleRate,
 		SampleRateString: strconv.Itoa(sampleRate),
 		OAuthTokenPath:   oAuthTokenPath,
+		CaCertPath:       caCertPath,
 	}
 	parseIncludeParam(include)
 }

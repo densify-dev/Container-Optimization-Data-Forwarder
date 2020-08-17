@@ -38,6 +38,9 @@ data :
    #include_list container,node,nodegroup,cluster
    #sample_rate 5
 
+   #prometheus_oauth_token /var/run/secrets/kubernetes.io/serviceaccount/token
+   #ca_certificate /var/run/secrets/kubernetes.io/serviceaccount/token
+
    ###################################################################
    # \ Client transfer settings / options
    ###################################################################

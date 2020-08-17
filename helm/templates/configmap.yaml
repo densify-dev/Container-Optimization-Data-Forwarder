@@ -23,9 +23,9 @@ data:
    endpoint /CIRBA/api/v2/
    
    user {{ .Values.config.densify.user }}
-{{- if .Values.config.densify.password }}   
+{{- if .Values.config.densify.password }}
    password {{ .Values.config.densify.password }}
-{{- end }}   
+{{- end }}
 {{- if .Values.config.densify.epassword }}
    # <override plaintext; use result of Encrypt.jar>
    epassword {{ .Values.config.densify.epassword }}
@@ -37,25 +37,25 @@ data:
    prometheus_address {{ .Values.config.prometheus.hostname }}
    prometheus_port {{ .Values.config.prometheus.port }}
    #prometheus_protocol {{ .Values.config.prometheus.protocol }}
-{{- if .Values.config.prometheus.clustername }}      
+{{- if .Values.config.prometheus.clustername }}
     #<optional parameter that allows you to specify name to show for cluster in Densify. If not specified will use the prometheus_address>
    cluster_name {{ .Values.config.prometheus.clustername }}
-{{- end }} 
-{{- if .Values.config.prometheus.interval }}  
+{{- end }}
+{{- if .Values.config.prometheus.interval }}
    interval {{ .Values.config.prometheus.interval }}
-{{- end }} 
-{{- if .Values.config.prometheus.intervalSize }}  
+{{- end }}
+{{- if .Values.config.prometheus.intervalSize }}
    interval_size {{ .Values.config.prometheus.intervalSize }}
-{{- end }} 
-{{- if .Values.config.prometheus.history }}  
+{{- end }}
+{{- if .Values.config.prometheus.history }}
    history {{ .Values.config.prometheus.history }}
-{{- end }} 
-{{- if .Values.config.prometheus.includeList }}  
+{{- end }}
+{{- if .Values.config.prometheus.includeList }}
    include_list {{ .Values.config.prometheus.includeList }}
-{{- end }} 
-{{- if .Values.config.prometheus.sampleRate }}  
+{{- end }}
+{{- if .Values.config.prometheus.sampleRate }}
    sample_rate {{ .Values.config.prometheus.sampleRate }}
-{{- end }} 
+{{- end }}
 
 
    ###################################################################
@@ -84,21 +84,21 @@ data:
    #  Provide information for proxyhost access
    # \ Will only come into play if proxyhost field defined
    ###################################################################
-{{- if .Values.config.proxy }}    
+{{- if .Values.config.proxy }}
    proxyhost  {{ .Values.config.proxy.host }}
    proxyport {{ .Values.config.proxy.port }}
    proxyprotocol {{ .Values.config.proxy.protocol }}
    # <Basic|NTLM>
-   proxyauth {{ .Values.config.proxy.auth }}   
-   proxyuser {{ .Values.config.proxy.user }}   
-   proxypassword {{ .Values.config.proxy.password }}   
+   proxyauth {{ .Values.config.proxy.auth }}
+   proxyuser {{ .Values.config.proxy.user }}
+   proxypassword {{ .Values.config.proxy.password }}
    #<override plaintext; use result of Encrypt.jar>
-   eproxypassword {{ .Values.config.proxy.epassword }}   
+   eproxypassword {{ .Values.config.proxy.epassword }}
    
    # Following are used for NTLM authentication
-   proxyserver {{ .Values.config.proxy.domainuser }} 
-   proxydomain {{ .Values.config.proxy.domain }} 
-{{- end }}      
+   proxyserver {{ .Values.config.proxy.domainuser }}
+   proxydomain {{ .Values.config.proxy.domain }}
+{{- end }}
    ###################################################################
    # \ Pre-run command invocation
    #  This command will be called before client execution
@@ -111,6 +111,6 @@ data:
    ###################################################################
    # \ Debugging options
    ###################################################################   
-   debug {{ .Values.config.debug }} 
+   debug {{ .Values.config.debug }}
    #internal <true|false>
 

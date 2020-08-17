@@ -18,6 +18,8 @@ THe order of precedence is Command Line, Config File, Environment Variables.
 | Debug | false | PROMETHEUS_DEBUG | debug | debug |
 | Config File | config | PROMETHEUS_CONFIGFILE | N/A | file |
 | Config Path | ./config | PROMETHEUS_CONFIGPATH | N/A | path |
+| OAuth Token | "" | OAUTH_TOKEN | prometheus_oauth_token | oAuthToken |
+| CA Certificate| "" | CA_CERT | ca_certificate | caCert |
 
 ## Variable Names Forwarder
 | Config Setting Name  | Environment Variable | 

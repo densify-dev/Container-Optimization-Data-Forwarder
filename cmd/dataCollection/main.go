@@ -45,7 +45,7 @@ func initParameters() {
 	var caCertPath = ""
 
 	//Temporary variables for procassing flags
-	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp string
+	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp, oAuthTokenPathTemp, caCertPathTemp string
 	var intervalSizeTemp, historyTemp, offsetTemp, sampleRateTemp int
 	var debugTemp bool
 	var includeTemp string
@@ -118,6 +118,14 @@ func initParameters() {
 		include = tempEnvVar
 	}
 
+	if tempEnvVar, ok := os.LookupEnv("OAUTH_TOKEN"); ok {
+		oAuthTokenPath = tempEnvVar
+	}
+
+	if tempEnvVar, ok := os.LookupEnv("CA_CERT"); ok {
+		caCertPath = tempEnvVar
+	}
+
 	//Get the settings passed in from the command line and update the variables as required.
 	flag.StringVar(&clusterNameTemp, "clusterName", clusterName, "Name of the cluster to show in Densify")
 	flag.StringVar(&promProtocolTemp, "protocol", promProtocol, "Which protocol to use http|https")
@@ -132,6 +140,8 @@ func initParameters() {
 	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
 	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
 	flag.StringVar(&includeTemp, "includeList", include, "Comma separated list of data to include in collection (cluster, node, container) Ex: \"node,cluster\"")
+	flag.StringVar(&oAuthTokenPathTemp, "oAuthToken", oAuthTokenPath, "Path to oAuth token file required to authenticate with the Cluster where Prometheus is running.")
+	flag.StringVar(&caCertPathTemp, "caCert", caCertPath, "Path to CA certificate required to pass certificate validation if using HTTPS")
 	flag.Parse()
 
 	//Set defaults for viper to use if setting not found in the config.properties file.
@@ -195,8 +205,12 @@ func initParameters() {
 			offset = offsetTemp
 		case "debug":
 			debug = debugTemp
-		case "include-list":
+		case "includeList":
 			include = includeTemp
+		case "oAuthToken":
+			oAuthTokenPath = oAuthTokenPathTemp
+		case "caCert":
+			caCertPath = caCertPathTemp
 		}
 	}
 

@@ -230,6 +230,23 @@ func initParameters() {
 	errorLogger = log.New(logFile, "[ERROR] ", log.Ldate|log.Ltime|log.Lshortfile)
 	debugLogger = log.New(logFile, "[DEBUG] ", log.Ldate|log.Ltime|log.Lshortfile)
 
+	// Check if token and certificate are missing
+	if oAuthTokenPath != "" {
+		if _, err := os.Stat(oAuthTokenPath); os.IsNotExist(err) {
+			fmt.Printf("[ERROR] %s does not exist. Attempting to execute without using oAuth token!\n", oAuthTokenPath)
+			errorLogger.Printf("%s does not exist. Attempting to execute without using oAuth token!\n", oAuthTokenPath)
+			oAuthTokenPath = ""
+		}
+	}
+
+	if caCertPath != "" {
+		if _, err := os.Stat(caCertPath); os.IsNotExist(err) {
+			fmt.Printf("[ERROR] %s does not exist. Attempting to execute without trusted CA Certificate configuration!\n", caCertPath)
+			errorLogger.Printf("%s does not exist. Attempting to execute without trusted CA Certificate configuration!\n", caCertPath)
+			caCertPath = ""
+		}
+	}
+
 	if clusterName == "" {
 		clusterName = promAddr
 	}

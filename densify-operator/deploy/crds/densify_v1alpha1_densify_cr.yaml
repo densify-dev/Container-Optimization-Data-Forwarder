@@ -1,0 +1,31 @@
+apiVersion: densify.com/v1alpha1
+kind: Densify
+nameOverride: test-oper
+metadata:
+  name: example-densify
+spec:
+  # Default values copied from <project_dir>/helm-charts/container-optimization-data-forwarder/values.yaml
+  
+  affinity: {}
+  config:
+    cronJob:
+      schedule: 0 * * * *
+    debug: false
+    densify:
+      hostname: <instance>.densify.com
+      port: 443
+      protocol: <http/https>
+      user: <username>
+      epassword: <epassword>
+    prometheus:
+      hostname: <prometheus host name>
+      port: <prometheus port>
+      protocol: <http/https>
+    zipEnabled: true
+    zipname: <zip file name>
+  image: densify/container-optimization-data-forwarder:latest
+  nodeSelector: {}
+  pullPolicy: Always
+  replicaCount: 1
+  resources: {}
+  

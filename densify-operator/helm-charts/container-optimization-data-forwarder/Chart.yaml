@@ -1,0 +1,11 @@
+apiVersion: v1
+description: Densify Container Optimization Data Forwarder Utility
+keywords:
+- densify
+- container
+- optimization
+maintainers:
+- email: support@densify.com
+  name: support
+name: container-data-forwarder
+version: 1.0.1

@@ -7,6 +7,9 @@ RUN env GOOS=linux GOARCH=amd64 go build -o dataCollection .
 
 FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
 
+RUN microdnf install -y shadow-utils \
+ && adduser densify -u 3000 -g 0
+
 ### Required OpenShift Labels
 LABEL name="Container-Optimization-Data-Forwarder" \
       vendor="Densify" \
@@ -17,12 +20,13 @@ LABEL name="Container-Optimization-Data-Forwarder" \
       description="Collects data from Prometheus and sends to Densify server for analysis"
 
 ### add licenses to this directory
-COPY ./LICENSE /licenses/LICENSE
+COPY --chown=densify:root ./LICENSE /licenses/LICENSE
 
 CMD ["./Forwarder", "-c", "-n", "k8s_transfer_v3", "-l", "k8s_transfer_v3", "-o", "upload", "-r", "-C", "config"]
 RUN mkdir data data/node data/container data/hpa data/cluster data/node_group
 RUN chmod 777 -R data
-COPY ./config config
-COPY ./tools .
-COPY --from=builder /github.com/densify-dev/Container-Optimization-Data-Forwarder/cmd/dataCollection .
-###USER densify
+RUN chown densify:root -R data/
+COPY --chown=densify:root ./config config
+COPY --chown=densify:root ./tools .
+COPY --chown=densify:root --from=builder /github.com/densify-dev/Container-Optimization-Data-Forwarder/cmd/dataCollection .
+USER densify

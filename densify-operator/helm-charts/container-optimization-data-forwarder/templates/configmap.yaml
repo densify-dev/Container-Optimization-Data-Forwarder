@@ -38,7 +38,7 @@ data:
    prometheus_port {{ .Values.config.prometheus.port }}
    prometheus_protocol {{ .Values.config.prometheus.protocol }}
 {{- if .Values.config.prometheus.clustername }}
-   #<optional parameter that allows you to specify name to show for cluster in Densify. If not specified will use the prometheus_address>
+    #<optional parameter that allows you to specify name to show for cluster in Densify. If not specified will use the prometheus_address>
    cluster_name {{ .Values.config.prometheus.clustername }}
 {{- end }}
 {{- if .Values.config.prometheus.interval }}
@@ -55,6 +55,12 @@ data:
 {{- end }}
 {{- if .Values.config.prometheus.sampleRate }}
    sample_rate {{ .Values.config.prometheus.sampleRate }}
+{{- end }}
+{{- if .Values.config.prometheus.oauth_token }}
+   prometheus_oauth_token {{ .Values.config.prometheus.oauth_token }}
+{{- end }}
+{{- if .Values.config.prometheus.ca_certificate }}
+   ca_certificate {{ .Values.config.prometheus.ca_certificate }}
 {{- end }}
 
 

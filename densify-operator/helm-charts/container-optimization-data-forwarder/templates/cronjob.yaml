@@ -14,6 +14,7 @@ spec:
     spec:
       template:
         spec:
+          serviceAccountName: {{ template "common.fullname" . }}
           containers:
           - name: {{ template "common.name" . }}
             image: "{{ .Values.image }}"

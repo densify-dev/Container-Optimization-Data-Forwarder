@@ -24,6 +24,7 @@ spec:
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       {{- end }}
+      serviceAccountName: {{ template "common.fullname" . }}
       containers:
         - name: {{ template "common.name" . }}
           image: "{{ .Values.image }}"

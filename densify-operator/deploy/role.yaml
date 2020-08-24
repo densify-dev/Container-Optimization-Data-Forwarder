@@ -1,5 +1,5 @@
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
   creationTimestamp: null
   name: densify-operator
@@ -24,9 +24,17 @@ rules:
   verbs:
   - create
 - apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterrolebindings
+  - clusterroles
+  verbs:
+  - '*'
+- apiGroups:
   - ""
   resources:
   - configmaps
+  - serviceaccounts
   verbs:
   - '*'
 - apiGroups:

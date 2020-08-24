@@ -1,6 +1,5 @@
 apiVersion: densify.com/v1alpha1
 kind: Densify
-nameOverride: test-oper
 metadata:
   name: example-densify
 spec:
@@ -14,16 +13,16 @@ spec:
     densify:
       hostname: <instance>.densify.com
       port: 443
-      protocol: <http/https>
-      user: <username>
-      epassword: <epassword>
+      protocol: https
+      user: <densify user>
+      epassword: <encrypted densify user password>
     prometheus:
-      hostname: <prometheus host name>
+      hostname: <prometheus hostname>
       port: <prometheus port>
-      protocol: <http/https>
+      protocol: http
     zipEnabled: true
-    zipname: <zip file name>
-  image: densify/container-optimization-data-forwarder:latest
+    zipname: null
+  image: densify/container-optimization-data-forwarder:release-2.2.1-beta
   nodeSelector: {}
   pullPolicy: Always
   replicaCount: 1

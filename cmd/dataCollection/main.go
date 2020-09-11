@@ -233,7 +233,7 @@ func initParameters() {
 	// Check if token and certificate are missing
 	if oAuthTokenPath != "" {
 		if _, err := os.Stat(oAuthTokenPath); os.IsNotExist(err) {
-			fmt.Printf("[ERROR] %s does not exist. Attempting to execute without using oAuth token!\n", oAuthTokenPath)
+			fmt.Printf("[INFO] %s does not exist. Attempting to execute without using oAuth token!\n", oAuthTokenPath)
 			infoLogger.Printf("%s does not exist. Attempting to execute without using oAuth token!\n", oAuthTokenPath)
 			oAuthTokenPath = ""
 		}
@@ -241,7 +241,7 @@ func initParameters() {
 
 	if caCertPath != "" {
 		if _, err := os.Stat(caCertPath); os.IsNotExist(err) {
-			fmt.Printf("[ERROR] %s does not exist. Attempting to execute without trusted CA Certificate configuration!\n", caCertPath)
+			fmt.Printf("[INFO] %s does not exist. Attempting to execute without trusted CA Certificate configuration!\n", caCertPath)
 			infoLogger.Printf("%s does not exist. Attempting to execute without trusted CA Certificate configuration!\n", caCertPath)
 			caCertPath = ""
 		}

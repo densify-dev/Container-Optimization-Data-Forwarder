@@ -56,6 +56,12 @@ data:
 {{- if .Values.config.prometheus.sampleRate }}
    sample_rate {{ .Values.config.prometheus.sampleRate }}
 {{- end }}
+{{- if .Values.config.prometheus.oauth_token }}
+   prometheus_oauth_token {{ .Values.config.prometheus.oauth_token }}
+{{- end }}
+{{- if .Values.config.prometheus.ca_certificate }}
+   ca_certificate {{ .Values.config.prometheus.ca_certificate }}
+{{- end }}
 
 
    ###################################################################
@@ -91,13 +97,21 @@ data:
    # <Basic|NTLM>
    proxyauth {{ .Values.config.proxy.auth }}
    proxyuser {{ .Values.config.proxy.user }}
+{{- if .Values.config.proxy.password }}
    proxypassword {{ .Values.config.proxy.password }}
+{{- end }}
+{{- if .Values.config.proxy.epassword }}
    #<override plaintext; use result of Encrypt.jar>
    eproxypassword {{ .Values.config.proxy.epassword }}
-   
+{{- end }}  
+
+{{- if .Values.config.proxy.domainuser }}
    # Following are used for NTLM authentication
    proxyserver {{ .Values.config.proxy.domainuser }}
+{{- end }}
+{{- if .Values.config.proxy.domain }}
    proxydomain {{ .Values.config.proxy.domain }}
+{{- end }}
 {{- end }}
    ###################################################################
    # \ Pre-run command invocation

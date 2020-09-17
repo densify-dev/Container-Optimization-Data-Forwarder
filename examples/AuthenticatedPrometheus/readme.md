@@ -11,6 +11,7 @@ You will edit the configmap.yml, create a service account, cluster role, and clu
     `kubectl create -f clusterrole.yml`
 
 4. Modify the cluster role binding to set the namespace being used to run the forwader:
+
 	`namespace: <namespace using for Forwarder>`
 
 5. Create the cluster role binding:
@@ -26,8 +27,11 @@ You will edit the configmap.yml, create a service account, cluster role, and clu
     `kubectl create -f pod.yml`
 	
 8. Review the log for the container you should see line similar to the following near the end of the log. If the value is 7 files then likely have issues and may need to review the rest of the log and contact Densify. If the number is higher then 7 usually between 20-70 files then can move to next step.
+
 	`kubectl logs densify`
+	
 	2020-09-17T12:00:38.266347376Z 	zipped file: data
+	
 	2020-09-17T12:00:38.266386035Z 	uploading gke.zip; contents of 66 file(s)...
 	
 9. Create the cron job using the cronjob.yml 

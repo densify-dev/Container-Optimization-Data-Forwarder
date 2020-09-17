@@ -1,0 +1,33 @@
+apiVersion: densify.com/v1
+kind: Densify
+metadata:
+  name: example-densify
+spec:
+  # Default values copied from <project_dir>/helm-charts/container-optimization-data-forwarder/values.yaml
+  nameOverride: densify-dc
+  affinity: {}
+  config:
+    cronJob:
+      schedule: 0 * * * *
+    debug: false
+    densify:
+      hostname: <instance>.densify.com
+      port: 443
+      protocol: https
+      user: <densify user>
+      epassword: <encrypted password for densify user>
+    prometheus:
+      hostname: <prometheus hostname or IP|prometheus-k8s.openshift-monitoring.svc>
+      port: <prometheus port|9091>
+      clustername: <name of cluster>
+      protocol: https
+      ca_certificate: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+      oauth_token: /var/run/secrets/kubernetes.io/serviceaccount/token
+    zipEnabled: true
+    zipname: data/<zip name most will set to match cluster name>
+  image: densify/container-optimization-data-forwarder:release-2.2.1-beta
+  nodeSelector: {}
+  pullPolicy: Always
+  replicaCount: 1
+  resources: {}
+  

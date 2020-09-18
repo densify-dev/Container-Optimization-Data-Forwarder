@@ -37,7 +37,7 @@ config:
 #========================================================= 
   zipEnabled: true    
 # Name of the zip file that archives the content
-  zipname: <zip file name>
+  zipname: data/<zip file name>
 
   cronJob:
     schedule: 0 * * * *  

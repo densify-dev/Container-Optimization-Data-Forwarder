@@ -1,7 +1,0 @@
----
-- group: densify.com
-  version: v1alpha1
-  kind: Densify
-  chart: helm-charts/container-optimization-data-forwarder
-  overrideValues:
-    image: $RELATED_IMAGE_DENSIFY

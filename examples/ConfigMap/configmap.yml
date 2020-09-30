@@ -38,6 +38,9 @@ data :
    #include_list container,node,nodegroup,cluster
    #sample_rate 5
 
+   #prometheus_oauth_token /var/run/secrets/kubernetes.io/serviceaccount/token
+   #ca_certificate /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+
    ###################################################################
    # \ Client transfer settings / options
    ###################################################################
@@ -45,7 +48,7 @@ data :
    # controls whether contents are zipped before transmission
    zip true
    # when directory transferred and zip active, will use this zip name
-   zipname <Cluster name or prometheus server name or other name may want to send zip as>
+   zipname data/<Cluster name or prometheus server name or other name may want to send zip as>
    # will prepend transferred filenames with this value
    prefix Container
    # default filename or directory to upload when name not supplied

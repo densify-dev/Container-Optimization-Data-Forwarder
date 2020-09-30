@@ -41,9 +41,11 @@ func initParameters() {
 	var configPath = "./config"
 	var sampleRate = 5
 	var include = "container,node,cluster,nodegroup"
+	var oAuthTokenPath = ""
+	var caCertPath = ""
 
 	//Temporary variables for procassing flags
-	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp string
+	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp, oAuthTokenPathTemp, caCertPathTemp string
 	var intervalSizeTemp, historyTemp, offsetTemp, sampleRateTemp int
 	var debugTemp bool
 	var includeTemp string
@@ -116,6 +118,14 @@ func initParameters() {
 		include = tempEnvVar
 	}
 
+	if tempEnvVar, ok := os.LookupEnv("OAUTH_TOKEN"); ok {
+		oAuthTokenPath = tempEnvVar
+	}
+
+	if tempEnvVar, ok := os.LookupEnv("CA_CERT"); ok {
+		caCertPath = tempEnvVar
+	}
+
 	//Get the settings passed in from the command line and update the variables as required.
 	flag.StringVar(&clusterNameTemp, "clusterName", clusterName, "Name of the cluster to show in Densify")
 	flag.StringVar(&promProtocolTemp, "protocol", promProtocol, "Which protocol to use http|https")
@@ -130,6 +140,8 @@ func initParameters() {
 	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
 	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
 	flag.StringVar(&includeTemp, "includeList", include, "Comma separated list of data to include in collection (cluster, node, container) Ex: \"node,cluster\"")
+	flag.StringVar(&oAuthTokenPathTemp, "oAuthToken", oAuthTokenPath, "Path to oAuth token file required to authenticate with the Cluster where Prometheus is running.")
+	flag.StringVar(&caCertPathTemp, "caCert", caCertPath, "Path to CA certificate required to pass certificate validation if using HTTPS")
 	flag.Parse()
 
 	//Set defaults for viper to use if setting not found in the config.properties file.
@@ -146,6 +158,8 @@ func initParameters() {
 		viper.SetDefault("offset", offset)
 		viper.SetDefault("debug", debug)
 		viper.SetDefault("include_list", include)
+		viper.SetDefault("prometheus_oauth_token", oAuthTokenPath)
+		viper.SetDefault("ca_certificate", caCertPath)
 		// Config import setup.
 		viper.SetConfigName(configFile)
 		viper.AddConfigPath(configPath)
@@ -164,6 +178,8 @@ func initParameters() {
 			offset = viper.GetInt("offset")
 			debug = viper.GetBool("debug")
 			include = viper.GetString("include_list")
+			oAuthTokenPath = viper.GetString("prometheus_oauth_token")
+			caCertPath = viper.GetString("ca_certificate")
 		}
 	}
 
@@ -189,8 +205,12 @@ func initParameters() {
 			offset = offsetTemp
 		case "debug":
 			debug = debugTemp
-		case "include-list":
+		case "includeList":
 			include = includeTemp
+		case "oAuthToken":
+			oAuthTokenPath = oAuthTokenPathTemp
+		case "caCert":
+			caCertPath = caCertPathTemp
 		}
 	}
 
@@ -209,6 +229,23 @@ func initParameters() {
 	warnLogger = log.New(logFile, "[WARN] ", log.Ldate|log.Ltime|log.Lshortfile)
 	errorLogger = log.New(logFile, "[ERROR] ", log.Ldate|log.Ltime|log.Lshortfile)
 	debugLogger = log.New(logFile, "[DEBUG] ", log.Ldate|log.Ltime|log.Lshortfile)
+
+	// Check if token and certificate are missing
+	if oAuthTokenPath != "" {
+		if _, err := os.Stat(oAuthTokenPath); os.IsNotExist(err) {
+			fmt.Printf("[INFO] %s does not exist. Attempting to execute without using oAuth token!\n", oAuthTokenPath)
+			infoLogger.Printf("%s does not exist. Attempting to execute without using oAuth token!\n", oAuthTokenPath)
+			oAuthTokenPath = ""
+		}
+	}
+
+	if caCertPath != "" {
+		if _, err := os.Stat(caCertPath); os.IsNotExist(err) {
+			fmt.Printf("[INFO] %s does not exist. Attempting to execute without trusted CA Certificate configuration!\n", caCertPath)
+			infoLogger.Printf("%s does not exist. Attempting to execute without trusted CA Certificate configuration!\n", caCertPath)
+			caCertPath = ""
+		}
+	}
 
 	if clusterName == "" {
 		clusterName = promAddr
@@ -230,6 +267,8 @@ func initParameters() {
 		DebugLogger:      debugLogger,
 		SampleRate:       sampleRate,
 		SampleRateString: strconv.Itoa(sampleRate),
+		OAuthTokenPath:   oAuthTokenPath,
+		CaCertPath:       caCertPath,
 	}
 	parseIncludeParam(include)
 }
@@ -254,7 +293,8 @@ func main() {
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
-	params.InfoLogger.Println("Version 2.2.0")
+	params.InfoLogger.Println("Version 2.2.1")
+	fmt.Println("Version 2.2.1")
 
 	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
 	var t time.Time

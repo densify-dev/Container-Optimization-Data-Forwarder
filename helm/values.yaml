@@ -2,33 +2,42 @@
 # Global configuration defaults.
 #################################################################
 
-#################################################################
-# Application configuration defaults.
-#################################################################
 # application image
 image:  densify/container-optimization-data-forwarder
 imageTag: latest
 pullPolicy: Always
 
 # application configuration
-# Example:
 config:
+#===============================
 # densify server settings
+#===============================
   densify:
-    hostname: localhost
-    protocol: http
-    port: 8086
-    user: 
-    password: 
+    hostname: <instance>.densify.com
+    protocol: <http/https>
+    port: 443
+    user: <username>
+#    password: <password>
+    epassword: <epassword>
+#===============================    
 # prometheus server settings    
+#===============================
   prometheus:
-    hostname:
-    port:
-    protocol: http
+    hostname: <prometheus host name>
+    protocol: <http/https>
+    port: <prometheus port>
+#    clustername: <cluster name>
+#    interval: <hours/days>
+#    intervalSize: 1
+#    history: 1
+#    sampleRate: 5
+#    includeList: container,node,nodegroup,cluster
+#=========================================================
 # controls whether contents are zipped before transmission    
+#========================================================= 
   zipEnabled: true    
 # Name of the zip file that archives the content
-  zipname: 
+  zipname: data/<zip file name>
 
   cronJob:
     schedule: 0 * * * *  

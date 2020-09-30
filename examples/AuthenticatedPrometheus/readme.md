@@ -2,7 +2,7 @@ This example shows you how to setup the Data Forwarder to connect to an authenti
 
 To configure the Data Forwarder with an authenticated Prometheus, you need to edit the configmap.yml, create a service account, cluster role, and cluster role binding. To test the Forwarder setup, create a pod to ensure that data is sent to Densify before enabling the cron job to run data collection every hour.
 
-1. Modify the configmap.yml to point to your Densify instance and Prometheus server.
+1. Modify the configmap.yml to point to your Densify instance and the Prometheus server.
 2. Create the service account:
 
     `kubectl create -f serviceaccount.yml`
@@ -38,7 +38,7 @@ To configure the Data Forwarder with an authenticated Prometheus, you need to ed
 	> 2020-09-17T12:00:38.266386035Z 	uploading gke.zip; contents of 66 file(s)...
 	
 	If the content has 7 files, then you probably have issues with sending container data to Densify and need to review the rest of the log and contact Densify support. 
-	If the content has more than 7 files (usually between 20-70 files), then you can move to the next step.
+	If the content has more than 7 files (usually between 20-70 files), then you can move on to the next step.
 	
 9. Create the cron job using the cronjob.yml
 

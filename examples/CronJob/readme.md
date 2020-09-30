@@ -1,6 +1,4 @@
-In this example you will edit the configmap.yml, create a pod to test then a cron job to run data collection every hour and pass the Config Map containing the required settings, to the config.properties file.
-
-This example shows you how to setup the Data Forwarder to connect to a Prometheus server and send container data to Densify, on an hourly basis. You need to edit the configmap.yml file, then create the config map to pass the settings to config.properties. To test the Data Forwarder setup, create a pod to ensure that data is sent to Densify before enabling the cron job to run data collection every hour.
+This example shows you how to setup the Data Forwarder to connect to a Prometheus server and send container data to Densify on an hourly basis. You need to edit the configmap.yml file, then create the config map to pass the settings to config.properties. To test the Data Forwarder setup, create a pod to ensure that data is sent to Densify before enabling the cron job to run data collection every hour.
 
 1. Modify the configmap.yml to point to your Densify instance and to the Prometheus server.
 

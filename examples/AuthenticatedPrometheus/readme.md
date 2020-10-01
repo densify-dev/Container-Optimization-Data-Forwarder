@@ -11,7 +11,7 @@ To configure the Data Forwarder with an authenticated Prometheus, you need to ed
 
     `kubectl create -f clusterrole.yml`
 
-4. Modify the cluster role binding to set the namespace being used to run the forwader:
+4. Modify the cluster role binding to set the namespace being used to run the forwarder:
 
 	`namespace: <namespace using for Forwarder>`
 

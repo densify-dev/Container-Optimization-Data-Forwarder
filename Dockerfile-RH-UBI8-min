@@ -1,5 +1,5 @@
 FROM golang as builder
-RUN apt-get update && apt-get upgrade && \
+RUN apt-get update && apt-get -y upgrade && \
     apt-get install bash git
 ADD . /github.com/densify-dev/Container-Optimization-Data-Forwarder
 WORKDIR /github.com/densify-dev/Container-Optimization-Data-Forwarder/cmd/dataCollection

@@ -1,10 +1,15 @@
-In this example you will edit the configmap.yml and create the pod. You will then pass the Config Map, containing the required settings, to the config.properties file.
+This example shows you how to setup the Data Forwarder to connect to a Prometheus server and send container data to Densify. You need to edit configmap.yml file, then create the config map to pass the settings to config.properties. To test the container data forwarding functionality, create the pod using pod.yml. 
+
 1. Modify the configmap.yml to point to your Densify instance and to your Prometheus server.
-2. Create the config map in Kubernetes:
+
+2. Create the config map in Kubernetes.
     
     `kubectl create -f configmap.yml`
-3. Create the pod using pod.yml: 
+    
+3. Create the pod using pod.yml.
     
     `kubectl create -f pod.yml`
 
-The pod will run and send the collected data to Densify. Once that data has been sent the pod will end. You will need to schedule the pod to run on the same interval you are using for data collection, as defined in the config file.
+The pod runs and sends the collected container data to Densify. Once the container data is sent, the pod ends.
+
+You need to schedule the pod to run at the same interval that is configured for data collection, as defined in the config.properties file. See the CronJob example.

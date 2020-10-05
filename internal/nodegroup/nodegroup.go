@@ -109,7 +109,7 @@ func writeConfig(args *common.Parameters) {
 			instance = ""
 		}
 
-		fmt.Fprintf(configWrite, "%s,%s,%s,%s,", *args.ClusterName, nodeGroupName, instance, nodeGroup.labelMap[os])
+		fmt.Fprintf(configWrite, "%s,%s,", *args.ClusterName, nodeGroupName)
 
 		if nodeGroup.cpuCapacity == -1 {
 			fmt.Fprintf(configWrite, ",,1,1,")
@@ -117,9 +117,9 @@ func writeConfig(args *common.Parameters) {
 			fmt.Fprintf(configWrite, "%d,%d,1,1,", nodeGroup.cpuCapacity, nodeGroup.cpuCapacity)
 		}
 		if nodeGroup.memCapacity == -1 {
-			fmt.Fprintf(configWrite, "\n")
+			fmt.Fprintf(configWrite, ",%s,%s\n", instance, nodeGroup.labelMap[os])
 		} else {
-			fmt.Fprintf(configWrite, "%d\n", nodeGroup.memCapacity)
+			fmt.Fprintf(configWrite, "%d,%s,%s\n", nodeGroup.memCapacity, instance, nodeGroup.labelMap[os])
 		}
 	}
 	configWrite.Close()

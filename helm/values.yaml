@@ -1,10 +1,10 @@
 #################################################################
 # Global configuration defaults.
 #################################################################
+nameOverride: densify-forwarder
 
 # application image
-image:  densify/container-optimization-data-forwarder
-imageTag: latest
+image:  densify/container-optimization-data-forwarder:latest
 pullPolicy: Always
 
 # application configuration
@@ -19,6 +19,9 @@ config:
     user: <username>
 #    password: <password>
     epassword: <epassword>
+    # Set only the above username and (e)password settings or this Secret not both.
+    # Secret must contain 2 fields username and epassword that will be used to connect to Densify.
+#    UserSecretName: <name of secret to use>
 #===============================    
 # prometheus server settings    
 #===============================
@@ -32,9 +35,27 @@ config:
 #    history: 1
 #    sampleRate: 5
 #    includeList: container,node,nodegroup,cluster
+    oauth_token: /var/run/secrets/kubernetes.io/serviceaccount/token
+    ca_certificate: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+
+#===================
+# proxy settings
+#===================
+#  proxy:
+#    host: <proxy host>
+#    port: <proxy port>
+#    protocol: <protocol>
+#    # <Basic|NTLM>
+#    auth: <auth type>
+#    user: <proxy server username>
+#    password: <proxy server password>
+#    epassword: <proxy server epassword>
+#    # NTLM authentication
+#    domainuser: <domain username>
+#    domain: <domain name>
 #=========================================================
-# controls whether contents are zipped before transmission    
-#========================================================= 
+# controls whether contents are zipped before transmission
+#=========================================================
   zipEnabled: true    
 # Name of the zip file that archives the content
   zipname: data/<zip file name>
@@ -42,13 +63,14 @@ config:
   cronJob:
     schedule: 0 * * * *  
     
-  debug: false  
-    
-# default number of instances
-replicaCount: 1
+  debug: false
+
+# If you are running Prometheus setup with Authentication such as OpenShift then need to set to true.   
+authenticated:
+  create: false 
 
 nodeSelector: {}
 
 resources: {}
 
-affinity: {}
+tolerations: {}

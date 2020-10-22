@@ -2,9 +2,9 @@
 
 To deploy it via Helm follow these steps:
 1. Clone or update repo
-2. Set the relevant endpoints and credentials values in helm/resources/overrideValues.yaml (see the [configuration table](Helm-Parameters.md))
+2. Set the relevant endpoints and credentials values in helm/values.yaml (see the [configuration table](Helm-Parameters.md))
 3. cd helm
-4. Run the command: 'helm install . -f resources/overrideValues.yaml'
+4. Run the command: 'helm install . -f values.yaml'
 
 # Configuration 
 

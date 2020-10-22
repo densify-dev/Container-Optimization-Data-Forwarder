@@ -86,7 +86,7 @@ func writeConfig(args *common.Parameters) {
 	configWrite, err := os.Create("./data/node_group/config.csv")
 	if err != nil {
 		args.ErrorLogger.Println("entity=node_group message=" + err.Error())
-		fmt.Println("entity=node_group message=" + err.Error())
+		fmt.Println("[ERROR] entity=node_group message=" + err.Error())
 		return
 	}
 
@@ -132,7 +132,7 @@ func writeAttributes(args *common.Parameters) {
 	attributeWrite, err := os.Create("./data/node_group/attributes.csv")
 	if err != nil {
 		args.ErrorLogger.Println("entity=node_group message=" + err.Error())
-		fmt.Println("entity=node_group message=" + err.Error())
+		fmt.Println("[ERROR] entity=node_group message=" + err.Error())
 		return
 	}
 

@@ -293,8 +293,8 @@ func main() {
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
-	params.InfoLogger.Println("Version 2.2.1")
-	fmt.Println("Version 2.2.1")
+	params.InfoLogger.Println("Version 2.2.2")
+	fmt.Println("[INFO] Version 2.2.2")
 
 	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
 	var t time.Time
@@ -313,24 +313,24 @@ func main() {
 		container2.Metrics(params)
 	} else {
 		params.InfoLogger.Println("Skipping container data collection")
-		fmt.Println("Skipping container data collection")
+		fmt.Println("[INFO] Skipping container data collection")
 	}
 	if includeNode {
 		node.Metrics(params)
 	} else {
 		params.InfoLogger.Println("Skipping node data collection")
-		fmt.Println("Skipping node data collection")
+		fmt.Println("[INFO] Skipping node data collection")
 	}
 	if includeNodeGroup {
 		nodegroup.Metrics(params)
 	} else {
 		params.InfoLogger.Println("Skipping node group data collection")
-		fmt.Println("Skipping node group data collection")
+		fmt.Println("[INFO] Skipping node group data collection")
 	}
 	if includeCluster {
 		cluster.Metrics(params)
 	} else {
 		params.InfoLogger.Println("Skipping cluster data collection")
-		fmt.Println("Skipping cluster data collection")
+		fmt.Println("[INFO] Skipping cluster data collection")
 	}
 }

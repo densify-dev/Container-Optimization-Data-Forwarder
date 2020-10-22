@@ -1,6 +1,36 @@
-# Helm chart Configuration
+# Densify Container Optimization Helm Chart
 
-The following table lists the configurable parameters of the container-optimization-data-forwarder chart in helm/values.yaml.
+<img src="https://www.densify.com/wp-content/uploads/densify.png" width="300">
+
+## Introduction
+This chart deploys the Densify Container Optimization Data Forwarder, which collects data from a Prometheus server and sends it to a Densify instance for analysis. 
+
+## Details
+* Deploys a configmap, job and cronjob
+* The cronjob will run hourly and collect data from Prometheus and send it to Densify for analysis.
+
+## Prerequisites
+
+* Densify account, which is provided with a Densify subscription or through a free trial (https://www.densify.com/service/signup)
+* Kubernetes or OpenShift
+* Prometheus (https://prometheus.io/)
+* Kube-state-metrics version 1.5.0+ (https://github.com/kubernetes/kube-state-metrics)
+* Node Exporter (https://hub.docker.com/r/prom/node-exporter) (optional)
+
+## Installing
+To deploy it via Helm follow these steps:
+1. Clone or update repo
+2. Set the relevant endpoints and credentials values in helm/values.yaml (see the [configuration table](Helm-Parameters.md))
+3. cd helm
+4. Run the command: 
+```console
+'helm install . -f values.yaml'
+```
+
+## Configuration
+ 
+Configure these parameters in values.yaml:
+
 | Parameter        | Description           | default ` |
 | ------------- |-------------|--------|
 | `nameOverride` | name override for helm chart name. | `densify-forwarder` |
@@ -41,3 +71,13 @@ The following table lists the configurable parameters of the container-optimizat
 | `nodeSelector` | Node labels for pod assignments. | `{}` |
 | `resources` | CPU/Memory resource requests/limits. | `{}` |
 | `tolerations` | Toleration lables for pod assignments. | `{}` |
+
+## Limitation
+* Supported Architecture: AMD64
+* Supported OS: Linux
+
+## Documentation
+* [Densify Feature Description and Reference Guide](https://www.densify.com/docs/Content/Welcome.htm)
+
+## License
+Apache 2 Licensed. See [LICENSE](LICENSE) for full details.

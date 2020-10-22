@@ -190,7 +190,7 @@ func Metrics(args *common.Parameters) {
 	//Checks to see if Node Exporter is installed. Based off if anything is returned from network speed bytes
 	if haveNodeExport == false {
 		args.ErrorLogger.Println("entity=" + entityKind + " message=It appears you do not have Node Exporter installed.")
-		fmt.Println("entity=" + entityKind + " message=It appears you do not have Node Exporter installed.")
+		fmt.Println("[ERROR] entity=" + entityKind + " message=It appears you do not have Node Exporter installed.")
 		return
 	}
 

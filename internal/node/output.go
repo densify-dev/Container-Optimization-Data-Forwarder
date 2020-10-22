@@ -20,7 +20,7 @@ func writeConfig(args *common.Parameters) {
 	configWrite, err := os.Create("./data/node/config.csv")
 	if err != nil {
 		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
-		fmt.Println("entity=" + entityKind + " message=" + err.Error())
+		fmt.Println("[ERROR] entity=" + entityKind + " message=" + err.Error())
 		return
 	}
 
@@ -77,7 +77,7 @@ func writeAttributes(args *common.Parameters) {
 	attributeWrite, err := os.Create("./data/node/attributes.csv")
 	if err != nil {
 		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
-		fmt.Println("entity=" + entityKind + " message=" + err.Error())
+		fmt.Println("[ERROR] entity=" + entityKind + " message=" + err.Error())
 		return
 	}
 

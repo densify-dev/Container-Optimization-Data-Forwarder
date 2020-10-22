@@ -307,7 +307,7 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 	workloadWrite, err := os.Create("./data/container/" + aggregator + `_` + fileName + ".csv")
 	if err != nil {
 		args.ErrorLogger.Println("entity=" + entityKind + " metric=" + metricName + " query=" + query + " message=" + err.Error())
-		fmt.Println("entity=" + entityKind + " metric=" + metricName + " query=" + query + " message=" + err.Error())
+		fmt.Println("[ERROR] entity=" + entityKind + " metric=" + metricName + " query=" + query + " message=" + err.Error())
 		return
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,%s\n", metricName)
@@ -329,15 +329,21 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "")
 
 		//query containers under a deployment
-		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) max(label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)")) by (namespace, pod, replicaset) * on (replicaset, namespace) group_left (owner_name) max(kube_replicaset_owner{owner_kind="Deployment"}) by (namespace, replicaset, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
-		result = common.MetricCollect(args, query2, range5Min, "deployment_"+metricName, false)
-		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "Deployment")
+		if args.Deployments {
+			query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) max(label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)")) by (namespace, pod, replicaset) * on (replicaset, namespace) group_left (owner_name) max(kube_replicaset_owner{owner_kind="Deployment"}) by (namespace, replicaset, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
+			result = common.MetricCollect(args, query2, range5Min, "deployment_"+metricName, false)
+			if result.(model.Matrix).Len() != 0 {
+				fmt.Println("Blah")
+			}
+			writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "Deployment")
+		}
 
 		//query containers under a cron job
-		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) max(label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)")) by (namespace, pod, job) * on (job, namespace) group_left (owner_name) max(label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (namespace, job, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
-		result = common.MetricCollect(args, query2, range5Min, "cronJob_"+metricName, false)
-		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "CronJob")
-
+		if args.CronJobs {
+			query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) max(label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)")) by (namespace, pod, job) * on (job, namespace) group_left (owner_name) max(label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (namespace, job, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
+			result = common.MetricCollect(args, query2, range5Min, "cronJob_"+metricName, false)
+			writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "CronJob")
+		}
 	}
 	//Close the workload files.
 	workloadWrite.Close()
@@ -352,7 +358,7 @@ func getDeploymentWorkload(fileName, metricName, query string, args *common.Para
 	workloadWrite, err := os.Create("./data/container/deployment_" + fileName + ".csv")
 	if err != nil {
 		args.ErrorLogger.Println("metric=" + metricName + " query=" + query + " message=File not found")
-		fmt.Println("metric=" + metricName + " query=" + query + " message=File not found")
+		fmt.Println("[ERROR] metric=" + metricName + " query=" + query + " message=File not found")
 		return
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,%s\n", metricName)
@@ -403,13 +409,13 @@ func getHPAWorkload(fileName, metricName, query string, args *common.Parameters)
 	workloadWrite, err := os.Create("./data/container/hpa_" + fileName + ".csv")
 	if err != nil {
 		args.ErrorLogger.Println("metric=" + metricName + " query=" + query + " message=File not found")
-		fmt.Println("metric=" + metricName + " query=" + query + " message=File not found")
+		fmt.Println("[ERROR] metric=" + metricName + " query=" + query + " message=File not found")
 		return
 	}
 	workloadWriteExtra, err := os.Create("./data/hpa/hpa_extra_" + fileName + ".csv")
 	if err != nil {
 		args.ErrorLogger.Println("metric=" + metricName + " query=" + query + " message=File not found")
-		fmt.Println("metric=" + metricName + " query=" + query + " message=File not found")
+		fmt.Println("[ERROR] metric=" + metricName + " query=" + query + " message=File not found")
 		return
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,HPA Name,Datetime,%s\n", metricName)

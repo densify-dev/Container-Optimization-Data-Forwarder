@@ -71,6 +71,7 @@ func Metrics(args *common.Parameters) {
 		rslt = result.(model.Matrix)
 		for i := 0; i < rslt.Len(); i++ {
 			replicaSetOwners[string(rslt[i].Metric["replicaset"])+"__"+string(rslt[i].Metric["namespace"])] = string(rslt[i].Metric["owner_name"])
+			args.Deployments = true
 		}
 	}
 
@@ -80,6 +81,7 @@ func Metrics(args *common.Parameters) {
 		rslt = result.(model.Matrix)
 		for i := 0; i < rslt.Len(); i++ {
 			jobOwners[string(rslt[i].Metric["job_name"])+"__"+string(rslt[i].Metric["namespace"])] = string(rslt[i].Metric["owner_name"])
+			args.CronJobs = true
 		}
 	}
 
@@ -92,6 +94,15 @@ func Metrics(args *common.Parameters) {
 	rslt = result.(model.Matrix)
 
 	var currentOwner string
+
+	if !args.CronJobs {
+		args.InfoLogger.Println("No CronJobs found")
+		fmt.Println("[Info] No CronJobs found")
+	}
+	if !args.Deployments {
+		args.InfoLogger.Println("No Deployments found")
+		fmt.Println("[Info] No Deployments found")
+	}
 
 	//Add containers and top owners to structure
 	for i := 0; i < rslt.Len(); i++ {
@@ -174,7 +185,7 @@ func Metrics(args *common.Parameters) {
 			}
 		}
 		args.DebugLogger.Println("message=Dump of Systesms structure\n" + tempString)
-		fmt.Println("message=Dump of Systesms structure\n" + tempString)
+		fmt.Println("[DEBUG] message=Dump of Systesms structure\n" + tempString)
 	}
 
 	//Container metrics
@@ -442,7 +453,7 @@ func Metrics(args *common.Parameters) {
 	currentSizeWrite, err := os.Create("./data/container/currentSize.csv")
 	if err != nil {
 		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
-		fmt.Println("entity=" + entityKind + " message=" + err.Error())
+		fmt.Println("[ERROR] entity=" + entityKind + " message=" + err.Error())
 		return
 	}
 	fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,Auto Scaling - In Service Instances\n")

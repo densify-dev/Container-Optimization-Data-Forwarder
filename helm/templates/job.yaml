@@ -16,26 +16,36 @@ spec:
         app: {{ template "common.name" . }}
         release: {{ .Release.Name }}
     spec:
-      {{- if .Values.nodeSelector }}
       nodeSelector:
+        kubernetes.io/os: linux
+        kubernetes.io/arch: amd64
+      {{- if .Values.nodeSelector }}
 {{ toYaml .Values.nodeSelector | indent 8 }}
       {{- end }}
       {{- if .Values.tolerations }}
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       {{- end }}
+      {{- if .Values.authenticated.create }}
+      serviceAccountName: {{ template "common.fullname" . }}
+      {{- end }}
       containers:
         - name: {{ template "common.name" . }}
-          image: "{{ .Values.image }}:{{ .Values.imageTag }}"
+          image: "{{ .Values.image }}"
           imagePullPolicy: {{ .Values.pullPolicy }}
-   {{ if .Values.command }}
-          command:
-   {{ toYaml .Values.command | indent 10 }}
-   {{ end }}
-   {{ if .Values.args }}
-          args:
-   {{ toYaml .Values.args | indent 10 }}
-   {{ end }}           
+          {{- if .Values.config.densify.UserSecretName }}
+          env:
+            - name: DENSIFY_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.densify.UserSecretName }}
+                  key: username
+            - name: DENSIFY_EPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.densify.UserSecretName }}
+                  key: epassword
+          {{- end }}
           volumeMounts:
           - name: config
             mountPath: /config  

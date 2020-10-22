@@ -30,6 +30,7 @@ type Parameters struct {
 	SampleRateString                                      string
 	OAuthTokenPath                                        string
 	CaCertPath                                            string
+	Deployments, CronJobs                                 bool
 }
 
 // Prometheus Objects
@@ -63,7 +64,7 @@ func MetricCollect(args *Parameters, query string, range5m v1.Range, metric stri
 	client, err := api.NewClient(api.Config{Address: *args.PromURL, RoundTripper: roundTripper})
 	if err != nil {
 		args.WarnLogger.Println("metric=" + metric + " query=" + query + " message=" + err.Error())
-		fmt.Println("metric=" + metric + " query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=" + metric + " query=" + query + " message=" + err.Error())
 		return value
 	}
 
@@ -72,7 +73,7 @@ func MetricCollect(args *Parameters, query string, range5m v1.Range, metric stri
 	value, _, err = q.QueryRange(ctx, query, range5m)
 	if err != nil {
 		args.ErrorLogger.Println("metric=" + metric + " query=" + query + " message=" + err.Error())
-		fmt.Println("metric=" + metric + " query=" + query + " message=" + err.Error())
+		fmt.Println("[ERROR] metric=" + metric + " query=" + query + " message=" + err.Error())
 		return value
 	}
 
@@ -80,30 +81,30 @@ func MetricCollect(args *Parameters, query string, range5m v1.Range, metric stri
 	if value == nil {
 		if vital {
 			args.ErrorLogger.Println("metric=" + metric + " query=" + query + " message=No resultset returned")
-			fmt.Println("metric=" + metric + " query=" + query + " message=No resultset returned")
+			fmt.Println("[ERROR] metric=" + metric + " query=" + query + " message=No resultset returned")
 			return value
 		}
 		args.WarnLogger.Println("metric=" + metric + " query=" + query + " message=No resultset returned")
-		fmt.Println("metric=" + metric + " query=" + query + " message=No resultset returned")
+		fmt.Println("[WARNING] metric=" + metric + " query=" + query + " message=No resultset returned")
 		return value
 
 	} else if value.(model.Matrix) == nil {
 		if vital {
 			args.ErrorLogger.Println("metric=" + metric + " query=" + query + " message=No time series data returned")
-			fmt.Println("metric=" + metric + " query=" + query + " message=No time series data returned")
+			fmt.Println("[ERROR] metric=" + metric + " query=" + query + " message=No time series data returned")
 			return value
 		}
 		args.WarnLogger.Println("metric=" + metric + " query=" + query + " message=No time series data returned")
-		fmt.Println("metric=" + metric + " query=" + query + " message=No time series data returned")
+		fmt.Println("[WARNING] metric=" + metric + " query=" + query + " message=No time series data returned")
 		return value
 	} else if value.(model.Matrix).Len() == 0 {
 		if vital {
 			args.ErrorLogger.Println("metric=" + metric + " query=" + query + " message=No data returned, value.(model.Matrix) is empty")
-			fmt.Println("metric=" + metric + " query=" + query + " message=No data returned, value.(model.Matrix) is empty")
+			fmt.Println("[ERROR] metric=" + metric + " query=" + query + " message=No data returned, value.(model.Matrix) is empty")
 			return value
 		}
 		args.WarnLogger.Println("metric=" + metric + " query=" + query + " message=No data returned, value.(model.Matrix) is empty")
-		fmt.Println("metric=" + metric + " query=" + query + " message=No data returned, value.(model.Matrix) is empty")
+		fmt.Println("[WARNING] metric=" + metric + " query=" + query + " message=No data returned, value.(model.Matrix) is empty")
 
 	}
 

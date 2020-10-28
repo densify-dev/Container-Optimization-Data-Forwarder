@@ -80,7 +80,7 @@ The following table lists configuratin parameters in values.yaml and their defau
 | `resources` | The CPU/Memory resource requests/limits. | `{}` |
 | `tolerations` | The toleration labels for pod assignments. | `{}` |
 
-## Limitation
+## Limitations
 * Supported Architecture: AMD64
 * Supported OS: Linux
 

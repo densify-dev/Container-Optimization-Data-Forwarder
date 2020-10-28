@@ -3,17 +3,6 @@
 <img src="https://www.densify.com/wp-content/uploads/densify.png" width="300">
 
 ## Introduction
-This chart deploys the Densify Container Optimization Data Forwarder, which collects data from a Prometheus server and sends it to a Densify instance for analysis. 
-
-## Details
-* Deploys a configmap, job and cronjob
-* The cronjob will run hourly and collect data from Prometheus and send it to Densify for analysis.
-
-# Densify Container Optimization Helm Chart
-
-<img src="https://www.densify.com/wp-content/uploads/densify.png" width="300">
-
-## Introduction
 
 This chart deploys the Densify Container Optimization Data Forwarder, which is scheduled to collect data from a Prometheus server and sends it to a Densify instance for analysis. 
 

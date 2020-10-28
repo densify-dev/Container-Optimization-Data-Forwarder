@@ -9,75 +9,96 @@ This chart deploys the Densify Container Optimization Data Forwarder, which coll
 * Deploys a configmap, job and cronjob
 * The cronjob will run hourly and collect data from Prometheus and send it to Densify for analysis.
 
+# Densify Container Optimization Helm Chart
+
+<img src="https://www.densify.com/wp-content/uploads/densify.png" width="300">
+
+## Introduction
+
+This chart deploys the Densify Container Optimization Data Forwarder, which is scheduled to collect data from a Prometheus server and sends it to a Densify instance for analysis. 
+
+## Details
+
+* Deploys configmap, job, and cronjob.
+* Cronjob is scheduled to run hourly to collect data from Prometheus and forwards it to Densify for analysis.
+
+
 ## Prerequisites
 
-* Densify account, which is provided with a Densify subscription or through a free trial (https://www.densify.com/service/signup)
+* A Densify account, which is provided with a Densify subscription or through a free trial (https://www.densify.com/service/signup)
 * Kubernetes or OpenShift
 * Prometheus (https://prometheus.io/)
 * Kube-state-metrics version 1.5.0+ (https://github.com/kubernetes/kube-state-metrics)
 * Node Exporter (https://hub.docker.com/r/prom/node-exporter) (optional)
 
 ## Installing
-To deploy it via Helm follow these steps:
-1. Clone or update repo
-2. Set the relevant endpoints and credentials values in helm/values.yaml (see the [configuration table](Helm-Parameters.md))
-3. cd helm
-4. Run the command: 
-```console
-'helm install . -f values.yaml'
+
+To deploy Data Forwarder with Helm, follow these steps below:
+1. Clone or update the repo.
+2. Specify the relevant parameters for connectivity in values.yaml. (See the [Configuration](#Configuration) parameters table below.)
+3. Navigate to the helm directory:
 ```
+cd helm
+```
+4. Execute the command: 
+```
+helm install . -f values.yaml
+```
+
 
 ## Configuration
  
-Configure these parameters in values.yaml:
+The following table lists configuratin parameters in values.yaml and their default values.
 
-| Parameter        | Description           | default ` |
+| Parameter        | Description           | Default/<value placeholder>  |
 | ------------- |-------------|--------|
-| `nameOverride` | name override for helm chart name. | `densify-forwarder` |
-| `image` | Image to use for the Densify Container Optimization Data Forwarder. | `densify/container-optimization-data-forwarder:latest` |
-| `pullPolicy` | Image pull policy for the Densify Container Optimization Data Forwarder. | `Always` |
-| `config.densify.hostname` | Specify your Densify server host. You may need to specify a fully qualified domain name. | `<instance>.densify.com` |
-| `config.densify.protocol` | Specify http or https. | `<http/https>` |
-| `config.densify.port` | Specify the Densify connection port. | `443` |
-| `config.densify.user` | Specify the Densify user account. This user must already exist in your Densify instance and have API access privileges. | `nil` |
-| `config.densify.password` | The password for the Densify user. Only specify one of password or encrypted password. | `nil` |
-| `config.densify.epassword` | The encrypted password for the Densify User. Only specify one of passsword or encrypted password. | `nil` |
-| `config.densify.UserSecretName` | Name of secret used to store Densify user and epassword. Needs to have keys of username and epassword. Also if using should disable username\password\epassword settings. | `nil` |
-| `config.prometheus.hostname` | Specify the Prometheus address. suggested to use the internal service name such as `<service name>.<namespace>.svc`. | `nil` |
-| `config.prometheus.protocol` | Specify http or https. | `<http/https>` |
+| `nameOverride` | Specify the helm chart name override. | `densify-forwarder` |
+| `image` | Specify the image to use for the Densify Container Optimization Data Forwarder. | `densify/container-optimization-data-forwarder:latest` |
+| `pullPolicy` | Specify the image pull policy for the Densify Container Optimization Data Forwarder. | `Always` |
+| `config.densify.hostname` | Specify the Densify instance hostname. You may need to specify a fully qualified domain name. | `<instance>.densify.com` |
+| `config.densify.protocol` | Specify the Densify connection protocol: http or https. | `<http/https>` |
+| `config.densify.port` | Specify the Densify connection port number. | `443` |
+| `config.densify.user` | Specify the Densify user account. You must specify either a password or an epassword along with this parameter. This user must already exist in your Densify instance and have API access privileges. Alternatively, you can use config.densify.UserSecretName for authentication instead of user/(e)password combination (see UserSecretName below). | `<username>` |
+| `config.densify.password` | Specify the password for the Densify user. Only specify a password or an encrypted password (not both). | `<password>` |
+| `config.densify.epassword` | Specify the encrypted password for the Densify User. If you specify an encrypted password, then disable the config.densify.password paramter. | `<epassword>` |
+| `config.densify.UserSecretName` | Specify the secret name used to store the Densify user and epassword (keys must contain username and epassword). If this parameter is used, then config.densify.username\password\epassword parameters must be disabled. | `<name of secret to use>` |
+| `config.prometheus.hostname` | Specify the Prometheus address. Using the internal service name is recommended (i.e. `<service name>.<namespace>.svc`). | `<prometheus host name>` |
+| `config.prometheus.protocol` | Specify the Prometheus connection protocol: http or https. | `<http/https>` |
 | `config.prometheus.port` | Specify the Prometheus service connection port. | `9090` |
-| `config.prometheus.clustername` | Name that will be set for the cluster in Densify UI. If left unset then will use the name that is specified in the prometheus hostname. | `nil` |
-| `config.prometheus.interval` | Interval to collect data from Prometheus (hours/days). | `hours` |
-| `config.prometheus.intervalSize` | Size of the interval to collect default would be 1 hour based on interval size. | `1` |
-| `config.prometheus.history` | History being collected by default it will be just the last hour that is collected. | `1` |
-| `config.prometheus.sampleRate` | Sample rate for data points that will be sent to Densify. | `5` |
-| `config.prometheus.includeList` | List of included data types being collected. | `container,node,nodegroup,cluster` |
-| `config.prometheus.oauth_token` | Oauth token to be used for when need to authenticate to Prometheus is secured environment. | `/var/run/secrets/kubernetes.io/serviceaccount/token` |
-| `config.prometheus.ca_certificate` | CA certificate to use when communicating with Prometheus in secure environment. | `/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt` |
-| `config.proxy.host` | Specify name of the proxy host. | `nil` |
-| `config.proxy.port` | Specify the proxy port. | `nil` |
-| `config.proxy.protocol` | Specify http or https. | `<http/https>` |
-| `config.proxy.auth` | Specify proxy authentication type. | `nil` |
-| `config.proxy.user` | Specify the username to use for the proxy. | `nil` |
-| `config.proxy.password` | Specify the password to use for the proxy. Should only enable either the proxy password or proxy encrypted password. | `nil` |
-| `config.proxy.epassword` | Specify the encrypted password to use for the proxy. Should only enable either the proxy password or proxy encrypted password. | `nil` |
-| `config.proxy.domainuser` | Specify domain user for the proxy. | `nil` |
-| `config.proxy.domain` | Specify the domain for the proxy. | `nil` |
-| `config.zipEnabled` | Should the files be zipped before sending to Densify. | `true` |
-| `config.zipname` | Name of the zipfile that will be sent to Densify. | `data/nil` |
-| `config.cronJob.schedule` | Schedule to use for the cronjob. Defaults to top of every hour in line with the interval settings of collecting last hour of data. | `0 * * * *` |
-| `config.debug` | Turn on debug logging. | `false` |
-| `authenticated.create` | Control deployment of service account, cluster role, and cluster role binding for use when the Prometheus server is secured. If using OpenShift environment then likely required to be true. | `false` |
-| `nodeSelector` | Node labels for pod assignments. | `{}` |
-| `resources` | CPU/Memory resource requests/limits. | `{}` |
-| `tolerations` | Toleration lables for pod assignments. | `{}` |
+| `config.prometheus.clustername` | Specify the name to identify the cluster in the Densify UI. If this parameter is disabled, then the specified Prometheus hostname is used to identify the cluster in the Densify UI. | `<cluster name>` |
+| `config.prometheus.interval` | The interval to collect data from Prometheus: hours or days. | `hours` |
+| `config.prometheus.intervalSize` | The size of the interval to collect data from Prometheus. For example, if interval=hours and intervalSize=3, then 3 hours block of data would be collected each time. By default, 1 hour of data is collected. | `1` |
+| `config.prometheus.history` | The number of intervalSize block of data to collect for historical purposes. For example, if interval=hours, intervalSize=2, and history=12, then 24 hours of historical data is collected. By default, the last hour of data is collected for history. | `1` |
+| `config.prometheus.sampleRate` | The sample rate for data points to be collected. By default, samples are recorded every 5 minutes within the intervalSize block of data collected.  | `5` |
+| `config.prometheus.includeList` | The list of included data types to collect. | `container,node,nodegroup,cluster` |
+| `config.prometheus.oauth_token` | Specify the path to the OAuth token used to authenticate with a secured Prometheus server. | `/var/run/secrets/kubernetes.io/serviceaccount/token` |
+| `config.prometheus.ca_certificate` | Specify the CA certificate used to commuicate with a secured Prometheus server. | `/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt` |
+| `config.proxy.host` | Specify name of the proxy host. | `<proxy host>` |
+| `config.proxy.port` | Specify the proxy port number. | `<proxy port>` |
+| `config.proxy.protocol` | Specify the proxy protocol: http or https. | `<protocol>` |
+| `config.proxy.auth` | Specify the proxy authentication type: Basic or NTLM. | `<auth type>` |
+| `config.proxy.user` | Specify the username used for the proxy server. You need to specify either the proxy password or encrypted password in conjunction with this parameter. | `<proxy server username>` |
+| `config.proxy.password` | Specify the password for the proxy server user. If the proxy password is specified, you need to disable the config.proxy.epassword parameter.  | `<proxy server password>` |
+| `config.proxy.epassword` | Specify the encrypted password for the proxy server user. If the proxy epassword is specified, you need to disable the config.proxy.password parameter. | `<proxy server epassword>` |
+| `config.proxy.domainuser` | Specify the domain user for proxy NTLM authentication. | `<domain username>` |
+| `config.proxy.domain` | Specify the domain for proxy NTLM authentication. | `<domain name>` |
+| `config.zipEnabled` | This flag indicates whether data files are zipped before sending to Densify. | `true` |
+| `config.zipname` | Specify the name of the zipfile to send to Densify. | `data/<zip file name>` |
+| `config.cronJob.schedule` | The cronjob schedule. By default, data collection is triggered at the top of every hour. This is in line with the default interval settings of collecting the last hour of data. | `0 * * * *` |
+| `config.debug` | This flag indicates debug logging. | `false` |
+| `authenticated.create` | This flag controls the deployment of service account, cluster role, and cluster role binding in a secured Prometheus server environment. If OpenShift is used, then this flag should be set to true. | `false` |
+| `nodeSelector` | The node labels for pod assignments. | `{}` |
+| `resources` | The CPU/Memory resource requests/limits. | `{}` |
+| `tolerations` | The toleration labels for pod assignments. | `{}` |
 
 ## Limitation
 * Supported Architecture: AMD64
 * Supported OS: Linux
 
 ## Documentation
-* [Densify Feature Description and Reference Guide](https://www.densify.com/docs/Content/Welcome.htm)
+
+* [Densify Solutions > Container Platforms](https://www.densify.com/solutions/container-optimization)
+* [Densify Feature Description and Reference Guide > Optimizing Your Containers](https://www.densify.com/docs/Content/Densify_Com/Optimizing_Your_Containers.htm)
 
 ## License
 Apache 2 Licensed. See [LICENSE](LICENSE) for full details.

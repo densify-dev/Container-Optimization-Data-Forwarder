@@ -58,7 +58,7 @@ spec:
           volumes:
             - name: config
               configMap:
-                name: {{ template "common.fullname" . }}-config
+                name: {{ template "common.fullname" . }}
                 items:
                 - key: config.properties
                   path: config.properties              

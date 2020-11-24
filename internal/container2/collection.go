@@ -332,9 +332,6 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 		if args.Deployments {
 			query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) max(label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)")) by (namespace, pod, replicaset) * on (replicaset, namespace) group_left (owner_name) max(kube_replicaset_owner{owner_kind="Deployment"}) by (namespace, replicaset, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
 			result = common.MetricCollect(args, query2, range5Min, "deployment_"+metricName, false)
-			if result.(model.Matrix).Len() != 0 {
-				fmt.Println("Blah")
-			}
 			writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "Deployment")
 		}
 

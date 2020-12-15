@@ -117,31 +117,44 @@ func Metrics(args *common.Parameters) {
 	historyInterval = 0
 	var query string
 	var result model.Value
+	var err error
 
 	//Start and end time + the prometheus address used for querying
 	range5Min := common.TimeRange(args, historyInterval)
 
 	query = `sum(kube_pod_container_resource_limits_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result = common.MetricCollect(args, query, range5Min, "cpuLimit", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cpuLimit query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cpuLimit query=" + query + " message=" + err.Error())
+	} else {
 		getClusterMetric(result, "cpuLimit")
 	}
 
 	query = `sum(kube_pod_container_resource_requests_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result = common.MetricCollect(args, query, range5Min, "cpuRequest", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cpuRequest query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cpuRequest query=" + query + " message=" + err.Error())
+	} else {
 		getClusterMetric(result, "cpuRequest")
 	}
 
 	query = `sum(kube_pod_container_resource_limits_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result = common.MetricCollect(args, query, range5Min, "memLimit", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=memLimit query=" + query + " message=" + err.Error())
+	} else {
 		getClusterMetric(result, "memLimit")
 	}
 
 	query = `sum(kube_pod_container_resource_requests_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result = common.MetricCollect(args, query, range5Min, "memRequest", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=memRequest query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=memRequest query=" + query + " message=" + err.Error())
+	} else {
 		getClusterMetric(result, "memRequest")
 	}
 

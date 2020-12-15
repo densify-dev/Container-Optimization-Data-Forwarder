@@ -35,14 +35,17 @@ func Metrics(args *common.Parameters) {
 	var query string
 	var result model.Value
 	var haveNodeExport = true
+	var err error
 
 	//Start and end time + the prometheus address used for querying
 	range5Min := common.TimeRange(args, historyInterval)
 
 	//Query and store kubernetes node information/labels
 	query = "max(kube_node_labels) by (instance, node)"
-	result = common.MetricCollect(args, query, range5Min, "nodes", true)
-	if result == nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.ErrorLogger.Println("metric=nodes query=" + query + " message=" + err.Error())
+		fmt.Println("[ERROR] metric=nodes query=" + query + " message=" + err.Error())
 		return
 	}
 	var rsltIndex = result.(model.Matrix)
@@ -63,18 +66,33 @@ func Metrics(args *common.Parameters) {
 
 	//Additonal config/attribute queries
 	query = `kube_node_labels`
-	result = common.MetricCollect(args, query, range5Min, "nodeLabels", false)
-	getNodeMetricString(result, "node")
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=nodeLabels query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=nodeLabels query=" + query + " message=" + err.Error())
+	} else {
+		getNodeMetricString(result, "node")
+	}
 
 	//Additonal config/attribute queries
 	query = `kube_node_info`
-	result = common.MetricCollect(args, query, range5Min, "nodeInfo", false)
-	getNodeMetricString(result, "node")
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=nodeInfo query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=nodeInfo query=" + query + " message=" + err.Error())
+	} else {
+		getNodeMetricString(result, "node")
+	}
 
 	//Gets the network speed in bytes as an attribute/config value for each node
 	query = `label_replace(node_network_speed_bytes, "pod_ip", "$1", "instance", "(.*):.*")`
-	result = common.MetricCollect(args, query, range5Min, "networkSpeedBytes", false)
-	getNodeMetric(result, "node", "netSpeedBytes")
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=networkSpeedBytes query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=networkSpeedBytes query=" + query + " message=" + err.Error())
+	} else {
+		getNodeMetric(result, "node", "netSpeedBytes")
+	}
 
 	if result.(model.Matrix).Len() == 0 {
 		haveNodeExport = false
@@ -82,7 +100,7 @@ func Metrics(args *common.Parameters) {
 
 	//Queries the capacity fields of all nodes
 	query = `kube_node_status_capacity`
-	result = common.MetricCollect(args, query, range5Min, "statusCapacity", false)
+	result, err = common.MetricCollect(args, query, range5Min)
 
 	/*
 	  Some older versions of kube-state-metrics don't support kube_node_status_capacity.
@@ -96,34 +114,46 @@ func Metrics(args *common.Parameters) {
 	if result.(model.Matrix).Len() == 0 {
 		//capacity_cpu_cores query
 		query = `kube_node_status_capacity_cpu_cores`
-		result = common.MetricCollect(args, query, range5Min, "statusCapacityCpuCores", false)
-		if result != nil {
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=statusCapacityCpuCores query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=statusCapacityCpuCores query=" + query + " message=" + err.Error())
+		} else {
 			getNodeMetric(result, "node", "capacity_cpu")
 		}
 
 		//capacity_memory_bytes query
 		query = `kube_node_status_capacity_memory_bytes`
-		result = common.MetricCollect(args, query, range5Min, "statusCapacityMemoryBytes", false)
-		if result != nil {
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=statusCapacityMemoryBytes query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=statusCapacityMemoryBytes query=" + query + " message=" + err.Error())
+		} else {
 			getNodeMetric(result, "node", "capacity_mem")
 		}
 
 		//capacity_pods query
 		query = `kube_node_status_capacity_pods`
-		result = common.MetricCollect(args, query, range5Min, "statusCapacityPods", false)
-		if result != nil {
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=statusCapacityPods query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=statusCapacityPods query=" + query + " message=" + err.Error())
+		} else {
 			getNodeMetric(result, "node", "capacity_pod")
 		}
 
 	} else {
-		if result != nil {
+		if err != nil {
+			args.WarnLogger.Println("metric=statusCapacity query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=statusCapacity query=" + query + " message=" + err.Error())
+		} else {
 			getNodeMetric(result, "node", "capacity")
 		}
 	}
 
 	//Queries the allocatable metric fields of all the nodes
 	query = `kube_node_status_allocatable`
-	result = common.MetricCollect(args, query, range5Min, "statusAllocatable", false)
+	result, err = common.MetricCollect(args, query, range5Min)
 
 	/*
 	  Some older versions of kube-state-metrics don't support kube_node_status_allocatable.
@@ -136,50 +166,74 @@ func Metrics(args *common.Parameters) {
 	*/
 	if result.(model.Matrix).Len() == 0 {
 		query = `kube_node_status_allocatable_cpu_cores`
-		result = common.MetricCollect(args, query, range5Min, "statusAllocatableCpuCores", false)
-		if result != nil {
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=statusAllocatableCpuCores query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=statusAllocatableCpuCores query=" + query + " message=" + err.Error())
+		} else {
 			getNodeMetric(result, "node", "allocatable_cpu")
 		}
 
 		query = `kube_node_status_allocatable_memory_bytes`
-		result = common.MetricCollect(args, query, range5Min, "statusAllocatableMemoryBytes", false)
-		if result != nil {
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=statusAllocatableMemoryBytes query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=statusAllocatableMemoryBytes query=" + query + " message=" + err.Error())
+		} else {
 			getNodeMetric(result, "node", "allocatable_mem")
 		}
 
 		query = `kube_node_status_allocatable_pods`
-		result = common.MetricCollect(args, query, range5Min, "statusAllocatablePods", false)
-		if result != nil {
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=statusAllocatablePods query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=statusAllocatablePods query=" + query + " message=" + err.Error())
+		} else {
 			getNodeMetric(result, "node", "allocatable_pod")
 		}
 
 	} else {
-		if result != nil {
+		if err != nil {
+			args.WarnLogger.Println("metric=statusAllocatable query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=statusAllocatable query=" + query + " message=" + err.Error())
+		} else {
 			getNodeMetric(result, "node", "allocatable")
 		}
 	}
 
 	query = `sum(kube_pod_container_resource_limits_cpu_cores * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)*1000`
-	result = common.MetricCollect(args, query, range5Min, "cpuLimit", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cpuLimit query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cpuLimit query=" + query + " message=" + err.Error())
+	} else {
 		getNodeMetric(result, "node", "cpuLimit")
 	}
 
 	query = `sum(kube_pod_container_resource_requests_cpu_cores * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)*1000`
-	result = common.MetricCollect(args, query, range5Min, "cpuRequest", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cpuRequest query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cpuRequest query=" + query + " message=" + err.Error())
+	} else {
 		getNodeMetric(result, "node", "cpuRequest")
 	}
 
 	query = `sum(kube_pod_container_resource_limits_memory_bytes * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)/1024/1024`
-	result = common.MetricCollect(args, query, range5Min, "memLimit", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=memLimit query=" + query + " message=" + err.Error())
+	} else {
 		getNodeMetric(result, "node", "memLimit")
 	}
 
 	query = `sum(kube_pod_container_resource_requests_memory_bytes * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)/1024/1024`
-	result = common.MetricCollect(args, query, range5Min, "memRequest", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=memRequest query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=memRequest query=" + query + " message=" + err.Error())
+	} else {
 		getNodeMetric(result, "node", "memRequest")
 	}
 
@@ -203,7 +257,7 @@ func Metrics(args *common.Parameters) {
 
 	//Check to see which disk queries to use if instance is IP address that need to link to pod to get name or if instance = node name.
 	query = `max(max(label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[` + args.SampleRateString + `m])) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
-	result = common.MetricCollect(args, query, range5Min, "testNodeWorkload", false)
+	result, err = common.MetricCollect(args, query, range5Min)
 
 	if result.(model.Matrix).Len() != 0 {
 		queryPrefix = `max(max(label_replace(`

@@ -191,6 +191,7 @@ func Metrics(args *common.Parameters) {
 	historyInterval = 0
 	var query string
 	var result model.Value
+	var err error
 
 	//Start and end time + the prometheus address used for querying
 	range5Min := common.TimeRange(args, historyInterval)
@@ -199,8 +200,10 @@ func Metrics(args *common.Parameters) {
 	var nodeGroupLabel model.LabelName
 
 	query = `avg(kube_node_labels) by (label_cloud_google_com_gke_nodepool,label_eks_amazonaws_com_nodegroup, label_agentpool, label_pool_name)`
-	result = common.MetricCollect(args, query, range5Min, "nodeGroupingLabelLookup", false)
-	if result == nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.ErrorLogger.Println("metric=nodeGroup query=" + query + " message=" + err.Error())
+		fmt.Println("[ERROR] metric=nodeGroup query=" + query + " message=" + err.Error())
 		return
 	}
 
@@ -215,8 +218,10 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_node_labels{` + string(nodeGroupLabel) + `=~".+"}`
-	result = common.MetricCollect(args, query, range5Min, "groupedNodes", false)
-	if result == nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.ErrorLogger.Println("metric=groupedNodes query=" + query + " message=" + err.Error())
+		fmt.Println("[ERROR] metric=groupedNodes query=" + query + " message=" + err.Error())
 		return
 	}
 	for i := range result.(model.Matrix) {
@@ -234,38 +239,56 @@ func Metrics(args *common.Parameters) {
 	var nodeGroupSuffix = ` * on (node) group_right kube_node_labels{` + string(nodeGroupLabel) + `=~".+"}) by (` + string(nodeGroupLabel) + `)`
 
 	query = `avg(sum(kube_pod_container_resource_limits_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)` + nodeGroupSuffix
-	result = common.MetricCollect(args, query, range5Min, "cpuLimit", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cpuLimit query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cpuLimit query=" + query + " message=" + err.Error())
+	} else {
 		getNodeGroupMetric(result, nodeGroupLabel, "cpuLimit")
 	}
 
 	query = `avg(sum(kube_pod_container_resource_requests_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)` + nodeGroupSuffix
-	result = common.MetricCollect(args, query, range5Min, "cpuRequest", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cpuRequest query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cpuRequest query=" + query + " message=" + err.Error())
+	} else {
 		getNodeGroupMetric(result, nodeGroupLabel, "cpuRequest")
 	}
 
 	query = `avg(sum(kube_pod_container_resource_limits_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)` + nodeGroupSuffix
-	result = common.MetricCollect(args, query, range5Min, "memLimit", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=memLimit query=" + query + " message=" + err.Error())
+	} else {
 		getNodeGroupMetric(result, nodeGroupLabel, "memLimit")
 	}
 
 	query = `avg(sum(kube_pod_container_resource_requests_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)` + nodeGroupSuffix
-	result = common.MetricCollect(args, query, range5Min, "memRequest", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=memRequest query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=memRequest query=" + query + " message=" + err.Error())
+	} else {
 		getNodeGroupMetric(result, nodeGroupLabel, "memRequest")
 	}
 
 	query = `avg(kube_node_status_capacity_cpu_cores` + nodeGroupSuffix
-	result = common.MetricCollect(args, query, range5Min, "cpuCapacity", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cpuCapacity query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cpuCapacity query=" + query + " message=" + err.Error())
+	} else {
 		getNodeGroupMetric(result, nodeGroupLabel, "cpuCapacity")
 	}
 
 	query = `avg(kube_node_status_capacity_memory_bytes/1024/1024` + nodeGroupSuffix
-	result = common.MetricCollect(args, query, range5Min, "memCapacity", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=memCapacity query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=memCapacity query=" + query + " message=" + err.Error())
+	} else {
 		getNodeGroupMetric(result, nodeGroupLabel, "memCapacity")
 	}
 
@@ -290,7 +313,7 @@ func Metrics(args *common.Parameters) {
 
 	//Check to see which disk queries to use if instance is IP address that need to link to pod to get name or if instance = node name.
 	query = `max(max(label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[` + args.SampleRateString + `m])) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
-	result = common.MetricCollect(args, query, range5Min, "testNodeWorkload", false)
+	result, err = common.MetricCollect(args, query, range5Min)
 
 	queryPrefix := `avg(label_replace(`
 	queryPrefixSum := `avg(label_replace(sum(`

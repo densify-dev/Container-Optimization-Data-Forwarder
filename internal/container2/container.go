@@ -44,6 +44,7 @@ func Metrics(args *common.Parameters) {
 	var query string
 	var result model.Value
 	var rslt model.Matrix
+	var err error
 
 	var podOwners = map[string]string{}
 	var podOwnersKind = map[string]string{}
@@ -54,8 +55,10 @@ func Metrics(args *common.Parameters) {
 
 	//querys gathering hierarchy information for the containers
 	query = `sum(kube_pod_owner{owner_name!="<none>"}) by (namespace, pod, owner_name, owner_kind)`
-	result = common.MetricCollect(args, query, range5Min, "pods", true)
-	if result == nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.ErrorLogger.Println("metric=pods query=" + query + " message=" + err.Error())
+		fmt.Println("[ERROR] metric=pods query=" + query + " message=" + err.Error())
 		return
 	}
 
@@ -66,8 +69,11 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `sum(kube_replicaset_owner{owner_name!="<none>"}) by (namespace, replicaset, owner_name)`
-	result = common.MetricCollect(args, query, range5Min, "replicasets", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=replicasets query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=replicasets query=" + query + " message=" + err.Error())
+	} else {
 		rslt = result.(model.Matrix)
 		for i := 0; i < rslt.Len(); i++ {
 			replicaSetOwners[string(rslt[i].Metric["replicaset"])+"__"+string(rslt[i].Metric["namespace"])] = string(rslt[i].Metric["owner_name"])
@@ -76,8 +82,11 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `sum(kube_job_owner{owner_name!="<none>"}) by (namespace, job_name, owner_name)`
-	result = common.MetricCollect(args, query, range5Min, "jobs", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=jobs query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=jobs query=" + query + " message=" + err.Error())
+	} else {
 		rslt = result.(model.Matrix)
 		for i := 0; i < rslt.Len(); i++ {
 			jobOwners[string(rslt[i].Metric["job_name"])+"__"+string(rslt[i].Metric["namespace"])] = string(rslt[i].Metric["owner_name"])
@@ -86,8 +95,10 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `max(kube_pod_container_info) by (container, pod, namespace)`
-	result = common.MetricCollect(args, query, range5Min, "containers", true)
-	if result == nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.ErrorLogger.Println("metric=containers query=" + query + " message=" + err.Error())
+		fmt.Println("[ERROR] metric=containers query=" + query + " message=" + err.Error())
 		return
 	}
 
@@ -190,8 +201,11 @@ func Metrics(args *common.Parameters) {
 
 	//Container metrics
 	query = `container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}/1024/1024`
-	result = common.MetricCollect(args, query, range5Min, "memory", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=memory query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=memory query=" + query + " message=" + err.Error())
+	} else {
 		if args.LabelSuffix == "" && getContainerMetric(result, "namespace", "pod", "container", "memory") {
 			//Don't do anything
 		} else if getContainerMetric(result, "namespace", "pod_name", "container_name", "memory") {
@@ -200,252 +214,372 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000`
-	result = common.MetricCollect(args, query, range5Min, "cpuLimit", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cpuLimit query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cpuLimit query=" + query + " message=" + err.Error())
+	} else {
 		getContainerMetric(result, "namespace", "pod", "container", "cpuLimit")
 	}
 
 	query = `sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000`
-	result = common.MetricCollect(args, query, range5Min, "cpuRequest", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cpuRequest query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cpuRequest query=" + query + " message=" + err.Error())
+	} else {
 		getContainerMetric(result, "namespace", "pod", "container", "cpuRequest")
 	}
 
 	query = `sum(kube_pod_container_resource_limits_memory_bytes) by (pod,namespace,container)/1024/1024`
-	result = common.MetricCollect(args, query, range5Min, "memLimit", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=openshift_clustememLimitrresourcequota_selector query=" + query + " message=" + err.Error())
+	} else {
 		getContainerMetric(result, "namespace", "pod", "container", "memLimit")
 	}
 
 	query = `sum(kube_pod_container_resource_requests_memory_bytes) by (pod,namespace,container)/1024/1024`
-	result = common.MetricCollect(args, query, range5Min, "memRequest", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=memRequest query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=memRequest query=" + query + " message=" + err.Error())
+	} else {
 		getContainerMetric(result, "namespace", "pod", "container", "memRequest")
 	}
 
 	query = `container_spec_cpu_shares{name!~"k8s_POD_.*"}`
-	result = common.MetricCollect(args, query, range5Min, "conLabel", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=conLabel query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=conLabel query=" + query + " message=" + err.Error())
+	} else {
 		getContainerMetricString(result, "namespace", model.LabelName("pod"+args.LabelSuffix), model.LabelName("container"+args.LabelSuffix))
 	}
 
 	query = `kube_pod_container_info`
-	result = common.MetricCollect(args, query, range5Min, "conInfo", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=conInfo query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=conInfo query=" + query + " message=" + err.Error())
+	} else {
 		getContainerMetricString(result, "namespace", "pod", "container")
 	}
 
 	//Pod metrics
 	query = `kube_pod_info`
-	result = common.MetricCollect(args, query, range5Min, "podInfo", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=podInfo query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=podInfo query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetricString(result, "namespace", "pod", "Pod")
 	}
 
 	query = `kube_pod_labels`
-	result = common.MetricCollect(args, query, range5Min, "podLabels", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=podLabels query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=podLabels query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetricString(result, "namespace", "pod", "Pod")
 	}
 
 	query = `sum(kube_pod_container_status_restarts_total) by (pod,namespace,container)`
-	result = common.MetricCollect(args, query, range5Min, "restarts", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=restarts query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=restarts query=" + query + " message=" + err.Error())
+	} else {
 		getContainerMetric(result, "namespace", "pod", "container", "restarts")
 	}
 
 	query = `sum(kube_pod_container_status_terminated) by (pod,namespace,container)`
-	result = common.MetricCollect(args, query, range5Min, "powerState", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=powerState query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=powerState query=" + query + " message=" + err.Error())
+	} else {
 		getContainerMetric(result, "namespace", "pod", "container", "powerState")
 	}
 
 	query = `kube_pod_created`
-	result = common.MetricCollect(args, query, range5Min, "podCreationTime", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=podCreationTime query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=podCreationTime query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "pod", "creationTime", "Pod")
 	}
 
 	//Namespace metrics
 	query = `kube_namespace_labels`
-	result = common.MetricCollect(args, query, range5Min, "namespaceLabels", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=namespaceLabels query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=namespaceLabels query=" + query + " message=" + err.Error())
+	} else {
 		getNamespaceMetricString(result, "namespace")
 	}
 
 	query = `kube_namespace_annotations`
-	result = common.MetricCollect(args, query, range5Min, "namespaceAnnotations", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=namespaceAnnotations query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=namespaceAnnotations query=" + query + " message=" + err.Error())
+	} else {
 		getNamespaceMetricString(result, "namespace")
 	}
 
 	query = `kube_limitrange`
-	result = common.MetricCollect(args, query, range5Min, "nameSpaceLimitrange", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=nameSpaceLimitrange query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=nameSpaceLimitrange query=" + query + " message=" + err.Error())
+	} else {
 		getNamespacelimits(result, "namespace")
 	}
 
 	//Deployment metrics
 	query = `kube_deployment_labels`
-	result = common.MetricCollect(args, query, range5Min, "labels", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=labels query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=labels query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetricString(result, "namespace", "deployment", "Deployment")
 	}
 
 	query = `kube_deployment_spec_strategy_rollingupdate_max_surge`
-	result = common.MetricCollect(args, query, range5Min, "maxSurge", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=maxSurge query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=maxSurge query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "deployment", "maxSurge", "Deployment")
 	}
 
 	query = `kube_deployment_spec_strategy_rollingupdate_max_unavailable`
-	result = common.MetricCollect(args, query, range5Min, "maxUnavailable", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=maxUnavailable query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=maxUnavailable query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "deployment", "maxUnavailable", "Deployment")
 	}
 
 	query = `kube_deployment_metadata_generation`
-	result = common.MetricCollect(args, query, range5Min, "metadataGeneration", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=metadataGeneration query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=metadataGeneration query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "deployment", "metadataGeneration", "Deployment")
 	}
 
 	query = `kube_deployment_created`
-	result = common.MetricCollect(args, query, range5Min, "deploymentCreated", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=deploymentCreated query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=deploymentCreated query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "deployment", "creationTime", "Deployment")
 	}
 
 	//ReplicaSet metrics
 	query = `kube_replicaset_labels`
-	result = common.MetricCollect(args, query, range5Min, "replicaSetLabels", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=replicaSetLabels query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=replicaSetLabels query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetricString(result, "namespace", "replicaset", "ReplicaSet")
 	}
 
 	query = `kube_replicaset_created`
-	result = common.MetricCollect(args, query, range5Min, "replicaSetCreated", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=replicaSetCreated query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=replicaSetCreated query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "replicaset", "creationTime", "ReplicaSet")
 	}
 
 	//ReplicationController metrics
 	query = `kube_replicationcontroller_created`
-	result = common.MetricCollect(args, query, range5Min, "replicationControllerCreated", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=replicationControllerCreated query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=replicationControllerCreated query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "replicationcontroller", "creationTime", "ReplicationController")
 	}
 
 	//DaemonSet metrics
 	query = `kube_daemonset_labels`
-	result = common.MetricCollect(args, query, range5Min, "daemonSetLabels", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=daemonSetLabels query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=daemonSetLabels query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetricString(result, "namespace", "daemonset", "DaemonSet")
 	}
 
 	query = `kube_daemonset_created`
-	result = common.MetricCollect(args, query, range5Min, "daemonSetCreated", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=daemonSetCreated query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=daemonSetCreated query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "daemonset", "creationTime", "DaemonSet")
 	}
 
 	//StatefulSet metrics
 	query = `kube_statefulset_labels`
-	result = common.MetricCollect(args, query, range5Min, "statefulSetLabels", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=statefulSetLabels query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=statefulSetLabels query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetricString(result, "namespace", "statefulset", "StatefulSet")
 	}
 
 	query = `kube_statefulset_created`
-	result = common.MetricCollect(args, query, range5Min, "statefulSetCreated", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=statefulSetCreated query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=statefulSetCreated query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "statefulset", "creationTime", "StatefulSet")
 	}
 
 	//Job metrics
 	query = `kube_job_info * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result = common.MetricCollect(args, query, range5Min, "jobInfo", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=jobInfo query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=jobInfo query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetricString(result, "namespace", "job_name", "Job")
 	}
 
 	query = `kube_job_labels * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result = common.MetricCollect(args, query, range5Min, "jobLabel", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=jobLabel query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=jobLabel query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetricString(result, "namespace", "job_name", "Job")
 	}
 
 	query = `kube_job_spec_completions * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result = common.MetricCollect(args, query, range5Min, "jobSpecCompletions", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=jobSpecCompletions query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=jobSpecCompletions query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "job_name", "specCompletions", "Job")
 	}
 
 	query = `kube_job_spec_parallelism * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result = common.MetricCollect(args, query, range5Min, "jobSpecParallelism", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=jobSpecParallelism query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=jobSpecParallelism query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "job_name", "specParallelism", "Job")
 	}
 
 	query = `kube_job_status_completion_time * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result = common.MetricCollect(args, query, range5Min, "jobStatusCompletionTime", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=jobStatusCompletionTime query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=jobStatusCompletionTime query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "job_name", "statusCompletionTime", "Job")
 	}
 
 	query = `kube_job_status_start_time * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result = common.MetricCollect(args, query, range5Min, "jobStatusStartTime", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=jobStatusStartTime query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=jobStatusStartTime query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "job_name", "statusStartTime", "Job")
 	}
 
 	query = `kube_job_created`
-	result = common.MetricCollect(args, query, range5Min, "jobCreated", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=jobCreated query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=jobCreated query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "job", "creationTime", "Job")
 	}
 
 	//CronJob metrics
 	query = `kube_cronjob_labels`
-	result = common.MetricCollect(args, query, range5Min, "cronJobLabels", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cronJobLabels query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cronJobLabels query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetricString(result, "namespace", "cronjob", "CronJob")
 	}
 
 	query = `kube_cronjob_info`
-	result = common.MetricCollect(args, query, range5Min, "cronJobInfo", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cronJobInfo query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cronJobInfo query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetricString(result, "namespace", "cronjob", "CronJob")
 	}
 
 	query = `kube_cronjob_next_schedule_time`
-	result = common.MetricCollect(args, query, range5Min, "cronJobNextScheduleTime", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cronJobNextScheduleTime query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cronJobNextScheduleTime query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "cronjob", "nextScheduleTime", "CronJob")
 	}
 
 	query = `kube_cronjob_status_last_schedule_time`
-	result = common.MetricCollect(args, query, range5Min, "cronJobStatusLastScheduleTime", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cronJobStatusLastScheduleTime query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cronJobStatusLastScheduleTime query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "cronjob", "lastScheduleTime", "CronJob")
 	}
 
 	query = `kube_cronjob_status_active`
-	result = common.MetricCollect(args, query, range5Min, "cronJobStatusActive", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cronJobStatusActive query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cronJobStatusActive query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "cronjob", "statusActive", "CronJob")
 	}
 
 	query = `kube_cronjob_created`
-	result = common.MetricCollect(args, query, range5Min, "cronJobCreated", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=cronJobCreated query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=cronJobCreated query=" + query + " message=" + err.Error())
+	} else {
 		getMidMetric(result, "namespace", "cronjob", "creationTime", "CronJob")
 	}
 
 	//HPA metrics
 	query = `kube_hpa_labels`
-	result = common.MetricCollect(args, query, range5Min, "hpaLabels", false)
-	if result != nil {
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=hpaLabels query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=hpaLabels query=" + query + " message=" + err.Error())
+	} else {
 		getHPAMetricString(result, "namespace", "hpa", args)
 	}
 
@@ -454,60 +588,81 @@ func Metrics(args *common.Parameters) {
 	if err != nil {
 		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
 		fmt.Println("[ERROR] entity=" + entityKind + " message=" + err.Error())
-		return
-	}
-	fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,Auto Scaling - In Service Instances\n")
+	} else {
+		fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,Auto Scaling - In Service Instances\n")
 
-	query = `kube_replicaset_spec_replicas`
-	result = common.MetricCollect(args, query, range5Min, "replicaSetSpecReplicas", false)
-	if result != nil {
-		getMidMetric(result, "namespace", "replicaset", "currentSize", "ReplicaSet")
-	}
-	writeWorkloadMid(currentSizeWrite, result, "namespace", "replicaset", args, "ReplicaSet")
+		query = `kube_replicaset_spec_replicas`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=replicaSetSpecReplicas query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=replicaSetSpecReplicas query=" + query + " message=" + err.Error())
+		} else {
+			getMidMetric(result, "namespace", "replicaset", "currentSize", "ReplicaSet")
+			writeWorkloadMid(currentSizeWrite, result, "namespace", "replicaset", args, "ReplicaSet")
+		}
 
-	query = `kube_replicationcontroller_spec_replicas`
-	result = common.MetricCollect(args, query, range5Min, "replicationcontroller_spec_replicas", false)
-	if result != nil {
-		getMidMetric(result, "namespace", "replicationcontroller", "currentSize", "ReplicationController")
-	}
-	writeWorkloadMid(currentSizeWrite, result, "namespace", "replicationcontroller", args, "ReplicationController")
+		query = `kube_replicationcontroller_spec_replicas`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=replicationcontroller_spec_replicas query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=replicationcontroller_spec_replicas query=" + query + " message=" + err.Error())
+		} else {
+			getMidMetric(result, "namespace", "replicationcontroller", "currentSize", "ReplicationController")
+			writeWorkloadMid(currentSizeWrite, result, "namespace", "replicationcontroller", args, "ReplicationController")
+		}
 
-	query = `kube_daemonset_status_number_available`
-	result = common.MetricCollect(args, query, range5Min, "daemonSetStatusNumberAvailable", false)
-	if result != nil {
-		getMidMetric(result, "namespace", "daemonset", "currentSize", "DaemonSet")
-	}
-	writeWorkloadMid(currentSizeWrite, result, "namespace", "daemonset", args, "DaemonSet")
+		query = `kube_daemonset_status_number_available`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=daemonSetStatusNumberAvailable query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=daemonSetStatusNumberAvailable query=" + query + " message=" + err.Error())
+		} else {
+			getMidMetric(result, "namespace", "daemonset", "currentSize", "DaemonSet")
+			writeWorkloadMid(currentSizeWrite, result, "namespace", "daemonset", args, "DaemonSet")
+		}
 
-	query = `kube_statefulset_replicas`
-	result = common.MetricCollect(args, query, range5Min, "statefulSetReplicas", false)
-	if result != nil {
-		getMidMetric(result, "namespace", "statefulset", "currentSize", "StatefulSet")
-	}
-	writeWorkloadMid(currentSizeWrite, result, "namespace", "statefulset", args, "StatefulSet")
+		query = `kube_statefulset_replicas`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=statefulSetReplicas query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=statefulSetReplicas query=" + query + " message=" + err.Error())
+		} else {
+			getMidMetric(result, "namespace", "statefulset", "currentSize", "StatefulSet")
+			writeWorkloadMid(currentSizeWrite, result, "namespace", "statefulset", args, "StatefulSet")
+		}
 
-	query = `kube_job_spec_parallelism`
-	result = common.MetricCollect(args, query, range5Min, "jobSpecParallelism", false)
-	if result != nil {
-		getMidMetric(result, "namespace", "job_name", "currentSize", "Job")
-	}
-	writeWorkloadMid(currentSizeWrite, result, "namespace", "job_name", args, "Job")
+		query = `kube_job_spec_parallelism`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=jobSpecParallelism query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=jobSpecParallelism query=" + query + " message=" + err.Error())
+		} else {
+			getMidMetric(result, "namespace", "job_name", "currentSize", "Job")
+			writeWorkloadMid(currentSizeWrite, result, "namespace", "job_name", args, "Job")
+		}
 
-	query = `sum(max(kube_job_spec_parallelism) by (namespace,job_name) * on (namespace,job_name) group_right max(kube_job_owner) by (namespace, job_name, owner_name)) by (owner_name, namespace)`
-	result = common.MetricCollect(args, query, range5Min, "cronJobSpecParallelism", false)
-	if result != nil {
-		getMidMetric(result, "namespace", "owner_name", "currentSize", "CronJob")
-	}
-	writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", args, "CronJob")
+		query = `sum(max(kube_job_spec_parallelism) by (namespace,job_name) * on (namespace,job_name) group_right max(kube_job_owner) by (namespace, job_name, owner_name)) by (owner_name, namespace)`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=cronJobSpecParallelism query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=cronJobSpecParallelism query=" + query + " message=" + err.Error())
+		} else {
+			getMidMetric(result, "namespace", "owner_name", "currentSize", "CronJob")
+			writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", args, "CronJob")
+		}
 
-	query = `sum(max(kube_replicaset_spec_replicas) by (namespace,replicaset) * on (namespace,replicaset) group_right max(kube_replicaset_owner) by (namespace, replicaset, owner_name)) by (owner_name, namespace)`
-	result = common.MetricCollect(args, query, range5Min, "replicaSetSpecReplicas", false)
-	if result != nil {
-		getMidMetric(result, "namespace", "owner_name", "currentSize", "Deployment")
-	}
-	writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", args, "Deployment")
+		query = `sum(max(kube_replicaset_spec_replicas) by (namespace,replicaset) * on (namespace,replicaset) group_right max(kube_replicaset_owner) by (namespace, replicaset, owner_name)) by (owner_name, namespace)`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=replicaSetSpecReplicas query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=replicaSetSpecReplicas query=" + query + " message=" + err.Error())
+		} else {
+			getMidMetric(result, "namespace", "owner_name", "currentSize", "Deployment")
+			writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", args, "Deployment")
+		}
 
-	currentSizeWrite.Close()
+		currentSizeWrite.Close()
+	}
 
 	writeAttributes(args)
 	writeConfig(args)

@@ -322,8 +322,8 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left max(kube_pod_owner{owner_name="<none>"}) by (namespace, pod, container` + args.LabelSuffix + `)) by (pod,namespace,container` + args.LabelSuffix + `)`
 		result, err = common.MetricCollect(args, query2, range5Min)
 		if err != nil {
-			args.WarnLogger.Println("metric=pod_" + metricName + " query=" + query + " message=" + err.Error())
-			fmt.Println("[WARNING] metric=pod_" + metricName + " query=" + query + " message=" + err.Error())
+			args.WarnLogger.Println("metric=pod_" + metricName + " query=" + query2 + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=pod_" + metricName + " query=" + query2 + " message=" + err.Error())
 		} else {
 			writeWorkload(workloadWrite, result, "namespace", "pod", model.LabelName("container"+args.LabelSuffix), args, "Pod")
 		}
@@ -332,8 +332,8 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (owner_name,owner_kind) max(kube_pod_owner) by (namespace, pod, owner_name, owner_kind)) by (owner_kind,owner_name,namespace,container` + args.LabelSuffix + `)`
 		result, err = common.MetricCollect(args, query2, range5Min)
 		if err != nil {
-			args.WarnLogger.Println("metric=controller_" + metricName + " query=" + query + " message=" + err.Error())
-			fmt.Println("[WARNING] metric=controller_" + metricName + " query=" + query + " message=" + err.Error())
+			args.WarnLogger.Println("metric=controller_" + metricName + " query=" + query2 + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=controller_" + metricName + " query=" + query2 + " message=" + err.Error())
 		} else {
 			writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "")
 		}
@@ -343,8 +343,8 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 			query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) max(label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)")) by (namespace, pod, replicaset) * on (replicaset, namespace) group_left (owner_name) max(kube_replicaset_owner{owner_kind="Deployment"}) by (namespace, replicaset, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
 			result, err = common.MetricCollect(args, query2, range5Min)
 			if err != nil {
-				args.WarnLogger.Println("metric=deployment_" + metricName + " query=" + query + " message=" + err.Error())
-				fmt.Println("[WARNING] metric=deployment_" + metricName + " query=" + query + " message=" + err.Error())
+				args.WarnLogger.Println("metric=deployment_" + metricName + " query=" + query2 + " message=" + err.Error())
+				fmt.Println("[WARNING] metric=deployment_" + metricName + " query=" + query2 + " message=" + err.Error())
 			} else {
 				writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "Deployment")
 			}
@@ -355,8 +355,8 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 			query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) max(label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)")) by (namespace, pod, job) * on (job, namespace) group_left (owner_name) max(label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (namespace, job, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
 			result, err = common.MetricCollect(args, query2, range5Min)
 			if err != nil {
-				args.WarnLogger.Println("metric=cronJob_" + metricName + " query=" + query + " message=" + err.Error())
-				fmt.Println("[WARNING] metric=cronJob_" + metricName + " query=" + query + " message=" + err.Error())
+				args.WarnLogger.Println("metric=cronJob_" + metricName + " query=" + query2 + " message=" + err.Error())
+				fmt.Println("[WARNING] metric=cronJob_" + metricName + " query=" + query2 + " message=" + err.Error())
 			} else {
 				writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "CronJob")
 			}

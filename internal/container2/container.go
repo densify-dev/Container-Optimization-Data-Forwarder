@@ -183,22 +183,10 @@ func Metrics(args *common.Parameters) {
 		}
 	}
 
-	//for printing containers
-	tempString := ""
 	if args.Debug {
-		for i := range systems {
-			tempString += "namespace: " + i + "\n"
-			for j, v := range systems[i].midLevels {
-				tempString += "- entity name: " + v.name + "\n  entity kind: " + v.kind + "\n  namespace: " + i + "\n  containers: \n"
-				for k := range systems[i].midLevels[j].containers {
-					tempString += "  - " + k + "\n"
-				}
-			}
-		}
-		args.DebugLogger.Println("message=Dump of Systesms structure\n" + tempString)
-		fmt.Println("[DEBUG] message=Dump of Systesms structure\n" + tempString)
+		args.DebugLogger.Println("message=Collecting Container Metrics")
+		fmt.Println("[DEBUG] message=Collecting Container Metrics")
 	}
-
 	//Container metrics
 	query = `container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}/1024/1024`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -268,6 +256,10 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//Pod metrics
+	if args.Debug {
+		args.DebugLogger.Println("message=Collecting Pod Metrics")
+		fmt.Println("[DEBUG] message=Collecting Pod Metrics")
+	}
 	query = `kube_pod_info`
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
@@ -314,6 +306,10 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//Namespace metrics
+	if args.Debug {
+		args.DebugLogger.Println("message=Collecting Namespace Metrics")
+		fmt.Println("[DEBUG] message=Collecting Namespace Metrics")
+	}
 	query = `kube_namespace_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
@@ -342,6 +338,10 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//Deployment metrics
+	if args.Debug {
+		args.DebugLogger.Println("message=Collecting Deployment Metrics")
+		fmt.Println("[DEBUG] message=Collecting Deployment Metrics")
+	}
 	query = `kube_deployment_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
@@ -388,6 +388,10 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//ReplicaSet metrics
+	if args.Debug {
+		args.DebugLogger.Println("message=Collecting Replica Set Metrics")
+		fmt.Println("[DEBUG] message=Collecting Replica Set Metrics")
+	}
 	query = `kube_replicaset_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
@@ -407,6 +411,10 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//ReplicationController metrics
+	if args.Debug {
+		args.DebugLogger.Println("message=Collecting Replication Controller Metrics")
+		fmt.Println("[DEBUG] message=Collecting Replication Controller Metrics")
+	}
 	query = `kube_replicationcontroller_created`
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
@@ -417,6 +425,10 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//DaemonSet metrics
+	if args.Debug {
+		args.DebugLogger.Println("message=Collecting Daemon Set Metrics")
+		fmt.Println("[DEBUG] message=Collecting Daemon Set Metrics")
+	}
 	query = `kube_daemonset_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
@@ -436,6 +448,10 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//StatefulSet metrics
+	if args.Debug {
+		args.DebugLogger.Println("message=Collecting Stateful Set Metrics")
+		fmt.Println("[DEBUG] message=Collecting Stateful Set Metrics")
+	}
 	query = `kube_statefulset_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
@@ -455,6 +471,10 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//Job metrics
+	if args.Debug {
+		args.DebugLogger.Println("message=Collecting Job Metrics")
+		fmt.Println("[DEBUG] message=Collecting Job Metrics")
+	}
 	query = `kube_job_info * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
@@ -519,6 +539,10 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//CronJob metrics
+	if args.Debug {
+		args.DebugLogger.Println("message=Collecting Cron Job Metrics")
+		fmt.Println("[DEBUG] message=Collecting Cron Job Metrics")
+	}
 	query = `kube_cronjob_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
@@ -574,6 +598,10 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//HPA metrics
+	if args.Debug {
+		args.DebugLogger.Println("message=Collecting HPA Metrics")
+		fmt.Println("[DEBUG] message=Collecting HPA Metrics")
+	}
 	query = `kube_hpa_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
@@ -584,6 +612,10 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//Current size workloads
+	if args.Debug {
+		args.DebugLogger.Println("message=Collecting Current Size Metric")
+		fmt.Println("[DEBUG] message=Collecting Current Size Metric")
+	}
 	currentSizeWrite, err := os.Create("./data/container/currentSize.csv")
 	if err != nil {
 		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
@@ -675,6 +707,10 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//Container workloads
+	if args.Debug {
+		args.DebugLogger.Println("message=Collecting Container Workload Metrics")
+		fmt.Println("[DEBUG] message=Collecting Container Workload Metrics")
+	}
 	query = queryPrefix + `round(max(irate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[` + args.SampleRateString + `m])) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)*1000,1)` + querySuffix
 	getWorkload("cpu_mCores_workload", "CPU Utilization in mCores", query, "max", args)
 	getWorkload("cpu_mCores_workload", "Prometheus CPU Utilization in mCores", query, "avg", args)

@@ -4,6 +4,7 @@ package container2
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
@@ -43,8 +44,8 @@ func Metrics(args *common.Parameters) {
 	historyInterval = 0
 	var query string
 	var result model.Value
-	var rslt model.Matrix
 	var err error
+	var mem runtime.MemStats
 
 	var podOwners = map[string]string{}
 	var podOwnersKind = map[string]string{}
@@ -52,7 +53,11 @@ func Metrics(args *common.Parameters) {
 	var jobOwners = map[string]string{}
 
 	range5Min := common.TimeRange(args, historyInterval)
-
+	if args.Debug {
+		runtime.ReadMemStats(&mem)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
+	}
 	//querys gathering hierarchy information for the containers
 	query = `sum(kube_pod_owner{owner_name!="<none>"}) by (namespace, pod, owner_name, owner_kind)`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -62,10 +67,9 @@ func Metrics(args *common.Parameters) {
 		return
 	}
 
-	rslt = result.(model.Matrix)
-	for i := 0; i < rslt.Len(); i++ {
-		podOwners[string(rslt[i].Metric["pod"])+"__"+string(rslt[i].Metric["namespace"])] = string(rslt[i].Metric["owner_name"])
-		podOwnersKind[string(rslt[i].Metric["pod"])+"__"+string(rslt[i].Metric["namespace"])] = string(rslt[i].Metric["owner_kind"])
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
+		podOwners[string(result.(model.Matrix)[i].Metric["pod"])+"__"+string(result.(model.Matrix)[i].Metric["namespace"])] = string(result.(model.Matrix)[i].Metric["owner_name"])
+		podOwnersKind[string(result.(model.Matrix)[i].Metric["pod"])+"__"+string(result.(model.Matrix)[i].Metric["namespace"])] = string(result.(model.Matrix)[i].Metric["owner_kind"])
 	}
 
 	query = `sum(kube_replicaset_owner{owner_name!="<none>"}) by (namespace, replicaset, owner_name)`
@@ -74,9 +78,8 @@ func Metrics(args *common.Parameters) {
 		args.WarnLogger.Println("metric=replicasets query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=replicasets query=" + query + " message=" + err.Error())
 	} else {
-		rslt = result.(model.Matrix)
-		for i := 0; i < rslt.Len(); i++ {
-			replicaSetOwners[string(rslt[i].Metric["replicaset"])+"__"+string(rslt[i].Metric["namespace"])] = string(rslt[i].Metric["owner_name"])
+		for i := 0; i < result.(model.Matrix).Len(); i++ {
+			replicaSetOwners[string(result.(model.Matrix)[i].Metric["replicaset"])+"__"+string(result.(model.Matrix)[i].Metric["namespace"])] = string(result.(model.Matrix)[i].Metric["owner_name"])
 			args.Deployments = true
 		}
 	}
@@ -87,9 +90,8 @@ func Metrics(args *common.Parameters) {
 		args.WarnLogger.Println("metric=jobs query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobs query=" + query + " message=" + err.Error())
 	} else {
-		rslt = result.(model.Matrix)
-		for i := 0; i < rslt.Len(); i++ {
-			jobOwners[string(rslt[i].Metric["job_name"])+"__"+string(rslt[i].Metric["namespace"])] = string(rslt[i].Metric["owner_name"])
+		for i := 0; i < result.(model.Matrix).Len(); i++ {
+			jobOwners[string(result.(model.Matrix)[i].Metric["job_name"])+"__"+string(result.(model.Matrix)[i].Metric["namespace"])] = string(result.(model.Matrix)[i].Metric["owner_name"])
 			args.CronJobs = true
 		}
 	}
@@ -101,8 +103,6 @@ func Metrics(args *common.Parameters) {
 		fmt.Println("[ERROR] metric=containers query=" + query + " message=" + err.Error())
 		return
 	}
-
-	rslt = result.(model.Matrix)
 
 	var currentOwner string
 
@@ -116,13 +116,13 @@ func Metrics(args *common.Parameters) {
 	}
 
 	//Add containers and top owners to structure
-	for i := 0; i < rslt.Len(); i++ {
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
 
-		containerName := string(rslt[i].Metric["container"])
-		podName := string(rslt[i].Metric["pod"])
+		containerName := string(result.(model.Matrix)[i].Metric["container"])
+		podName := string(result.(model.Matrix)[i].Metric["pod"])
 		var ownerKind string
 
-		namespaceName := string(rslt[i].Metric["namespace"])
+		namespaceName := string(result.(model.Matrix)[i].Metric["namespace"])
 		if _, ok := systems[namespaceName]; !ok {
 			systems[namespaceName] = &namespace{pointers: map[string]*midLevel{}, midLevels: map[string]*midLevel{}, cpuRequest: -1, cpuLimit: -1, memRequest: -1, memLimit: -1, labelMap: map[string]string{}}
 		}
@@ -309,6 +309,9 @@ func Metrics(args *common.Parameters) {
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting Namespace Metrics")
 		fmt.Println("[DEBUG] message=Collecting Namespace Metrics")
+		runtime.ReadMemStats(&mem)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
 	}
 	query = `kube_namespace_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -341,6 +344,9 @@ func Metrics(args *common.Parameters) {
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting Deployment Metrics")
 		fmt.Println("[DEBUG] message=Collecting Deployment Metrics")
+		runtime.ReadMemStats(&mem)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
 	}
 	query = `kube_deployment_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -391,6 +397,9 @@ func Metrics(args *common.Parameters) {
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting Replica Set Metrics")
 		fmt.Println("[DEBUG] message=Collecting Replica Set Metrics")
+		runtime.ReadMemStats(&mem)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
 	}
 	query = `kube_replicaset_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -414,6 +423,9 @@ func Metrics(args *common.Parameters) {
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting Replication Controller Metrics")
 		fmt.Println("[DEBUG] message=Collecting Replication Controller Metrics")
+		runtime.ReadMemStats(&mem)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
 	}
 	query = `kube_replicationcontroller_created`
 	result, err = common.MetricCollect(args, query, range5Min)

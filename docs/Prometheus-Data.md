@@ -126,8 +126,8 @@ The following table lists Prometheus metrics and their usage.
 | kube_pod_container_resource_requests_cpu_cores | CPU requests (used for workload and attribute) |
 | kube_pod_container_resource_limits_memory_bytes | Memory limit (used for workload and attribute) |
 | kube_pod_container_resource_requests_memory_bytes | Memory requests (used for workload and attribute) |
-| kube_node_status_capacity_cpu_cores | Node Group avg capacity CPU cores |
-| kube_node_status_capacity_memory_bytes | Node Group avg capacity memory bytes |
+| kube_node_status_capacity_cpu_cores | Avg capacity CPU cores |
+| kube_node_status_capacity_memory_bytes | Avg capacity memory bytes |
 | node_disk_written_bytes_total | Disk write bytes total (avg) |
 | node_disk_read_bytes_total | Disk read bytes total (avg) |
 | node_disk_write_time_seconds_total | Disk write operations (avg) |

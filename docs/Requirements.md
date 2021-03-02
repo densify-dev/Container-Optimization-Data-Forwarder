@@ -14,5 +14,8 @@ The following item is not mandatory, but does provide additional environment inf
 - Node Exporter
   - Collects data about the Nodes, on which the containers are running. 
   - https://hub.docker.com/r/prom/node-exporter/
+- openshift-state-metrics
+  - The collected metrics provide additional details related to OpenShift specific items such as Cluster Resource Quotas
+  - https://github.com/openshift/openshift-state-metrics
 
 Contact Support@Densify.com for more details.

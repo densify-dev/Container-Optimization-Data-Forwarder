@@ -13,7 +13,7 @@ import (
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 )
 
-//writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
+//writeConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
 func writeConfig(args *common.Parameters) {
 
 	//Create the config file and open it for writing.
@@ -70,7 +70,7 @@ func writeConfig(args *common.Parameters) {
 	}
 }
 
-//writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
+//writeAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
 func writeAttributes(args *common.Parameters) {
 
 	//Create the attributes file and open it for writing

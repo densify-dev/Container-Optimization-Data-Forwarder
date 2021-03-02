@@ -172,7 +172,7 @@ func GetWorkload(fileName, metricName, query string, metricfield model.LabelName
 	}
 
 	//If the History parameter is set to anything but default 1 then will loop through the calls starting with the current day\hour\minute interval and work backwards.
-	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
+	//This is done as the farther you go back in time the slower prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
 	//As a result if we do hit an issue with timing out on Prometheus side we still can send the current data and data going back to that point vs losing it all.
 	for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
 		range5Min := TimeRange(args, historyInterval)

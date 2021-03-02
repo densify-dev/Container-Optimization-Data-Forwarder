@@ -13,6 +13,7 @@ import (
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/cluster"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/crq"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/nodegroup"
 	"github.com/spf13/viper"
@@ -22,7 +23,7 @@ import (
 var params *common.Parameters
 
 // Parameters that allows user to control what levels they want to collect data on (cluster, node, container)
-var includeContainer, includeNode, includeNodeGroup, includeCluster bool
+var includeContainer, includeNode, includeNodeGroup, includeCluster, includeQuota bool
 
 //initParamters will look for settings defined on the command line or in config.properties file and update accordingly. Also defines the default values for these variables.
 //Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
@@ -40,7 +41,7 @@ func initParameters() {
 	var configFile = "config"
 	var configPath = "./config"
 	var sampleRate = 5
-	var include = "container,node,cluster,nodegroup"
+	var include = "container,node,cluster,nodegroup,quota"
 	var oAuthTokenPath = ""
 	var caCertPath = ""
 
@@ -284,6 +285,8 @@ func parseIncludeParam(param string) {
 			includeContainer = true
 		} else if strings.Compare(elem, "nodegroup") == 0 {
 			includeNodeGroup = true
+		} else if strings.Compare(elem, "quota") == 0 {
+			includeQuota = true
 		}
 	}
 }
@@ -293,8 +296,8 @@ func main() {
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
-	params.InfoLogger.Println("Version 2.2.2")
-	fmt.Println("[INFO] Version 2.2.2")
+	params.InfoLogger.Println("Version 2.3.0 Beta")
+	fmt.Println("[INFO] Version 2.3.0 Beta")
 
 	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
 	var t time.Time
@@ -332,5 +335,11 @@ func main() {
 	} else {
 		params.InfoLogger.Println("Skipping cluster data collection")
 		fmt.Println("[INFO] Skipping cluster data collection")
+	}
+	if includeQuota {
+		crq.Metrics(params)
+	} else {
+		params.InfoLogger.Println("Skipping quota data collection")
+		fmt.Println("[INFO] Skipping quota data collection")
 	}
 }

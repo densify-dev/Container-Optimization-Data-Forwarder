@@ -12,7 +12,7 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-//writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
+//writeConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
 func writeConfig(args *common.Parameters) {
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/container/config.csv")
@@ -40,7 +40,7 @@ func writeConfig(args *common.Parameters) {
 	}
 }
 
-//writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
+//writeConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
 func writeHPAConfig(args *common.Parameters, systems map[string]map[string]string) {
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/hpa/hpa_extra_config.csv")
@@ -61,7 +61,7 @@ func writeHPAConfig(args *common.Parameters, systems map[string]map[string]strin
 	}
 }
 
-//writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
+//writeAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
 func writeAttributes(args *common.Parameters) {
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/container/attributes.csv")
@@ -144,7 +144,7 @@ func writeAttributes(args *common.Parameters) {
 					fmt.Fprintf(attributeWrite, ",")
 				} else {
 					//Formatting the date into the expexted format. Note the reason for that date is a Go specific way of declaring a format you must use that exact date and time.
-					fmt.Fprintf(attributeWrite, ",%s", time.Unix(int64(vt.creationTime), 0).Format("2006-01-02 15:04:05.000"))
+					fmt.Fprintf(attributeWrite, ",%s", time.Unix(vt.creationTime, 0).Format("2006-01-02 15:04:05.000"))
 				}
 				if vc.restarts == -1 {
 					fmt.Fprintf(attributeWrite, ",,")
@@ -190,7 +190,7 @@ func writeAttributes(args *common.Parameters) {
 	}
 }
 
-//writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
+//writeAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
 func writeHPAAttributes(args *common.Parameters, systems map[string]map[string]string) {
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/hpa/hpa_extra_attributes.csv")

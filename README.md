@@ -16,6 +16,7 @@ The Densify Container Optimization Data Forwarder is the container that collects
 - Kubernetes or OpenShift
 - Prometheus (https://prometheus.io/)
 - Kube-state-metrics (https://github.com/kubernetes/kube-state-metrics)
+- openshift-state-metrics (https://github.com/openshift/openshift-state-metrics)
 
 ## Docker images
 

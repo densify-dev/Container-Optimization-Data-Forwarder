@@ -79,7 +79,7 @@ func getNodeGroupMetric(result model.Value, nodeGroupLabel model.LabelName, metr
 	}
 }
 
-//writeNodeGroupConfig will create the config.csv file that is will be sent Densify by the Forwarder.
+//writeNodeGroupConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
 func writeConfig(args *common.Parameters) {
 
 	//Create the config file and open it for writing.
@@ -125,7 +125,7 @@ func writeConfig(args *common.Parameters) {
 	configWrite.Close()
 }
 
-//writeNodeGroupAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
+//writeNodeGroupAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
 func writeAttributes(args *common.Parameters) {
 
 	//Create the attributes file and open it for writing

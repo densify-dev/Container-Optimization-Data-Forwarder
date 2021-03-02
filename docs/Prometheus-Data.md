@@ -126,4 +126,29 @@ The following table lists Prometheus metrics and their usage.
 | kube_pod_container_resource_requests_cpu_cores | CPU requests (used for workload and attribute) |
 | kube_pod_container_resource_limits_memory_bytes | Memory limit (used for workload and attribute) |
 | kube_pod_container_resource_requests_memory_bytes | Memory requests (used for workload and attribute) |
+| kube_node_status_capacity_cpu_cores | Node Group avg capacity CPU cores |
+| kube_node_status_capacity_memory_bytes | Node Group avg capacity memory bytes |
+| node_disk_written_bytes_total | Disk write bytes total (avg) |
+| node_disk_read_bytes_total | Disk read bytes total (avg) |
+| node_disk_write_time_seconds_total | Disk write operations (avg) |
+| node_disk_read_time_seconds_total | Disk read operations (avg) |
+| node_disk_io_time_seconds_total | Disk write operations (avg) & Disk read operations (avg) |
+| node_memory_MemTotal_bytes | Total memory bytes (avg) & Raw memory utilization (avg) & Actual memory utilization (avg) |
+| node_memory_MemFree_bytes | Raw memory utilization (avg) & Actual memory utilization (avg) |
+| node_memory_Cached_bytes | Actual memory utilization (avg) |
+| node_memory_Buffrees_bytes | Actual memory utilization (avg) |
+| node_memory_Active_bytes | Actual memory bytes (avg) |
+| node_network_recieve_bytes_total | Raw net received utilization (avg) |
+| node_network_recieve_packets_total | Network packets received (avg) |
+| node_network_transmit_bytes_total | Raw net sent utilization (avg) |
+| node_network_transmit_packets_total | Network packets sent (avg) |
+| node_cpu_seconds_total | CPU utilization (avg) |
 
+## CRQ Metrics (OpenShift)
+| Metric | Usage |
+|--------|-------|
+| openshift_clusterresourcequota_created | Cluster Resource Quota creation time |
+| openshift_clusterresourcequota_selector | Cluster Resource Quota information |
+| openshift_clusterresourcequota_labels | Cluster Resource Quota labels |
+| openshift_clusterresourcequota_usage | CPU\memory request\limit utlization (used for workload and attribute) |
+| openshift_clusterresourcequota_namespace_usage | Namespaces information |

@@ -55,8 +55,8 @@ func Metrics(args *common.Parameters) {
 	range5Min := common.TimeRange(args, historyInterval)
 	if args.Debug {
 		runtime.ReadMemStats(&mem)
-		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
-		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	//querys gathering hierarchy information for the containers
 	query = `sum(kube_pod_owner{owner_name!="<none>"}) by (namespace, pod, owner_name, owner_kind)`
@@ -186,6 +186,9 @@ func Metrics(args *common.Parameters) {
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting Container Metrics")
 		fmt.Println("[DEBUG] message=Collecting Container Metrics")
+		runtime.ReadMemStats(&mem)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	//Container metrics
 	query = `container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}/1024/1024`
@@ -259,6 +262,9 @@ func Metrics(args *common.Parameters) {
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting Pod Metrics")
 		fmt.Println("[DEBUG] message=Collecting Pod Metrics")
+		runtime.ReadMemStats(&mem)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_pod_info`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -310,8 +316,8 @@ func Metrics(args *common.Parameters) {
 		args.DebugLogger.Println("message=Collecting Namespace Metrics")
 		fmt.Println("[DEBUG] message=Collecting Namespace Metrics")
 		runtime.ReadMemStats(&mem)
-		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
-		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_namespace_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -345,8 +351,8 @@ func Metrics(args *common.Parameters) {
 		args.DebugLogger.Println("message=Collecting Deployment Metrics")
 		fmt.Println("[DEBUG] message=Collecting Deployment Metrics")
 		runtime.ReadMemStats(&mem)
-		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
-		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_deployment_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -398,8 +404,8 @@ func Metrics(args *common.Parameters) {
 		args.DebugLogger.Println("message=Collecting Replica Set Metrics")
 		fmt.Println("[DEBUG] message=Collecting Replica Set Metrics")
 		runtime.ReadMemStats(&mem)
-		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
-		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_replicaset_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -424,8 +430,8 @@ func Metrics(args *common.Parameters) {
 		args.DebugLogger.Println("message=Collecting Replication Controller Metrics")
 		fmt.Println("[DEBUG] message=Collecting Replication Controller Metrics")
 		runtime.ReadMemStats(&mem)
-		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
-		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024, mem.NumGC)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_replicationcontroller_created`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -440,6 +446,9 @@ func Metrics(args *common.Parameters) {
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting Daemon Set Metrics")
 		fmt.Println("[DEBUG] message=Collecting Daemon Set Metrics")
+		runtime.ReadMemStats(&mem)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_daemonset_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -463,6 +472,9 @@ func Metrics(args *common.Parameters) {
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting Stateful Set Metrics")
 		fmt.Println("[DEBUG] message=Collecting Stateful Set Metrics")
+		runtime.ReadMemStats(&mem)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_statefulset_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -486,6 +498,9 @@ func Metrics(args *common.Parameters) {
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting Job Metrics")
 		fmt.Println("[DEBUG] message=Collecting Job Metrics")
+		runtime.ReadMemStats(&mem)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_job_info * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -554,6 +569,9 @@ func Metrics(args *common.Parameters) {
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting Cron Job Metrics")
 		fmt.Println("[DEBUG] message=Collecting Cron Job Metrics")
+		runtime.ReadMemStats(&mem)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_cronjob_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -613,6 +631,9 @@ func Metrics(args *common.Parameters) {
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting HPA Metrics")
 		fmt.Println("[DEBUG] message=Collecting HPA Metrics")
+		runtime.ReadMemStats(&mem)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_hpa_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
@@ -627,6 +648,9 @@ func Metrics(args *common.Parameters) {
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting Current Size Metric")
 		fmt.Println("[DEBUG] message=Collecting Current Size Metric")
+		runtime.ReadMemStats(&mem)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	currentSizeWrite, err := os.Create("./data/container/currentSize.csv")
 	if err != nil {
@@ -722,6 +746,9 @@ func Metrics(args *common.Parameters) {
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting Container Workload Metrics")
 		fmt.Println("[DEBUG] message=Collecting Container Workload Metrics")
+		runtime.ReadMemStats(&mem)
+		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
+		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = queryPrefix + `round(max(irate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[` + args.SampleRateString + `m])) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)*1000,1)` + querySuffix
 	getWorkload("cpu_mCores_workload", "CPU Utilization in mCores", query, "max", args)

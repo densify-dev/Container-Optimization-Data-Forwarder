@@ -28,14 +28,14 @@ data :
    ###################################################################
    # \ Specify settings for Prometheus used by the dataCollection
    ###################################################################
-   prometheus_address <hostname or IP>
+   prometheus_address <Prometheus hostname. Using the internal service name is recommended (i.e. “service name”.”namespace”.svc)>
    prometheus_port <port|9090>
    #prometheus_protocol <http|https>
    #cluster_name <optional parameter that allows you to specify name to show for cluster in Densify. If not specified will use the prometheus_address>
    #interval <days|hours|minutes>
    #interval_size 1
    #history 1
-   #include_list container,node,nodegroup,cluster
+   #include_list container,node,nodegroup,cluster,quota
    #sample_rate 5
    
    #prometheus_oauth_token /var/run/secrets/kubernetes.io/serviceaccount/token

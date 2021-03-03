@@ -1,6 +1,6 @@
 The following table briefly explains the default variable values, environment and command line variable names.
 
-THe order of precedence is Command Line, Config File, Environment Variables. 
+The order of precedence is: Command Line, Config File, Environment Variables. 
 
 ## Variable Names Data Collection
 | Config Setting Name | Default | Environment Variables | Config.Properties | Command Line |
@@ -34,7 +34,7 @@ THe order of precedence is Command Line, Config File, Environment Variables.
 | Proxy Protocol | DENSIFY_PROXYPROTOCOL | 
 | Proxy Auth | DENSIFY_PROXYAUTH |
 | Proxy User | DENSIFY_PROXYUSER |
-|Proxy Password | DENSIFY_PROXYPASSWORD | 
+| Proxy Password | DENSIFY_PROXYPASSWORD | 
 | Encrypted Proxy Password | DENSIFY_EPROXYPASSWORD | 
 | Proxy Server | DENSIFY_PROXYSERVER |
 | Proxy Domain | DENISFY_PROXYDOMAIN | 

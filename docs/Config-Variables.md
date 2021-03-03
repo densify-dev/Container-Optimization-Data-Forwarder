@@ -3,7 +3,7 @@ The following table briefly explains the default variable values, environment an
 The order of precedence is: Command Line, Config File, Environment Variables. 
 
 ## Variable Names Data Collection
-| Config Setting Name | Default | Environment Variables | Config.Properties | Command Line |
+| Config Setting Name | Default Value | Environment Variables | Config.Properties | Command Line |
 |--------|-------|-------|-------|-------|
 | Cluster Name | "" | PROMETHEUS_CLUSTER | cluster_name | clusterName | 
 | Prometheus Protocol | http | PROMETHEUS_PROTOCOL | protocol | protocol |

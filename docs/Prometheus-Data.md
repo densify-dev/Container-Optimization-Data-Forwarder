@@ -1,4 +1,4 @@
-The following tables list Prometheus metrics and their usage.
+The following tables list Prometheus metrics and how they are used by Densify.
 
 - [Container Metrics](#container-metrics)
 - [Node Metrics](#node-metrics)
@@ -92,7 +92,7 @@ The following tables list Prometheus metrics and their usage.
 | node_memory_MemTotal_bytes | Total memory bytes & Raw memory utilization & Actual memory utilization | 
 | node_memory_MemFree_bytes | Raw memory utilization & Actual memory utilization | 
 | node_memory_Cached_bytes | Actual memory utilization | 
-| node_memory_Buffrees_bytes | Actual memory utilization | 
+| node_memory_Buffers_bytes | Actual memory utilization | 
 | node_memory_Active_bytes | Actual memory bytes | Is this mem used or available? |
 | node_network_recieve_bytes_total | Raw net received utilization | 
 | node_network_recieve_packets_total | Network packets received | 
@@ -118,7 +118,7 @@ The following tables list Prometheus metrics and their usage.
 | node_memory_MemTotal_bytes | Total memory bytes (avg) & Raw memory utilization (avg) & Actual memory utilization (avg) |
 | node_memory_MemFree_bytes | Raw memory utilization (avg) & Actual memory utilization (avg) | 
 | node_memory_Cached_bytes | Actual memory utilization (avg) |
-| node_memory_Buffrees_bytes | Actual memory utilization (avg) |
+| node_memory_Buffers_bytes | Actual memory utilization (avg) |
 | node_memory_Active_bytes | Actual memory bytes (avg) |  
 | node_network_recieve_bytes_total | Raw net received utilization (avg) | 
 | node_network_recieve_packets_total | Network packets received (avg) | 
@@ -144,7 +144,7 @@ The following tables list Prometheus metrics and their usage.
 | node_memory_MemTotal_bytes | Total memory bytes (avg) & Raw memory utilization (avg) & Actual memory utilization (avg) |
 | node_memory_MemFree_bytes | Raw memory utilization (avg) & Actual memory utilization (avg) |
 | node_memory_Cached_bytes | Actual memory utilization (avg) |
-| node_memory_Buffrees_bytes | Actual memory utilization (avg) |
+| node_memory_Buffers_bytes | Actual memory utilization (avg) |
 | node_memory_Active_bytes | Actual memory bytes (avg) |
 | node_network_recieve_bytes_total | Raw net received utilization (avg) |
 | node_network_recieve_packets_total | Network packets received (avg) |

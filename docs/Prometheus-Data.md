@@ -1,5 +1,11 @@
 The following table lists Prometheus metrics and their usage.
 
+- [Node Metrics](#node-metrics)
+- [Node Group Metrics](#node-group-metrics)
+- [Cluster Metrics](#cluster-metrics)
+- [CRQ Metrics](#crq-metrics)
+
+
 ## Container Metrics
 | Metric | Usage | 
 |--------|-------|

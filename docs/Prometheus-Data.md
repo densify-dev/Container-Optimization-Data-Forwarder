@@ -1,5 +1,6 @@
-The following table lists Prometheus metrics and their usage.
+The following tables list Prometheus metrics and their usage.
 
+- [Container Metrics](#container-metrics)
 - [Node Metrics](#node-metrics)
 - [Node Group Metrics](#node-group-metrics)
 - [Cluster Metrics](#cluster-metrics)

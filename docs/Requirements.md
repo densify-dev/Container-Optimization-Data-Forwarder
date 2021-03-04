@@ -16,7 +16,7 @@ The following items are not mandatory, but can provide additional environment in
   - Collects data about the Nodes, on which the containers are running. 
   - https://hub.docker.com/r/prom/node-exporter/
 - openshift-state-metrics
-  - The collected metrics provide additional details related to OpenShift-specific items such as Cluster Resource Quotas (CRQ).
+  - The collected metrics provide additional details for OpenShift-specific items such as Cluster Resource Quotas (CRQ).
   - https://github.com/openshift/openshift-state-metrics
 
 Contact Support@Densify.com for more details.

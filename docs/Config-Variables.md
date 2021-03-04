@@ -1,4 +1,4 @@
-The following table provides the default values and the environment and command line names for the variables used to configure the data forwarder.
+The following tables provide the default values and the environment and command line names for the variables used to configure the data forwarder.
 
 The order of precedence is: Command Line, Config File, Environment Variables. 
 

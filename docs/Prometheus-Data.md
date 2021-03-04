@@ -151,7 +151,9 @@ The following tables list Prometheus metrics and their usage.
 | node_network_transmit_packets_total | Network packets sent (avg) |
 | node_cpu_seconds_total | CPU utilization (avg) |
 
-## CRQ Metrics (OpenShift)
+## CRQ Metrics
+Available only for OpenShift.
+
 | Metric | Usage |
 |--------|-------|
 | openshift_clusterresourcequota_created | Cluster Resource Quota creation time |

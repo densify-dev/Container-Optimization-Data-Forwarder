@@ -2,7 +2,7 @@
 
 <img src="https://www.densify.com/wp-content/uploads/densify.png" width="300">
 
-The Densify Container Optimization Data Forwarder is the container that collects data from Kubernetes via Prometheus and forwards that data to Densify. Densify then analyzes how the containers are running and provides sizing recommendations. 
+The Densify Container Optimization Data Forwarder is the container that collects data from Kubernetes via Prometheus and forwards that data to Densify. Densify then analyzes your containers and provides sizing recommendations. 
 
 - [Requirements](#requirements)
 - [Docker Images](#docker-images)
@@ -16,7 +16,7 @@ The Densify Container Optimization Data Forwarder is the container that collects
 - Kubernetes or OpenShift
 - Prometheus (https://prometheus.io/)
 - Kube-state-metrics (https://github.com/kubernetes/kube-state-metrics)
-- openshift-state-metrics (https://github.com/openshift/openshift-state-metrics)
+- OpenShift-state-metrics (https://github.com/openshift/openshift-state-metrics)
 
 ## Docker images
 

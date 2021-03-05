@@ -124,7 +124,7 @@ func writeConfig(args *common.Parameters) {
 	fmt.Fprintln(configWrite, "cluster,crq")
 
 	for crqName := range crqs {
-		fmt.Fprintf(configWrite, "%s,%s,", *args.ClusterName, crqName)
+		fmt.Fprintf(configWrite, "%s,%s\n", *args.ClusterName, crqName)
 	}
 	configWrite.Close()
 }
@@ -221,7 +221,6 @@ func Metrics(args *common.Parameters) {
 	var rsltIndex = result.(model.Matrix)
 	for i := 0; i < rsltIndex.Len(); i++ {
 
-		fmt.Println(rsltIndex[i].Values)
 		unixTimeInt := int64(rsltIndex[i].Values[len(rsltIndex[i].Values)-1].Value)
 		if err != nil {
 			fmt.Println("ERROR: Unable to parse unix time into int")

@@ -94,8 +94,8 @@ The following tables list Prometheus metrics and how they are used by Densify.
 | node_memory_Cached_bytes | Actual memory utilization | 
 | node_memory_Buffers_bytes | Actual memory utilization | 
 | node_memory_Active_bytes | Actual memory bytes | Is this mem used or available? |
-| node_network_recieve_bytes_total | Raw net received utilization | 
-| node_network_recieve_packets_total | Network packets received | 
+| node_network_receive_bytes_total | Raw net received utilization | 
+| node_network_receive_packets_total | Network packets received | 
 | node_network_transmit_bytes_total | Raw net sent utilization | 
 | node_network_transmit_packets_total | Network packets sent |  
 | node_cpu_seconds_total | CPU utilization | 
@@ -120,8 +120,8 @@ The following tables list Prometheus metrics and how they are used by Densify.
 | node_memory_Cached_bytes | Actual memory utilization (avg) |
 | node_memory_Buffers_bytes | Actual memory utilization (avg) |
 | node_memory_Active_bytes | Actual memory bytes (avg) |  
-| node_network_recieve_bytes_total | Raw net received utilization (avg) | 
-| node_network_recieve_packets_total | Network packets received (avg) | 
+| node_network_receive_bytes_total | Raw net received utilization (avg) | 
+| node_network_receive_packets_total | Network packets received (avg) | 
 | node_network_transmit_bytes_total | Raw net sent utilization (avg) |  
 | node_network_transmit_packets_total | Network packets sent (avg) |  
 | node_cpu_seconds_total | CPU utilization (avg) | 
@@ -146,8 +146,8 @@ The following tables list Prometheus metrics and how they are used by Densify.
 | node_memory_Cached_bytes | Actual memory utilization (avg) |
 | node_memory_Buffers_bytes | Actual memory utilization (avg) |
 | node_memory_Active_bytes | Actual memory bytes (avg) |
-| node_network_recieve_bytes_total | Raw net received utilization (avg) |
-| node_network_recieve_packets_total | Network packets received (avg) |
+| node_network_receive_bytes_total | Raw net received utilization (avg) |
+| node_network_receive_packets_total | Network packets received (avg) |
 | node_network_transmit_bytes_total | Raw net sent utilization (avg) |
 | node_network_transmit_packets_total | Network packets sent (avg) |
 | node_cpu_seconds_total | CPU utilization (avg) |

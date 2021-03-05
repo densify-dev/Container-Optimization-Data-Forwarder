@@ -28,7 +28,7 @@ type Parameters struct {
 	LabelSuffix                                           string
 	InfoLogger, WarnLogger, ErrorLogger, DebugLogger      *log.Logger
 	SampleRate                                            int
-	SampleRateString                                      string
+	SampleRateString, NodeGroupList                       string
 	OAuthTokenPath                                        string
 	CaCertPath                                            string
 	Deployments, CronJobs                                 bool
@@ -154,7 +154,7 @@ func AddToLabelMap(key string, value string, labelPath map[string]string) {
 }
 
 //GetWorkload used to query for the workload data and then calls write workload
-func GetWorkload(fileName, metricName, query string, metricfield model.LabelName, args *Parameters, entityKind string) {
+func GetWorkload(fileName, metricName, query string, metricField model.LabelName, args *Parameters, entityKind string) {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
@@ -182,21 +182,21 @@ func GetWorkload(fileName, metricName, query string, metricfield model.LabelName
 			args.WarnLogger.Println("metric=" + metricName + " query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=" + metricName + " query=" + query + " message=" + err.Error())
 		} else {
-			writeWorkload(workloadWrite, result, metricfield, args, entityKind)
+			WriteWorkload(workloadWrite, result, metricField, args, entityKind)
 		}
 	}
 	//Close the workload files.
 	workloadWrite.Close()
 }
 
-//writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
-func writeWorkload(file io.Writer, result model.Value, metricfield model.LabelName, args *Parameters, entityKind string) {
+//WriteWorkload will write out the workload data specific to metric provided to the file that was passed in.
+func WriteWorkload(file io.Writer, result model.Value, metricField model.LabelName, args *Parameters, entityKind string) {
 	//Loop through the results for the workload and validate that contains the required labels and that the entity exists in the systems data structure once validated will write out the workload for the system.
 	for i := 0; i < result.(model.Matrix).Len(); i++ {
 		var entity model.LabelValue
 		var ok bool
 		if entityKind != "cluster" {
-			if entity, ok = result.(model.Matrix)[i].Metric[metricfield]; !ok {
+			if entity, ok = result.(model.Matrix)[i].Metric[metricField]; !ok {
 				continue
 			}
 		}

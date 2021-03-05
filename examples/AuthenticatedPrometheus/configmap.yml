@@ -36,6 +36,7 @@ data :
    #interval_size 1
    #history 1
    #include_list container,node,nodegroup,cluster,quota
+   #node_group_list label_cloud_google_com_gke_nodepool,label_eks_amazonaws_com_nodegroup,label_agentpool,label_pool_name,label_alpha_eksctl_io_nodegroup_name,label_kops_k8s_io_instancegroup
    #sample_rate 5
    
    prometheus_oauth_token /var/run/secrets/kubernetes.io/serviceaccount/token

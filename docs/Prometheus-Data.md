@@ -8,7 +8,7 @@ The following tables list Prometheus metrics and how they are used by Densify.
 
 
 ## Container Metrics
-| Metric | Description | 
+| Metric | Usage | 
 |--------|-------| 
 | container_spec_cpu_shares | Container labels |
 | kube_pod_container_info | Container information |
@@ -71,7 +71,7 @@ The following tables list Prometheus metrics and how they are used by Densify.
 | kube_hpa_status_desired_replicas | HPA desired replicas |
 
 ## Node Metrics
-| Metric | Description |
+| Metric | Usage |
 |--------|-------|
 | kube_node_labels | Node labels |
 | kube_node_info | Node info |
@@ -101,8 +101,8 @@ The following tables list Prometheus metrics and how they are used by Densify.
 | node_cpu_seconds_total | CPU utilization | 
 
 ## Node Group Metrics
-| Metric | Description |  JM-Comments | 
-|--------|-------| -------|
+| Metric | Usage |
+|--------|-------|
 | kube_node_labels | Node Group labels |
 | kube_pod_container_resource_limits_cpu_cores | CPU limit (used for workload and attribute) |
 | kube_pod_container_resource_requests_cpu_cores | CPU requests (used for workload and attribute) |
@@ -128,7 +128,7 @@ The following tables list Prometheus metrics and how they are used by Densify.
 
 ## Cluster Metrics
 
-| Metric | Desription |
+| Metric | Usage |
 |--------|-------|
 | kube_pod_container_resource_limits_cpu_cores | CPU limit (used for workload and attribute) |
 | kube_pod_container_resource_requests_cpu_cores | CPU requests (used for workload and attribute) |

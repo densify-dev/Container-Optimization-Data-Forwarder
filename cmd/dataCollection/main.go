@@ -42,14 +42,14 @@ func initParameters() {
 	var configPath = "./config"
 	var sampleRate = 5
 	var include = "container,node,cluster,nodegroup,quota"
+	var nodeGroupList = "label_cloud_google_com_gke_nodepool,label_eks_amazonaws_com_nodegroup,label_agentpool,label_pool_name,label_alpha_eksctl_io_nodegroup_name,label_kops_k8s_io_instancegroup"
 	var oAuthTokenPath = ""
 	var caCertPath = ""
 
 	//Temporary variables for procassing flags
-	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp, oAuthTokenPathTemp, caCertPathTemp string
+	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp, oAuthTokenPathTemp, caCertPathTemp, includeTemp, nodeGroupListTemp string
 	var intervalSizeTemp, historyTemp, offsetTemp, sampleRateTemp int
 	var debugTemp bool
-	var includeTemp string
 
 	//Set settings using environment variables
 	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_CLUSTER"); ok {
@@ -119,6 +119,10 @@ func initParameters() {
 		include = tempEnvVar
 	}
 
+	if tempEnvVar, ok := os.LookupEnv("NODE_GROUP_LIST"); ok {
+		nodeGroupList = tempEnvVar
+	}
+
 	if tempEnvVar, ok := os.LookupEnv("OAUTH_TOKEN"); ok {
 		oAuthTokenPath = tempEnvVar
 	}
@@ -140,7 +144,8 @@ func initParameters() {
 	flag.BoolVar(&debugTemp, "debug", debug, "Enable debug logging")
 	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
 	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
-	flag.StringVar(&includeTemp, "includeList", include, "Comma separated list of data to include in collection (cluster, node, container) Ex: \"node,cluster\"")
+	flag.StringVar(&includeTemp, "includeList", include, "Comma separated list of data to include in collection (cluster, node, container, nodegroup, quota) Ex: \"node,cluster\"")
+	flag.StringVar(&nodeGroupListTemp, "nodeGroupList", nodeGroupList, "Comma separated list of labels to check for building node groups Ex: \"label_cloud_google_com_gke_nodepool,label_eks_amazonaws_com_nodegroup,label_agentpool,label_pool_name\"")
 	flag.StringVar(&oAuthTokenPathTemp, "oAuthToken", oAuthTokenPath, "Path to oAuth token file required to authenticate with the Cluster where Prometheus is running.")
 	flag.StringVar(&caCertPathTemp, "caCert", caCertPath, "Path to CA certificate required to pass certificate validation if using HTTPS")
 	flag.Parse()
@@ -159,6 +164,7 @@ func initParameters() {
 		viper.SetDefault("offset", offset)
 		viper.SetDefault("debug", debug)
 		viper.SetDefault("include_list", include)
+		viper.SetDefault("node_group_list", nodeGroupList)
 		viper.SetDefault("prometheus_oauth_token", oAuthTokenPath)
 		viper.SetDefault("ca_certificate", caCertPath)
 		// Config import setup.
@@ -179,6 +185,7 @@ func initParameters() {
 			offset = viper.GetInt("offset")
 			debug = viper.GetBool("debug")
 			include = viper.GetString("include_list")
+			nodeGroupList = viper.GetString("node_group_list")
 			oAuthTokenPath = viper.GetString("prometheus_oauth_token")
 			caCertPath = viper.GetString("ca_certificate")
 		}
@@ -208,6 +215,8 @@ func initParameters() {
 			debug = debugTemp
 		case "includeList":
 			include = includeTemp
+		case "nodeGroupList":
+			nodeGroupList = nodeGroupListTemp
 		case "oAuthToken":
 			oAuthTokenPath = oAuthTokenPathTemp
 		case "caCert":
@@ -268,6 +277,7 @@ func initParameters() {
 		DebugLogger:      debugLogger,
 		SampleRate:       sampleRate,
 		SampleRateString: strconv.Itoa(sampleRate),
+		NodeGroupList:    nodeGroupList,
 		OAuthTokenPath:   oAuthTokenPath,
 		CaCertPath:       caCertPath,
 	}

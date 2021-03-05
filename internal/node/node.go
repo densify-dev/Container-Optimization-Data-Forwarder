@@ -248,12 +248,12 @@ func Metrics(args *common.Parameters) {
 		return
 	}
 
-	var metricfield model.LabelName
+	var metricField model.LabelName
 	queryPrefix := ``
 	queryPrefixSum := `sum(`
 	querySuffix := ``
 	querySuffixSum := `) by (instance)`
-	metricfield = "instance"
+	metricField = "instance"
 
 	//Check to see which disk queries to use if instance is IP address that need to link to pod to get name or if instance = node name.
 	query = `max(max(label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[` + args.SampleRateString + `m])) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
@@ -264,68 +264,68 @@ func Metrics(args *common.Parameters) {
 		queryPrefixSum = `max(sum(label_replace(`
 		querySuffix = `, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 		querySuffixSum = querySuffix
-		metricfield = "node"
+		metricField = "node"
 	}
 	//Query and store prometheus total cpu uptime in seconds
 	query = queryPrefix + `sum(irate(node_cpu_seconds_total{mode!="idle"}[` + args.SampleRateString + `m])) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100` + querySuffix
-	common.GetWorkload("cpu_utilization", "CPU Utilization", query, metricfield, args, entityKind)
+	common.GetWorkload("cpu_utilization", "CPU Utilization", query, metricField, args, entityKind)
 
 	//Query and store prometheus node memory total in bytes
 	query = queryPrefix + `node_memory_MemTotal_bytes - node_memory_MemFree_bytes` + querySuffix
-	common.GetWorkload("memory_raw_bytes", "Raw Mem Utilization", query, metricfield, args, entityKind)
+	common.GetWorkload("memory_raw_bytes", "Raw Mem Utilization", query, metricField, args, entityKind)
 
 	//Query and store prometheus node memory total free in bytes
 	query = queryPrefix + `node_memory_MemTotal_bytes - (node_memory_MemFree_bytes + node_memory_Cached_bytes + node_memory_Buffers_bytes)` + querySuffix
-	common.GetWorkload("memory_actual_workload", "Actual Memory Utilization", query, metricfield, args, entityKind)
+	common.GetWorkload("memory_actual_workload", "Actual Memory Utilization", query, metricField, args, entityKind)
 
 	//Query and store prometheus node disk write in bytes
 	query = queryPrefixSum + `irate(node_disk_written_bytes_total{device!~"dm-.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	common.GetWorkload("disk_write_bytes", "Raw Disk Write Utilization", query, metricfield, args, entityKind)
+	common.GetWorkload("disk_write_bytes", "Raw Disk Write Utilization", query, metricField, args, entityKind)
 
 	//Query and store prometheus node disk read in bytes
 	query = queryPrefixSum + `irate(node_disk_read_bytes_total{device!~"dm-.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	common.GetWorkload("disk_read_bytes", "Raw Disk Read Utilization", query, metricfield, args, entityKind)
+	common.GetWorkload("disk_read_bytes", "Raw Disk Read Utilization", query, metricField, args, entityKind)
 
 	//Query and store prometheus total disk read uptime as a percentage
 	query = queryPrefixSum + `irate(node_disk_read_time_seconds_total{device!~"dm-.*"}[` + args.SampleRateString + `m]) / irate(node_disk_io_time_seconds_total{device!~"dm-.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	common.GetWorkload("disk_read_ops", "Disk Read Operations", query, metricfield, args, entityKind)
+	common.GetWorkload("disk_read_ops", "Disk Read Operations", query, metricField, args, entityKind)
 
 	//Query and store prometheus total disk write uptime as a percentage
 	query = queryPrefixSum + `irate(node_disk_write_time_seconds_total{device!~"dm-.*"}[` + args.SampleRateString + `m]) / irate(node_disk_io_time_seconds_total{device!~"dm-.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	common.GetWorkload("disk_write_ops", "Disk Write Operations", query, metricfield, args, entityKind)
+	common.GetWorkload("disk_write_ops", "Disk Write Operations", query, metricField, args, entityKind)
 
 	//Total disk values
 	//Query and store prometheus node disk read in bytes
 	query = queryPrefixSum + `irate(node_disk_read_bytes_total{device!~"dm-.*"}[` + args.SampleRateString + `m]) + irate(node_disk_written_bytes_total{device!~"dm-.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	common.GetWorkload("disk_total_bytes", "Raw Disk Utilization", query, metricfield, args, entityKind)
+	common.GetWorkload("disk_total_bytes", "Raw Disk Utilization", query, metricField, args, entityKind)
 
 	//Query and store prometheus total disk read uptime as a percentage
 	query = queryPrefixSum + `(irate(node_disk_read_time_seconds_total{device!~"dm-.*"}[` + args.SampleRateString + `m]) + irate(node_disk_write_time_seconds_total{device!~"dm-.*"}[` + args.SampleRateString + `m])) / irate(node_disk_io_time_seconds_total{device!~"dm-.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	common.GetWorkload("disk_total_ops", "Disk Operations", query, metricfield, args, entityKind)
+	common.GetWorkload("disk_total_ops", "Disk Operations", query, metricField, args, entityKind)
 
 	//Query and store prometheus node recieved network data in bytes
 	query = queryPrefixSum + `irate(node_network_receive_bytes_total{device!~"veth.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	common.GetWorkload("net_received_bytes", "Raw Net Received Utilization", query, metricfield, args, entityKind)
+	common.GetWorkload("net_received_bytes", "Raw Net Received Utilization", query, metricField, args, entityKind)
 
 	//Query and store prometheus recieved network data in packets
 	query = queryPrefixSum + `irate(node_network_receive_packets_total{device!~"veth.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	common.GetWorkload("net_received_packets", "Network Packets Received", query, metricfield, args, entityKind)
+	common.GetWorkload("net_received_packets", "Network Packets Received", query, metricField, args, entityKind)
 
 	//Query and store prometheus total transmitted network data in bytes
 	query = queryPrefixSum + `irate(node_network_transmit_bytes_total{device!~"veth.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	common.GetWorkload("net_sent_bytes", "Raw Net Sent Utilization", query, metricfield, args, entityKind)
+	common.GetWorkload("net_sent_bytes", "Raw Net Sent Utilization", query, metricField, args, entityKind)
 
 	//Query and store prometheus total transmitted network data in packets
 	query = queryPrefixSum + `irate(node_network_transmit_packets_total{device!~"veth.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	common.GetWorkload("net_sent_packets", "Network Packets Sent", query, metricfield, args, entityKind)
+	common.GetWorkload("net_sent_packets", "Network Packets Sent", query, metricField, args, entityKind)
 
 	//Total values network
 	//Query and store prometheus total network data in bytes
 	query = queryPrefixSum + `irate(node_network_transmit_bytes_total{device!~"veth.*"}[` + args.SampleRateString + `m]) + irate(node_network_receive_bytes_total{device!~"veth.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	common.GetWorkload("net_total_bytes", "Raw Net Utilization", query, metricfield, args, entityKind)
+	common.GetWorkload("net_total_bytes", "Raw Net Utilization", query, metricField, args, entityKind)
 
 	//Query and store prometheus total network data in packets
 	query = queryPrefixSum + `irate(node_network_transmit_packets_total{device!~"veth.*"}[` + args.SampleRateString + `m]) + irate(node_network_receive_packets_total{device!~"veth.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	common.GetWorkload("net_total_packets", "Network Packets", query, metricfield, args, entityKind)
+	common.GetWorkload("net_total_packets", "Network Packets", query, metricField, args, entityKind)
 
 }

@@ -21,7 +21,7 @@ type crq struct {
 	createTime                                 time.Time
 }
 
-var crqs map[string]*crq
+var crqs = map[string]*crq{}
 
 var entityKind = "crq"
 

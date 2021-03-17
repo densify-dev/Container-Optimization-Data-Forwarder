@@ -14,11 +14,11 @@ type crq struct {
 	//Labels & general information about each node
 	labelMap map[string]string
 
-	selectorType, selectorKey, selectorValue   string
-	resources, namespaces                      string
-	cpuLimit, cpuRequest, memLimit, memRequest float64
-	podsLimit                                  int64
-	createTime                                 time.Time
+	selectorType, selectorKey, selectorValue                                                                   string
+	resources, namespaces                                                                                      string
+	cpuLimit, cpuRequest, memLimit, memRequest, usageCpuLimit, usageCpuRequest, usageMemLimit, usageMemRequest float64
+	podsLimit, usagePodsLimit                                                                                  int64
+	createTime                                                                                                 time.Time
 }
 
 var crqs = map[string]*crq{}
@@ -71,23 +71,39 @@ func getExistingQuotas(result model.Value) {
 		}
 		resource := string(resourceLabel)
 
-		crqs[crqName].resources += resource + ": " + val.Values[0].Value.String() + "|"
+		if typeHard := val.Metric["type"]; typeHard == "hard" {
+			crqs[crqName].resources += resource + ": " + val.Values[0].Value.String() + "|"
 
-		if len(val.Values) < 1 {
-			continue
-		}
-		switch resource {
-		case "limits.cpu":
-			crqs[crqName].cpuLimit = float64(val.Values[0].Value) * 1000
-		case "requests.cpu":
-			crqs[crqName].cpuRequest = float64(val.Values[0].Value) * 1000
-		case "limits.memory":
-			crqs[crqName].memLimit = float64(val.Values[0].Value) / (1024 * 1024)
-		case "requests.memory":
-			crqs[crqName].memRequest = float64(val.Values[0].Value) / (1024 * 1024)
-		case "pods":
-			crqs[crqName].podsLimit = int64(val.Values[0].Value)
-		default:
+			if len(val.Values) < 1 {
+				continue
+			}
+			switch resource {
+			case "limits.cpu":
+				crqs[crqName].cpuLimit = float64(val.Values[0].Value) * 1000
+			case "requests.cpu", "cpu":
+				crqs[crqName].cpuRequest = float64(val.Values[0].Value) * 1000
+			case "limits.memory":
+				crqs[crqName].memLimit = float64(val.Values[0].Value) / (1024 * 1024)
+			case "requests.memory", "memory":
+				crqs[crqName].memRequest = float64(val.Values[0].Value) / (1024 * 1024)
+			case "pods":
+				crqs[crqName].podsLimit = int64(val.Values[0].Value)
+			default:
+			}
+		} else if typeUsed := val.Metric["type"]; typeUsed == "used" {
+			switch resource {
+			case "limits.cpu":
+				crqs[crqName].usageCpuLimit = float64(val.Values[0].Value) * 1000
+			case "requests.cpu", "cpu":
+				crqs[crqName].usageCpuRequest = float64(val.Values[0].Value) * 1000
+			case "limits.memory":
+				crqs[crqName].usageMemLimit = float64(val.Values[0].Value) / (1024 * 1024)
+			case "requests.memory", "memory":
+				crqs[crqName].usageMemRequest = float64(val.Values[0].Value) / (1024 * 1024)
+			case "pods":
+				crqs[crqName].usagePodsLimit = int64(val.Values[0].Value)
+			default:
+			}
 		}
 	}
 }
@@ -141,13 +157,13 @@ func writeAttributes(args *common.Parameters) {
 	defer attributeWrite.Close()
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,crq,Quota Labels,Quota Selector Type,Quota Selector Key,Quota Selector Value,Quoted Resources,Existing CPU Limit mCores,Existing CPU Request mCores,Existing Memory Limit MB,Existing Memory Request MB,Existing Pods Limit,Namespaces Affected")
+	fmt.Fprintln(attributeWrite, "cluster,crq,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Quota Selector Type,Quota Selector Key,Quota Selector Value,Create Time,Namespace Labels,Resource Metadata,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Current Size,Namespace CPU Limit,Namespace CPU Request,Namespace Memory Limit,Namespace Memory Request,Pods Limit,Namespaces Affected")
 
 	//Loop through the CRQs and write out the attributes data for each system.
 	for crqName, crq := range crqs {
 
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-		fmt.Fprintf(attributeWrite, "%s,%s,%s", *args.ClusterName, crqName, crq.createTime.Format("2006-01-02 15:04:05.000"))
+		fmt.Fprintf(attributeWrite, "%s,%s,ClusterResourceQuota,%s,%s,%s,%s,%s,%s,%s,", *args.ClusterName, crqName, *args.ClusterName, crq.selectorType, crq.selectorKey, crq.selectorType, crq.selectorKey, crq.selectorValue, crq.createTime.Format("2006-01-02 15:04:05.000"))
 
 		for key, value := range crq.labelMap {
 			if len(key) >= 250 {
@@ -162,7 +178,37 @@ func writeAttributes(args *common.Parameters) {
 			}
 		}
 
-		fmt.Fprintf(attributeWrite, ",%s,%s,%s,%s", crq.selectorType, crq.selectorKey, crq.selectorValue, crq.resources)
+		fmt.Fprintf(attributeWrite, ",%s", crq.resources)
+
+		if crq.cpuLimit == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%f", crq.usageCpuLimit)
+		}
+
+		if crq.cpuRequest == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%f", crq.usageCpuRequest)
+		}
+
+		if crq.memLimit == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%f", crq.usageMemRequest)
+		}
+
+		if crq.memRequest == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%f", crq.usageMemRequest)
+		}
+
+		if crq.podsLimit == -1 {
+			fmt.Fprintf(attributeWrite, ",")
+		} else {
+			fmt.Fprintf(attributeWrite, ",%d", crq.usagePodsLimit)
+		}
 
 		if crq.cpuLimit == -1 {
 			fmt.Fprintf(attributeWrite, ",")
@@ -227,8 +273,9 @@ func Metrics(args *common.Parameters) {
 		}
 		crqs[string(rsltIndex[i].Metric["name"])] =
 			&crq{
-				labelMap: map[string]string{},
-
+				labelMap:     map[string]string{},
+				selectorType: "", selectorKey: "", selectorValue: "",
+				resources: "", namespaces: "",
 				cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, podsLimit: -1,
 				createTime: time.Unix(unixTimeInt, 0),
 			}
@@ -252,7 +299,7 @@ func Metrics(args *common.Parameters) {
 		populateLabelMap(result, "name")
 	}
 
-	query = `max(openshift_clusterresourcequota_usage{type="hard"}) by (name, resource)`
+	query = `max(openshift_clusterresourcequota_usage) by (name, resource, type)`
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
 		args.WarnLogger.Println("metric=openshift_clusterresourcequota_usage query=" + query + " message=" + err.Error())
@@ -273,19 +320,21 @@ func Metrics(args *common.Parameters) {
 	writeAttributes(args)
 	writeConfig(args)
 
+	var metricField []model.LabelName
+	metricField = append(metricField, "name")
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="limits.cpu"}) by (name) * 1000`
-	common.GetWorkload("cpu_limit", "CPU Utilization in mCores", query, "name", args, entityKind)
+	common.GetWorkload("cpu_limit", "CPU Utilization in mCores", query, metricField, args, entityKind)
 
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="requests.cpu"}) by (name) * 1000`
-	common.GetWorkload("cpu_request", "Prometheus CPU Utilization in mCores", query, "name", args, entityKind)
+	common.GetWorkload("cpu_request", "Prometheus CPU Utilization in mCores", query, metricField, args, entityKind)
 
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="limits.memory"}) by (name) / (1024 * 1024)`
-	common.GetWorkload("mem_limit", "Raw Mem Utilization", query, "name", args, entityKind)
+	common.GetWorkload("mem_limit", "Raw Mem Utilization", query, metricField, args, entityKind)
 
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="requests.memory"}) by (name) / (1024 * 1024)`
-	common.GetWorkload("mem_request", "Prometheus Raw Mem Utilization", query, "name", args, entityKind)
+	common.GetWorkload("mem_request", "Prometheus Raw Mem Utilization", query, metricField, args, entityKind)
 
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="pods"}) by (name)`
-	common.GetWorkload("pods", "Auto Scaling - In Service Instances", query, "name", args, entityKind)
+	common.GetWorkload("pods", "Auto Scaling - In Service Instances", query, metricField, args, entityKind)
 
 }

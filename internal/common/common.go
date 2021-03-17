@@ -154,7 +154,7 @@ func AddToLabelMap(key string, value string, labelPath map[string]string) {
 }
 
 //GetWorkload used to query for the workload data and then calls write workload
-func GetWorkload(fileName, metricName, query string, metricField model.LabelName, args *Parameters, entityKind string) {
+func GetWorkload(fileName, metricName, query string, metricField []model.LabelName, args *Parameters, entityKind string) {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
@@ -167,6 +167,8 @@ func GetWorkload(fileName, metricName, query string, metricField model.LabelName
 	}
 	if entityKind == "cluster" {
 		fmt.Fprintf(workloadWrite, "cluster,Datetime,%s\n", metricName)
+	} else if entityKind == "rq" {
+		fmt.Fprintf(workloadWrite, "cluster,namespace,%s,Datetime,%s\n", entityKind, metricName)
 	} else {
 		fmt.Fprintf(workloadWrite, "cluster,%s,Datetime,%s\n", entityKind, metricName)
 	}
@@ -190,13 +192,18 @@ func GetWorkload(fileName, metricName, query string, metricField model.LabelName
 }
 
 //WriteWorkload will write out the workload data specific to metric provided to the file that was passed in.
-func WriteWorkload(file io.Writer, result model.Value, metricField model.LabelName, args *Parameters, entityKind string) {
+func WriteWorkload(file io.Writer, result model.Value, metricField []model.LabelName, args *Parameters, entityKind string) {
 	//Loop through the results for the workload and validate that contains the required labels and that the entity exists in the systems data structure once validated will write out the workload for the system.
 	for i := 0; i < result.(model.Matrix).Len(); i++ {
-		var entity model.LabelValue
+		var field, field2 model.LabelValue
 		var ok bool
 		if entityKind != "cluster" {
-			if entity, ok = result.(model.Matrix)[i].Metric[metricField]; !ok {
+			if field, ok = result.(model.Matrix)[i].Metric[metricField[0]]; !ok {
+				continue
+			}
+		}
+		if entityKind == "rq" {
+			if field2, ok = result.(model.Matrix)[i].Metric[metricField[1]]; !ok {
 				continue
 			}
 		}
@@ -208,7 +215,10 @@ func WriteWorkload(file io.Writer, result model.Value, metricField model.LabelNa
 			}
 			fmt.Fprintf(file, "%s,", *args.ClusterName)
 			if entityKind != "cluster" {
-				fmt.Fprintf(file, "%s,", strings.Replace(string(entity), ";", ".", -1))
+				fmt.Fprintf(file, "%s,", strings.Replace(string(field), ";", ".", -1))
+			}
+			if entityKind == "rq" {
+				fmt.Fprintf(file, "%s,", strings.Replace(string(field2), ";", ".", -1))
 			}
 			fmt.Fprintf(file, "%s,%f\n", time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val)
 		}

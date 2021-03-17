@@ -23,7 +23,7 @@ LABEL name="Container-Optimization-Data-Forwarder" \
 COPY --chown=densify:root ./LICENSE /licenses/LICENSE
 
 CMD ["./Forwarder", "-c", "-n", "k8s_transfer_v3", "-l", "k8s_transfer_v3", "-o", "upload", "-r", "-C", "config"]
-RUN mkdir data data/node data/container data/hpa data/cluster data/node_group data/crq
+RUN mkdir data data/node data/container data/hpa data/cluster data/node_group data/crq data/rq
 RUN chmod 777 -R data
 RUN chown densify:root -R data/
 COPY --chown=densify:root ./config config

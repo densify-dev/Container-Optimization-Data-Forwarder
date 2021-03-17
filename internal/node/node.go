@@ -248,12 +248,12 @@ func Metrics(args *common.Parameters) {
 		return
 	}
 
-	var metricField model.LabelName
+	var metricField []model.LabelName
 	queryPrefix := ``
 	queryPrefixSum := `sum(`
 	querySuffix := ``
 	querySuffixSum := `) by (instance)`
-	metricField = "instance"
+	metricField = append(metricField, "instance")
 
 	//Check to see which disk queries to use if instance is IP address that need to link to pod to get name or if instance = node name.
 	query = `max(max(label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[` + args.SampleRateString + `m])) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
@@ -264,7 +264,7 @@ func Metrics(args *common.Parameters) {
 		queryPrefixSum = `max(sum(label_replace(`
 		querySuffix = `, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 		querySuffixSum = querySuffix
-		metricField = "node"
+		metricField = append(metricField, "node")
 	}
 	//Query and store prometheus total cpu uptime in seconds
 	query = queryPrefix + `sum(irate(node_cpu_seconds_total{mode!="idle"}[` + args.SampleRateString + `m])) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100` + querySuffix

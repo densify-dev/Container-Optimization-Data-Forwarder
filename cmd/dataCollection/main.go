@@ -16,6 +16,7 @@ import (
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/crq"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/nodegroup"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/resourcequota"
 	"github.com/spf13/viper"
 )
 
@@ -348,6 +349,7 @@ func main() {
 	}
 	if includeQuota {
 		crq.Metrics(params)
+		resourcequota.Metrics(params)
 	} else {
 		params.InfoLogger.Println("Skipping quota data collection")
 		fmt.Println("[INFO] Skipping quota data collection")

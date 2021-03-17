@@ -235,7 +235,7 @@ func getHPAMetricString(result model.Value, namespace model.LabelName, hpa model
 	}
 }
 
-//getNamespaceMetric is used to parse the results from Prometheus related to Namespace Entities and store them in the systems data structure.
+//getNamespacelimits is used to parse the results from Prometheus related to Namespace Entities and store them in the systems data structure.
 func getNamespacelimits(result model.Value, namespace model.LabelName) {
 	//Validate there is data in the results.
 	if result == nil {
@@ -252,24 +252,24 @@ func getNamespacelimits(result model.Value, namespace model.LabelName) {
 			continue
 		}
 		//validates that the value of the entity is set and if not will default to 0
-		var value int
+		var value float64
 		if len(result.(model.Matrix)[i].Values) != 0 {
-			value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+			value = float64(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
 		}
 
 		//Check which metric this is for and update the corresponding variable for this container in the system data structure
 		//For systems limits they are defined based on 2 of the labels as they combine the Limits and Request for CPU and Memory all into 1 call.
-		constraint := result.(model.Matrix)[i].Metric["constraint"]
 		resource := result.(model.Matrix)[i].Metric["resource"]
-		switch {
-		case constraint == "defaultRequest" && resource == "cpu":
-			systems[string(namespaceValue)].cpuRequest = value
-		case constraint == "defaultRequest" && resource == "memory":
-			systems[string(namespaceValue)].memRequest = value
-		case constraint == "default" && resource == "cpu":
-			systems[string(namespaceValue)].cpuLimit = value
-		case constraint == "default" && resource == "memory":
-			systems[string(namespaceValue)].memLimit = value
+		switch resource {
+		case "requests.cpu":
+			systems[string(namespaceValue)].cpuRequest = int(value * 1000)
+		case "limits.cpu":
+			systems[string(namespaceValue)].cpuLimit = int(value * 1000)
+		case "requests.memory":
+			systems[string(namespaceValue)].memRequest = int(value / (1024 * 1024))
+		case "limits.memory":
+			systems[string(namespaceValue)].memLimit = int(value / (1024 * 1024))
+		default:
 		}
 	}
 }

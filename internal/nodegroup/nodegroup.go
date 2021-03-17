@@ -85,8 +85,8 @@ func writeConfig(args *common.Parameters) {
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/node_group/config.csv")
 	if err != nil {
-		args.ErrorLogger.Println("entity=node_group message=" + err.Error())
-		fmt.Println("[ERROR] entity=node_group message=" + err.Error())
+		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
+		fmt.Println("[ERROR] entity=" + entityKind + " message=" + err.Error())
 		return
 	}
 
@@ -131,8 +131,8 @@ func writeAttributes(args *common.Parameters) {
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/node_group/attributes.csv")
 	if err != nil {
-		args.ErrorLogger.Println("entity=node_group message=" + err.Error())
-		fmt.Println("[ERROR] entity=node_group message=" + err.Error())
+		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
+		fmt.Println("[ERROR] entity=" + entityKind + " message=" + err.Error())
 		return
 	}
 
@@ -224,7 +224,9 @@ func getWorkload(fileName, metricName, query string, nodeGroupLabels []model.Lab
 				args.WarnLogger.Println("metric=" + metricName + " query=" + query + " message=" + err.Error())
 				fmt.Println("[WARNING] metric=" + metricName + " query=" + query + " message=" + err.Error())
 			} else {
-				common.WriteWorkload(workloadWrite, result, metricField, args, entityKind)
+				var field []model.LabelName
+				field = append(field, metricField)
+				common.WriteWorkload(workloadWrite, result, field, args, entityKind)
 			}
 		}
 	}

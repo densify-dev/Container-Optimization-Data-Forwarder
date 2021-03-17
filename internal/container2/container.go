@@ -226,7 +226,7 @@ func Metrics(args *common.Parameters) {
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
 		args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=openshift_clustememLimitrresourcequota_selector query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=memLimit query=" + query + " message=" + err.Error())
 	} else {
 		getContainerMetric(result, "namespace", "pod", "container", "memLimit")
 	}
@@ -337,11 +337,12 @@ func Metrics(args *common.Parameters) {
 		getNamespaceMetricString(result, "namespace")
 	}
 
-	query = `kube_limitrange`
+	//This is min as want to know what the most restrictive quota is if there are multiple.
+	query = `min(kube_resourcequota{type="hard"}) by (resource, namespace)`
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
-		args.WarnLogger.Println("metric=nameSpaceLimitrange query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=nameSpaceLimitrange query=" + query + " message=" + err.Error())
+		args.WarnLogger.Println("metric=namespaceResourceQuota query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=namespaceResourceQuota query=" + query + " message=" + err.Error())
 	} else {
 		getNamespacelimits(result, "namespace")
 	}

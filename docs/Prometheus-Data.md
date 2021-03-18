@@ -28,7 +28,8 @@ The following tables list Prometheus metrics and how they are used by Densify.
 | kube_pod_created | Pod creation time |
 | kube_pod_owner | Pod owner |
 | kube_namespace_labels | Namespace labels |
-| kube_limitrange | Namespace limit |
+| kube_resourcequota | Namespace Quotas |
+| kube_limitrange | Namespace labels |
 | kube_replicaset_labels | ReplicaSet labels |
 | kube_replicaset_created | ReplicaSet creation time |
 | kube_replicaset_owner | ReplicaSet owner |
@@ -99,6 +100,7 @@ The following tables list Prometheus metrics and how they are used by Densify.
 | node_network_transmit_bytes_total | Raw net sent utilization | 
 | node_network_transmit_packets_total | Network packets sent |  
 | node_cpu_seconds_total | CPU utilization | 
+| kube_node_role | Node labels |
 
 ## Node Group Metrics
 | Metric | Usage |
@@ -152,7 +154,7 @@ The following tables list Prometheus metrics and how they are used by Densify.
 | node_network_transmit_packets_total | Network packets sent (avg) |
 | node_cpu_seconds_total | CPU utilization (avg) |
 
-## CRQ Metrics
+## Cluster Resource Quota (CRQ) Metrics
 Available only for OpenShift.
 
 | Metric | Usage |
@@ -162,3 +164,10 @@ Available only for OpenShift.
 | openshift_clusterresourcequota_labels | Cluster Resource Quota labels |
 | openshift_clusterresourcequota_usage | CPU\memory request\limit utlization (used for workload and attribute) |
 | openshift_clusterresourcequota_namespace_usage | Namespace usage information |
+
+## Resoure Quota Metrics
+
+| Metric | Usage |
+|--------|-------|
+| kube_resourcequota_created | Resource Quota creation time |
+| kube_resourcequota | Resource Quota CPU\memory request\limit utlization (used for workload and attribute) |

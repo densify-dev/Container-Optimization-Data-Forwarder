@@ -157,7 +157,7 @@ func writeAttributes(args *common.Parameters) {
 	defer attributeWrite.Close()
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,crq,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Quota Selector Type,Quota Selector Key,Quota Selector Value,Create Time,Namespace Labels,Resource Metadata,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Current Size,Namespace CPU Limit,Namespace CPU Request,Namespace Memory Limit,Namespace Memory Request,Pods Limit,Namespaces Affected")
+	fmt.Fprintln(attributeWrite, "cluster,crq,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Quota Selector Type,Quota Selector Key,Quota Selector Value,Create Time,Namespace Labels,Resource Metadata,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Current Size,Namespace CPU Limit,Namespace CPU Request,Namespace Memory Limit,Namespace Memory Request,Pods Limit,Namespaces")
 
 	//Loop through the CRQs and write out the attributes data for each system.
 	for crqName, crq := range crqs {

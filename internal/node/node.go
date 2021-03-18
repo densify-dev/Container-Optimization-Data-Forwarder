@@ -84,6 +84,15 @@ func Metrics(args *common.Parameters) {
 		getNodeMetricString(result, "node")
 	}
 
+	query = `kube_node_role`
+	result, err = common.MetricCollect(args, query, range5Min)
+	if err != nil {
+		args.WarnLogger.Println("metric=nodeInfo query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=nodeInfo query=" + query + " message=" + err.Error())
+	} else {
+		getNodeMetricString(result, "node")
+	}
+
 	//Gets the network speed in bytes as an attribute/config value for each node
 	query = `label_replace(node_network_speed_bytes, "pod_ip", "$1", "instance", "(.*):.*")`
 	result, err = common.MetricCollect(args, query, range5Min)

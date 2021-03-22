@@ -187,7 +187,7 @@ func writeAttributes(args *common.Parameters) {
 			}
 
 			if vrq.podsLimit == -1 {
-				fmt.Fprintf(attributeWrite, "\n")
+				fmt.Fprintf(attributeWrite, ",\n")
 			} else {
 				fmt.Fprintf(attributeWrite, ",%d\n", vrq.podsLimit)
 			}

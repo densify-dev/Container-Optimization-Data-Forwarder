@@ -261,14 +261,16 @@ func getNamespacelimits(result model.Value, namespace model.LabelName) {
 		//For systems limits they are defined based on 2 of the labels as they combine the Limits and Request for CPU and Memory all into 1 call.
 		resource := result.(model.Matrix)[i].Metric["resource"]
 		switch resource {
-		case "requests.cpu":
+		case "requests.cpu", "cpu":
 			systems[string(namespaceValue)].cpuRequest = int(value * 1000)
 		case "limits.cpu":
 			systems[string(namespaceValue)].cpuLimit = int(value * 1000)
-		case "requests.memory":
+		case "requests.memory", "memory":
 			systems[string(namespaceValue)].memRequest = int(value / (1024 * 1024))
 		case "limits.memory":
 			systems[string(namespaceValue)].memLimit = int(value / (1024 * 1024))
+		case "count/pods", "pods":
+			systems[string(namespaceValue)].podsLimit = int(value)
 		default:
 		}
 	}

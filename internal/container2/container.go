@@ -15,10 +15,10 @@ var systems = map[string]*namespace{}
 var entityKind = "Container"
 
 type namespace struct {
-	pointers                                   map[string]*midLevel
-	midLevels                                  map[string]*midLevel
-	cpuLimit, cpuRequest, memLimit, memRequest int
-	labelMap                                   map[string]string
+	pointers                                              map[string]*midLevel
+	midLevels                                             map[string]*midLevel
+	cpuLimit, cpuRequest, memLimit, memRequest, podsLimit int
+	labelMap                                              map[string]string
 }
 
 //midLevel is used to hold information related to the highest owner of any containers
@@ -124,7 +124,7 @@ func Metrics(args *common.Parameters) {
 
 		namespaceName := string(result.(model.Matrix)[i].Metric["namespace"])
 		if _, ok := systems[namespaceName]; !ok {
-			systems[namespaceName] = &namespace{pointers: map[string]*midLevel{}, midLevels: map[string]*midLevel{}, cpuRequest: -1, cpuLimit: -1, memRequest: -1, memLimit: -1, labelMap: map[string]string{}}
+			systems[namespaceName] = &namespace{pointers: map[string]*midLevel{}, midLevels: map[string]*midLevel{}, cpuRequest: -1, cpuLimit: -1, memRequest: -1, memLimit: -1, podsLimit: -1, labelMap: map[string]string{}}
 		}
 
 		//systems[namespaceName].pods[podName] = &pod{labelMap: map[string]string{}}

@@ -121,7 +121,7 @@ func writeAttributes(args *common.Parameters) {
 	defer attributeWrite.Close()
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,namespace,rq,Virtual Technology,Virtual Domain,Virtual Datacenter,Create Time,Resource Metadata,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Current Size,Namespace CPU Limit,Namespace CPU Request,Namespace Memory Limit,Namespace Memory Request,Pods Limit")
+	fmt.Fprintln(attributeWrite, "cluster,namespace,rq,Virtual Technology,Virtual Domain,Virtual Datacenter,Create Time,Resource Metadata,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Current Size,Namespace CPU Limit,Namespace CPU Request,Namespace Memory Limit,Namespace Memory Request,Namespace Pods Limit")
 
 	//Loop through the resource quotas and write out the attributes data for each system.
 	for kn := range resourceQuotas {

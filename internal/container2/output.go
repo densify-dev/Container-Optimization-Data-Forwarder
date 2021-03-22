@@ -72,7 +72,7 @@ func writeAttributes(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,namespace,entity_name,entity_type,container,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Current Nodes,Power State,Created By Kind,Created By Name,Current Size,Create Time,Container Restarts,Namespace Labels,Namespace CPU Request,Namespace CPU Limit,Namespace Memory Request,Namespace Memory Limit")
+	fmt.Fprintln(attributeWrite, "cluster,namespace,entity_name,entity_type,container,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Container Labels,Pod Labels,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Container Name,Current Nodes,Power State,Created By Kind,Created By Name,Current Size,Create Time,Container Restarts,Namespace Labels,Namespace CPU Request,Namespace CPU Limit,Namespace Memory Request,Namespace Memory Limit,Namespace Pods Limit")
 
 	//Loop through the systems and write out the attributes data for each system.
 	for kn, vn := range systems {
@@ -183,6 +183,11 @@ func writeAttributes(args *common.Parameters) {
 					fmt.Fprintf(attributeWrite, ",")
 				} else {
 					fmt.Fprintf(attributeWrite, ",%d", vn.memLimit)
+				}
+				if vn.memLimit == -1 {
+					fmt.Fprintf(attributeWrite, ",")
+				} else {
+					fmt.Fprintf(attributeWrite, ",%d", vn.podsLimit)
 				}
 				fmt.Fprintf(attributeWrite, "\n")
 			}

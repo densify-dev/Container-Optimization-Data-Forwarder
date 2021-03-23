@@ -14,11 +14,10 @@ type crq struct {
 	//Labels & general information about each node
 	labelMap map[string]string
 
-	selectorType, selectorKey, selectorValue                                                                   string
-	resources, namespaces                                                                                      string
-	cpuLimit, cpuRequest, memLimit, memRequest, usageCpuLimit, usageCpuRequest, usageMemLimit, usageMemRequest float64
-	podsLimit, usagePodsLimit                                                                                  int64
-	createTime                                                                                                 time.Time
+	selectorType, selectorKey, selectorValue                                                                                              string
+	resources, namespaces                                                                                                                 string
+	cpuLimit, cpuRequest, memLimit, memRequest, usageCpuLimit, usageCpuRequest, usageMemLimit, usageMemRequest, podsLimit, usagePodsLimit int
+	createTime                                                                                                                            time.Time
 }
 
 var crqs = map[string]*crq{}
@@ -79,29 +78,29 @@ func getExistingQuotas(result model.Value) {
 			}
 			switch resource {
 			case "limits.cpu":
-				crqs[crqName].cpuLimit = float64(val.Values[0].Value) * 1000
+				crqs[crqName].cpuLimit = int(val.Values[0].Value) * 1000
 			case "requests.cpu", "cpu":
-				crqs[crqName].cpuRequest = float64(val.Values[0].Value) * 1000
+				crqs[crqName].cpuRequest = int(val.Values[0].Value) * 1000
 			case "limits.memory":
-				crqs[crqName].memLimit = float64(val.Values[0].Value) / (1024 * 1024)
+				crqs[crqName].memLimit = int(val.Values[0].Value) / (1024 * 1024)
 			case "requests.memory", "memory":
-				crqs[crqName].memRequest = float64(val.Values[0].Value) / (1024 * 1024)
+				crqs[crqName].memRequest = int(val.Values[0].Value) / (1024 * 1024)
 			case "pods":
-				crqs[crqName].podsLimit = int64(val.Values[0].Value)
+				crqs[crqName].podsLimit = int(val.Values[0].Value)
 			default:
 			}
 		} else if typeUsed := val.Metric["type"]; typeUsed == "used" {
 			switch resource {
 			case "limits.cpu":
-				crqs[crqName].usageCpuLimit = float64(val.Values[0].Value) * 1000
+				crqs[crqName].usageCpuLimit = int(val.Values[0].Value) * 1000
 			case "requests.cpu", "cpu":
-				crqs[crqName].usageCpuRequest = float64(val.Values[0].Value) * 1000
+				crqs[crqName].usageCpuRequest = int(val.Values[0].Value) * 1000
 			case "limits.memory":
-				crqs[crqName].usageMemLimit = float64(val.Values[0].Value) / (1024 * 1024)
+				crqs[crqName].usageMemLimit = int(val.Values[0].Value) / (1024 * 1024)
 			case "requests.memory", "memory":
-				crqs[crqName].usageMemRequest = float64(val.Values[0].Value) / (1024 * 1024)
+				crqs[crqName].usageMemRequest = int(val.Values[0].Value) / (1024 * 1024)
 			case "pods":
-				crqs[crqName].usagePodsLimit = int64(val.Values[0].Value)
+				crqs[crqName].usagePodsLimit = int(val.Values[0].Value)
 			default:
 			}
 		}
@@ -183,25 +182,25 @@ func writeAttributes(args *common.Parameters) {
 		if crq.cpuLimit == -1 {
 			fmt.Fprintf(attributeWrite, ",")
 		} else {
-			fmt.Fprintf(attributeWrite, ",%f", crq.usageCpuLimit)
+			fmt.Fprintf(attributeWrite, ",%d", crq.usageCpuLimit)
 		}
 
 		if crq.cpuRequest == -1 {
 			fmt.Fprintf(attributeWrite, ",")
 		} else {
-			fmt.Fprintf(attributeWrite, ",%f", crq.usageCpuRequest)
+			fmt.Fprintf(attributeWrite, ",%d", crq.usageCpuRequest)
 		}
 
 		if crq.memLimit == -1 {
 			fmt.Fprintf(attributeWrite, ",")
 		} else {
-			fmt.Fprintf(attributeWrite, ",%f", crq.usageMemRequest)
+			fmt.Fprintf(attributeWrite, ",%d", crq.usageMemRequest)
 		}
 
 		if crq.memRequest == -1 {
 			fmt.Fprintf(attributeWrite, ",")
 		} else {
-			fmt.Fprintf(attributeWrite, ",%f", crq.usageMemRequest)
+			fmt.Fprintf(attributeWrite, ",%d", crq.usageMemRequest)
 		}
 
 		if crq.podsLimit == -1 {
@@ -213,25 +212,25 @@ func writeAttributes(args *common.Parameters) {
 		if crq.cpuLimit == -1 {
 			fmt.Fprintf(attributeWrite, ",")
 		} else {
-			fmt.Fprintf(attributeWrite, ",%f", crq.cpuLimit)
+			fmt.Fprintf(attributeWrite, ",%d", crq.cpuLimit)
 		}
 
 		if crq.cpuRequest == -1 {
 			fmt.Fprintf(attributeWrite, ",")
 		} else {
-			fmt.Fprintf(attributeWrite, ",%f", crq.cpuRequest)
+			fmt.Fprintf(attributeWrite, ",%d", crq.cpuRequest)
 		}
 
 		if crq.memLimit == -1 {
 			fmt.Fprintf(attributeWrite, ",")
 		} else {
-			fmt.Fprintf(attributeWrite, ",%f", crq.memLimit)
+			fmt.Fprintf(attributeWrite, ",%d", crq.memLimit)
 		}
 
 		if crq.memRequest == -1 {
 			fmt.Fprintf(attributeWrite, ",")
 		} else {
-			fmt.Fprintf(attributeWrite, ",%f", crq.memRequest)
+			fmt.Fprintf(attributeWrite, ",%d", crq.memRequest)
 		}
 
 		if crq.podsLimit == -1 {
@@ -328,7 +327,7 @@ func Metrics(args *common.Parameters) {
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="requests.cpu"}) by (name) * 1000`
 	common.GetWorkload("cpu_request", "Prometheus CPU Utilization in mCores", query, metricField, args, entityKind)
 
-	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="limits.memory"}) by (name) / (1024 * 1024)`
+	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="limits.memory"}) by (name)`
 	common.GetWorkload("mem_limit", "Raw Mem Utilization", query, metricField, args, entityKind)
 
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="requests.memory"}) by (name) / (1024 * 1024)`

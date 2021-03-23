@@ -257,7 +257,7 @@ func Metrics(args *common.Parameters) {
 	query = `sum(kube_resourcequota{type="used", resource="requests.cpu"}) by (resourcequota,namespace) * 1000`
 	common.GetWorkload("cpu_request", "Prometheus CPU Utilization in mCores", query, metricField, args, entityKind)
 
-	query = `sum(kube_resourcequota{type="used", resource="limits.memory"}) by (resourcequota,namespace) / (1024 * 1024)`
+	query = `sum(kube_resourcequota{type="used", resource="limits.memory"}) by (resourcequota,namespace)`
 	common.GetWorkload("mem_limit", "Raw Mem Utilization", query, metricField, args, entityKind)
 
 	query = `sum(kube_resourcequota{type="used", resource="requests.memory"}) by (resourcequota,namespace) / (1024 * 1024)`

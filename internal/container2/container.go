@@ -757,10 +757,12 @@ func Metrics(args *common.Parameters) {
 
 	query = queryPrefix + `max(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
 	getWorkload("mem_workload", "Raw Mem Utilization", query, "max", args)
+	query = queryPrefix + `max(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `) / (1024 * 1024)` + querySuffix
 	getWorkload("mem_workload", "Prometheus Raw Mem Utilization", query, "avg", args)
 
 	query = queryPrefix + `max(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
 	getWorkload("rss_workload", "Actual Memory Utilization", query, "max", args)
+	query = queryPrefix + `max(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `) / (1024 * 1024)` + querySuffix
 	getWorkload("rss_workload", "Prometheus Actual Memory Utilization", query, "avg", args)
 
 	query = queryPrefix + `max(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix

@@ -358,7 +358,7 @@ func Metrics(args *common.Parameters) {
 	getWorkload("cpu_requests", "CPU Reservation in Cores", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus CPU requests
-	query = `avg(sum((kube_pod_container_resource_requests_cpu_cores) * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node) / sum(kube_node_status_allocatable_cpu_cores) by (node)` + nodeGroupSuffix + ` * 100`
+	query = `avg(sum((kube_pod_container_resource_requests_cpu_cores) * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node) / sum(kube_node_status_capacity_cpu_cores) by (node)` + nodeGroupSuffix + ` * 100`
 	getWorkload("cpu_reservation_percent", "CPU Reservation Percent", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus Memory requests
@@ -366,7 +366,7 @@ func Metrics(args *common.Parameters) {
 	getWorkload("memory_requests", "Memory Reservation in MB", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus Memory requests
-	query = `avg(sum((kube_pod_container_resource_requests_memory_bytes/1024/1024) * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node) / sum(kube_node_status_allocatable_memory_bytes/1024/1024) by (node)` + nodeGroupSuffix + ` * 100`
+	query = `avg(sum((kube_pod_container_resource_requests_memory_bytes/1024/1024) * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node) / sum(kube_node_status_capacity_memory_bytes/1024/1024) by (node)` + nodeGroupSuffix + ` * 100`
 	getWorkload("memory_reservation_percent", "Memory Reservation Percent", query, nodeGroupLabels, args, entityKind)
 
 	//Check to see which disk queries to use if instance is IP address that need to link to pod to get name or if instance = node name.

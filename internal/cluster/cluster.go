@@ -168,7 +168,7 @@ func Metrics(args *common.Parameters) {
 	common.GetWorkload("cpu_requests", "CPU Reservation in Cores", query, metricField, args, entityKind)
 
 	//Query and store prometheus CPU requests
-	query = `avg(sum((kube_pod_container_resource_requests_cpu_cores) * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node) / sum(kube_node_status_allocatable_cpu_cores) by (node)) * 100`
+	query = `avg(sum((kube_pod_container_resource_requests_cpu_cores) * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node) / sum(kube_node_status_capacity_cpu_cores) by (node)) * 100`
 	common.GetWorkload("cpu_reservation_percent", "CPU Reservation Percent", query, metricField, args, entityKind)
 
 	//Query and store prometheus Memory requests
@@ -176,7 +176,7 @@ func Metrics(args *common.Parameters) {
 	common.GetWorkload("memory_requests", "Memory Reservation in MB", query, metricField, args, entityKind)
 
 	//Query and store prometheus Memory requests
-	query = `avg(sum((kube_pod_container_resource_requests_memory_bytes/1024/1024) * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node) / sum(kube_node_status_allocatable_memory_bytes/1024/1024) by (node)) * 100`
+	query = `avg(sum((kube_pod_container_resource_requests_memory_bytes/1024/1024) * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node) / sum(kube_node_status_capacity_memory_bytes/1024/1024) by (node)) * 100`
 	common.GetWorkload("memory_reservation_percent", "Memory Reservation Percent", query, metricField, args, entityKind)
 
 	//For cluster we don't have to check instance field and convert to pod_ip as we aren't looking to map to the node names but rather just get the avg for nodes. So we can use just instance field in all cases.

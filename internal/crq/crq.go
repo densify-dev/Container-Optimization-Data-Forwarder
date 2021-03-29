@@ -322,16 +322,16 @@ func Metrics(args *common.Parameters) {
 	var metricField []model.LabelName
 	metricField = append(metricField, "name")
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="limits.cpu"}) by (name) * 1000`
-	common.GetWorkload("cpu_limit", "CPU Utilization in mCores", query, metricField, args, entityKind)
+	common.GetWorkload("cpu_limits", "CPU Utilization in mCores", query, metricField, args, entityKind)
 
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="requests.cpu"}) by (name) * 1000`
-	common.GetWorkload("cpu_request", "Prometheus CPU Utilization in mCores", query, metricField, args, entityKind)
+	common.GetWorkload("cpu_requests", "Prometheus CPU Utilization in mCores", query, metricField, args, entityKind)
 
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="limits.memory"}) by (name)`
-	common.GetWorkload("mem_limit", "Raw Mem Utilization", query, metricField, args, entityKind)
+	common.GetWorkload("mem_limits", "Raw Mem Utilization", query, metricField, args, entityKind)
 
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="requests.memory"}) by (name) / (1024 * 1024)`
-	common.GetWorkload("mem_request", "Prometheus Raw Mem Utilization", query, metricField, args, entityKind)
+	common.GetWorkload("mem_requests", "Prometheus Raw Mem Utilization", query, metricField, args, entityKind)
 
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="pods"}) by (name)`
 	common.GetWorkload("pods", "Auto Scaling - In Service Instances", query, metricField, args, entityKind)

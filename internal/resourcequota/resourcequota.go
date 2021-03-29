@@ -252,16 +252,16 @@ func Metrics(args *common.Parameters) {
 	metricField = append(metricField, "resourcequota")
 
 	query = `sum(kube_resourcequota{type="used", resource="limits.cpu"}) by (resourcequota,namespace) * 1000`
-	common.GetWorkload("cpu_limit", "CPU Utilization in mCores", query, metricField, args, entityKind)
+	common.GetWorkload("cpu_limits", "CPU Utilization in mCores", query, metricField, args, entityKind)
 
 	query = `sum(kube_resourcequota{type="used", resource="requests.cpu"}) by (resourcequota,namespace) * 1000`
-	common.GetWorkload("cpu_request", "Prometheus CPU Utilization in mCores", query, metricField, args, entityKind)
+	common.GetWorkload("cpu_requests", "Prometheus CPU Utilization in mCores", query, metricField, args, entityKind)
 
 	query = `sum(kube_resourcequota{type="used", resource="limits.memory"}) by (resourcequota,namespace)`
-	common.GetWorkload("mem_limit", "Raw Mem Utilization", query, metricField, args, entityKind)
+	common.GetWorkload("mem_limits", "Raw Mem Utilization", query, metricField, args, entityKind)
 
 	query = `sum(kube_resourcequota{type="used", resource="requests.memory"}) by (resourcequota,namespace) / (1024 * 1024)`
-	common.GetWorkload("mem_request", "Prometheus Raw Mem Utilization", query, metricField, args, entityKind)
+	common.GetWorkload("mem_requests", "Prometheus Raw Mem Utilization", query, metricField, args, entityKind)
 
 	query = `sum(kube_resourcequota{type="used", resource="count/pods"}) by (resourcequota,namespace)`
 	common.GetWorkload("pods", "Auto Scaling - In Service Instances", query, metricField, args, entityKind)

@@ -111,6 +111,7 @@ func TimeRange(args *Parameters, historyInterval time.Duration) (promRange v1.Ra
 func AddToLabelMap(key string, value string, labelPath map[string]string) {
 	if _, ok := labelPath[key]; !ok {
 		value = strings.Replace(value, "\n", "", -1)
+		value = strings.Replace(value, "\r", "", -1)
 		if len(value) > 255 {
 			labelPath[key] = value[:255]
 		} else {

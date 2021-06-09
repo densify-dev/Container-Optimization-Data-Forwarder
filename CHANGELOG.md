@@ -1,3 +1,9 @@
+## 2.3.0
+* Add support for resource quotas and cluster resource quotas
+* Add support for changing label used for building node groups
+* Add additional network, disk metrics to cluster entity. 
+* Bug fixes for logging.
+
 ## 2.2.0
 * Add support for node groups
 * Use default logger

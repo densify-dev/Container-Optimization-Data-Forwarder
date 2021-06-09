@@ -10,9 +10,13 @@ This section describes the prerequisites for Densify's Container Optimization da
   - Requires version 1.5.0 or newer. 
   - The collected metrics allow Densify to get a complete picture of how your containers are setup. i.e. Replica Sets, Deployments, Pod and Container Labels.
   - https://github.com/kubernetes/kube-state-metrics.
-The following item is not mandatory, but does provide additional environment information for Densify container optimization.
+
+The following items are not mandatory, but can provide additional environment information for Densify container optimization.
 - Node Exporter
   - Collects data about the Nodes, on which the containers are running. 
   - https://hub.docker.com/r/prom/node-exporter/
+- openshift-state-metrics
+  - The collected metrics provide additional details for OpenShift-specific items such as Cluster Resource Quotas (CRQ).
+  - https://github.com/openshift/openshift-state-metrics
 
 Contact Support@Densify.com for more details.

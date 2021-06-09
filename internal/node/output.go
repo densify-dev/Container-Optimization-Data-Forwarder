@@ -13,14 +13,14 @@ import (
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 )
 
-//writeConfig will create the config.csv file that is will be sent Densify by the Forwarder.
+//writeConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
 func writeConfig(args *common.Parameters) {
 
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/node/config.csv")
 	if err != nil {
 		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
-		fmt.Println("entity=" + entityKind + " message=" + err.Error())
+		fmt.Println("[ERROR] entity=" + entityKind + " message=" + err.Error())
 		return
 	}
 
@@ -70,14 +70,14 @@ func writeConfig(args *common.Parameters) {
 	}
 }
 
-//writeAttributes will create the attributes.csv file that is will be sent Densify by the Forwarder.
+//writeAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
 func writeAttributes(args *common.Parameters) {
 
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/node/attributes.csv")
 	if err != nil {
 		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
-		fmt.Println("entity=" + entityKind + " message=" + err.Error())
+		fmt.Println("[ERROR] entity=" + entityKind + " message=" + err.Error())
 		return
 	}
 

@@ -235,7 +235,7 @@ func getHPAMetricString(result model.Value, namespace model.LabelName, hpa model
 	}
 }
 
-//getNamespaceMetric is used to parse the results from Prometheus related to Namespace Entities and store them in the systems data structure.
+//getNamespacelimits is used to parse the results from Prometheus related to Namespace Entities and store them in the systems data structure.
 func getNamespacelimits(result model.Value, namespace model.LabelName) {
 	//Validate there is data in the results.
 	if result == nil {
@@ -252,24 +252,26 @@ func getNamespacelimits(result model.Value, namespace model.LabelName) {
 			continue
 		}
 		//validates that the value of the entity is set and if not will default to 0
-		var value int
+		var value float64
 		if len(result.(model.Matrix)[i].Values) != 0 {
-			value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+			value = float64(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
 		}
 
 		//Check which metric this is for and update the corresponding variable for this container in the system data structure
 		//For systems limits they are defined based on 2 of the labels as they combine the Limits and Request for CPU and Memory all into 1 call.
-		constraint := result.(model.Matrix)[i].Metric["constraint"]
 		resource := result.(model.Matrix)[i].Metric["resource"]
-		switch {
-		case constraint == "defaultRequest" && resource == "cpu":
-			systems[string(namespaceValue)].cpuRequest = value
-		case constraint == "defaultRequest" && resource == "memory":
-			systems[string(namespaceValue)].memRequest = value
-		case constraint == "default" && resource == "cpu":
-			systems[string(namespaceValue)].cpuLimit = value
-		case constraint == "default" && resource == "memory":
-			systems[string(namespaceValue)].memLimit = value
+		switch resource {
+		case "requests.cpu", "cpu":
+			systems[string(namespaceValue)].cpuRequest = int(value * 1000)
+		case "limits.cpu":
+			systems[string(namespaceValue)].cpuLimit = int(value * 1000)
+		case "requests.memory", "memory":
+			systems[string(namespaceValue)].memRequest = int(value / (1024 * 1024))
+		case "limits.memory":
+			systems[string(namespaceValue)].memLimit = int(value / (1024 * 1024))
+		case "count/pods", "pods":
+			systems[string(namespaceValue)].podsLimit = int(value)
+		default:
 		}
 	}
 }
@@ -307,7 +309,7 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 	workloadWrite, err := os.Create("./data/container/" + aggregator + `_` + fileName + ".csv")
 	if err != nil {
 		args.ErrorLogger.Println("entity=" + entityKind + " metric=" + metricName + " query=" + query + " message=" + err.Error())
-		fmt.Println("entity=" + entityKind + " metric=" + metricName + " query=" + query + " message=" + err.Error())
+		fmt.Println("[ERROR] entity=" + entityKind + " metric=" + metricName + " query=" + query + " message=" + err.Error())
 		return
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,%s\n", metricName)
@@ -320,24 +322,47 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 
 		//query containers under a pod with no owner
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left max(kube_pod_owner{owner_name="<none>"}) by (namespace, pod, container` + args.LabelSuffix + `)) by (pod,namespace,container` + args.LabelSuffix + `)`
-		result = common.MetricCollect(args, query2, range5Min, "pod_"+metricName, false)
-		writeWorkload(workloadWrite, result, "namespace", "pod", model.LabelName("container"+args.LabelSuffix), args, "Pod")
+		result, err = common.MetricCollect(args, query2, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=pod_" + metricName + " query=" + query2 + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=pod_" + metricName + " query=" + query2 + " message=" + err.Error())
+		} else {
+			writeWorkload(workloadWrite, result, "namespace", "pod", model.LabelName("container"+args.LabelSuffix), args, "Pod")
+		}
 
 		//query containers under a controller with no owner
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (owner_name,owner_kind) max(kube_pod_owner) by (namespace, pod, owner_name, owner_kind)) by (owner_kind,owner_name,namespace,container` + args.LabelSuffix + `)`
-		result = common.MetricCollect(args, query2, range5Min, "controller_"+metricName, false)
-		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "")
+		result, err = common.MetricCollect(args, query2, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=controller_" + metricName + " query=" + query2 + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=controller_" + metricName + " query=" + query2 + " message=" + err.Error())
+		} else {
+			writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "")
+		}
 
 		//query containers under a deployment
-		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) max(label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)")) by (namespace, pod, replicaset) * on (replicaset, namespace) group_left (owner_name) max(kube_replicaset_owner{owner_kind="Deployment"}) by (namespace, replicaset, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
-		result = common.MetricCollect(args, query2, range5Min, "deployment_"+metricName, false)
-		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "Deployment")
+		if args.Deployments {
+			query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (replicaset) max(label_replace(kube_pod_owner{owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)")) by (namespace, pod, replicaset) * on (replicaset, namespace) group_left (owner_name) max(kube_replicaset_owner{owner_kind="Deployment"}) by (namespace, replicaset, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
+			result, err = common.MetricCollect(args, query2, range5Min)
+			if err != nil {
+				args.WarnLogger.Println("metric=deployment_" + metricName + " query=" + query2 + " message=" + err.Error())
+				fmt.Println("[WARNING] metric=deployment_" + metricName + " query=" + query2 + " message=" + err.Error())
+			} else {
+				writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "Deployment")
+			}
+		}
 
 		//query containers under a cron job
-		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) max(label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)")) by (namespace, pod, job) * on (job, namespace) group_left (owner_name) max(label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (namespace, job, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
-		result = common.MetricCollect(args, query2, range5Min, "cronJob_"+metricName, false)
-		writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "CronJob")
-
+		if args.CronJobs {
+			query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left (job) max(label_replace(kube_pod_owner{owner_kind="Job"}, "job", "$1", "owner_name", "(.*)")) by (namespace, pod, job) * on (job, namespace) group_left (owner_name) max(label_replace(kube_job_owner{owner_kind="CronJob"}, "job", "$1", "job_name", "(.*)")) by (namespace, job, owner_name)) by (owner_name,namespace,container` + args.LabelSuffix + `)`
+			result, err = common.MetricCollect(args, query2, range5Min)
+			if err != nil {
+				args.WarnLogger.Println("metric=cronJob_" + metricName + " query=" + query2 + " message=" + err.Error())
+				fmt.Println("[WARNING] metric=cronJob_" + metricName + " query=" + query2 + " message=" + err.Error())
+			} else {
+				writeWorkload(workloadWrite, result, "namespace", "owner_name", model.LabelName("container"+args.LabelSuffix), args, "CronJob")
+			}
+		}
 	}
 	//Close the workload files.
 	workloadWrite.Close()
@@ -352,7 +377,7 @@ func getDeploymentWorkload(fileName, metricName, query string, args *common.Para
 	workloadWrite, err := os.Create("./data/container/deployment_" + fileName + ".csv")
 	if err != nil {
 		args.ErrorLogger.Println("metric=" + metricName + " query=" + query + " message=File not found")
-		fmt.Println("metric=" + metricName + " query=" + query + " message=File not found")
+		fmt.Println("[ERROR] metric=" + metricName + " query=" + query + " message=File not found")
 		return
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,%s\n", metricName)
@@ -363,7 +388,12 @@ func getDeploymentWorkload(fileName, metricName, query string, args *common.Para
 		tempMap[int(historyInterval)] = map[string]map[string][]model.SamplePair{}
 		range5Min := common.TimeRange(args, historyInterval)
 
-		result = common.MetricCollect(args, query, range5Min, metricName, false)
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=" + metricName + " query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=" + metricName + " query=" + query + " message=" + err.Error())
+			return
+		}
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
 				if _, ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]; !ok {
@@ -403,13 +433,13 @@ func getHPAWorkload(fileName, metricName, query string, args *common.Parameters)
 	workloadWrite, err := os.Create("./data/container/hpa_" + fileName + ".csv")
 	if err != nil {
 		args.ErrorLogger.Println("metric=" + metricName + " query=" + query + " message=File not found")
-		fmt.Println("metric=" + metricName + " query=" + query + " message=File not found")
+		fmt.Println("[ERROR] metric=" + metricName + " query=" + query + " message=File not found")
 		return
 	}
 	workloadWriteExtra, err := os.Create("./data/hpa/hpa_extra_" + fileName + ".csv")
 	if err != nil {
 		args.ErrorLogger.Println("metric=" + metricName + " query=" + query + " message=File not found")
-		fmt.Println("metric=" + metricName + " query=" + query + " message=File not found")
+		fmt.Println("[ERROR] metric=" + metricName + " query=" + query + " message=File not found")
 		return
 	}
 	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,HPA Name,Datetime,%s\n", metricName)
@@ -421,7 +451,12 @@ func getHPAWorkload(fileName, metricName, query string, args *common.Parameters)
 		tempMap[int(historyInterval)] = map[string]map[string][]model.SamplePair{}
 		range5Min := common.TimeRange(args, historyInterval)
 
-		result = common.MetricCollect(args, query, range5Min, metricName, false)
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=" + metricName + " query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=" + metricName + " query=" + query + " message=" + err.Error())
+			return
+		}
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
 				if _, ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]; !ok {

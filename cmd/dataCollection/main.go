@@ -13,8 +13,10 @@ import (
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/cluster"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/crq"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/nodegroup"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/resourcequota"
 	"github.com/spf13/viper"
 )
 
@@ -22,7 +24,7 @@ import (
 var params *common.Parameters
 
 // Parameters that allows user to control what levels they want to collect data on (cluster, node, container)
-var includeContainer, includeNode, includeNodeGroup, includeCluster bool
+var includeContainer, includeNode, includeNodeGroup, includeCluster, includeQuota bool
 
 //initParamters will look for settings defined on the command line or in config.properties file and update accordingly. Also defines the default values for these variables.
 //Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
@@ -40,15 +42,15 @@ func initParameters() {
 	var configFile = "config"
 	var configPath = "./config"
 	var sampleRate = 5
-	var include = "container,node,cluster,nodegroup"
+	var include = "container,node,cluster,nodegroup,quota"
+	var nodeGroupList = "label_cloud_google_com_gke_nodepool,label_eks_amazonaws_com_nodegroup,label_agentpool,label_pool_name,label_alpha_eksctl_io_nodegroup_name,label_kops_k8s_io_instancegroup"
 	var oAuthTokenPath = ""
 	var caCertPath = ""
 
 	//Temporary variables for procassing flags
-	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp, oAuthTokenPathTemp, caCertPathTemp string
+	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp, oAuthTokenPathTemp, caCertPathTemp, includeTemp, nodeGroupListTemp string
 	var intervalSizeTemp, historyTemp, offsetTemp, sampleRateTemp int
 	var debugTemp bool
-	var includeTemp string
 
 	//Set settings using environment variables
 	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_CLUSTER"); ok {
@@ -118,6 +120,10 @@ func initParameters() {
 		include = tempEnvVar
 	}
 
+	if tempEnvVar, ok := os.LookupEnv("NODE_GROUP_LIST"); ok {
+		nodeGroupList = tempEnvVar
+	}
+
 	if tempEnvVar, ok := os.LookupEnv("OAUTH_TOKEN"); ok {
 		oAuthTokenPath = tempEnvVar
 	}
@@ -139,7 +145,8 @@ func initParameters() {
 	flag.BoolVar(&debugTemp, "debug", debug, "Enable debug logging")
 	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
 	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
-	flag.StringVar(&includeTemp, "includeList", include, "Comma separated list of data to include in collection (cluster, node, container) Ex: \"node,cluster\"")
+	flag.StringVar(&includeTemp, "includeList", include, "Comma separated list of data to include in collection (cluster, node, container, nodegroup, quota) Ex: \"node,cluster\"")
+	flag.StringVar(&nodeGroupListTemp, "nodeGroupList", nodeGroupList, "Comma separated list of labels to check for building node groups Ex: \"label_cloud_google_com_gke_nodepool,label_eks_amazonaws_com_nodegroup,label_agentpool,label_pool_name\"")
 	flag.StringVar(&oAuthTokenPathTemp, "oAuthToken", oAuthTokenPath, "Path to oAuth token file required to authenticate with the Cluster where Prometheus is running.")
 	flag.StringVar(&caCertPathTemp, "caCert", caCertPath, "Path to CA certificate required to pass certificate validation if using HTTPS")
 	flag.Parse()
@@ -158,6 +165,7 @@ func initParameters() {
 		viper.SetDefault("offset", offset)
 		viper.SetDefault("debug", debug)
 		viper.SetDefault("include_list", include)
+		viper.SetDefault("node_group_list", nodeGroupList)
 		viper.SetDefault("prometheus_oauth_token", oAuthTokenPath)
 		viper.SetDefault("ca_certificate", caCertPath)
 		// Config import setup.
@@ -178,6 +186,7 @@ func initParameters() {
 			offset = viper.GetInt("offset")
 			debug = viper.GetBool("debug")
 			include = viper.GetString("include_list")
+			nodeGroupList = viper.GetString("node_group_list")
 			oAuthTokenPath = viper.GetString("prometheus_oauth_token")
 			caCertPath = viper.GetString("ca_certificate")
 		}
@@ -207,6 +216,8 @@ func initParameters() {
 			debug = debugTemp
 		case "includeList":
 			include = includeTemp
+		case "nodeGroupList":
+			nodeGroupList = nodeGroupListTemp
 		case "oAuthToken":
 			oAuthTokenPath = oAuthTokenPathTemp
 		case "caCert":
@@ -267,6 +278,7 @@ func initParameters() {
 		DebugLogger:      debugLogger,
 		SampleRate:       sampleRate,
 		SampleRateString: strconv.Itoa(sampleRate),
+		NodeGroupList:    nodeGroupList,
 		OAuthTokenPath:   oAuthTokenPath,
 		CaCertPath:       caCertPath,
 	}
@@ -284,6 +296,8 @@ func parseIncludeParam(param string) {
 			includeContainer = true
 		} else if strings.Compare(elem, "nodegroup") == 0 {
 			includeNodeGroup = true
+		} else if strings.Compare(elem, "quota") == 0 {
+			includeQuota = true
 		}
 	}
 }
@@ -293,8 +307,8 @@ func main() {
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
-	params.InfoLogger.Println("Version 2.2.1")
-	fmt.Println("Version 2.2.1")
+	params.InfoLogger.Println("Version 2.3.0 Beta")
+	fmt.Println("[INFO] Version 2.3.0 Beta")
 
 	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
 	var t time.Time
@@ -313,24 +327,31 @@ func main() {
 		container2.Metrics(params)
 	} else {
 		params.InfoLogger.Println("Skipping container data collection")
-		fmt.Println("Skipping container data collection")
+		fmt.Println("[INFO] Skipping container data collection")
 	}
 	if includeNode {
 		node.Metrics(params)
 	} else {
 		params.InfoLogger.Println("Skipping node data collection")
-		fmt.Println("Skipping node data collection")
+		fmt.Println("[INFO] Skipping node data collection")
 	}
 	if includeNodeGroup {
 		nodegroup.Metrics(params)
 	} else {
 		params.InfoLogger.Println("Skipping node group data collection")
-		fmt.Println("Skipping node group data collection")
+		fmt.Println("[INFO] Skipping node group data collection")
 	}
 	if includeCluster {
 		cluster.Metrics(params)
 	} else {
 		params.InfoLogger.Println("Skipping cluster data collection")
-		fmt.Println("Skipping cluster data collection")
+		fmt.Println("[INFO] Skipping cluster data collection")
+	}
+	if includeQuota {
+		crq.Metrics(params)
+		resourcequota.Metrics(params)
+	} else {
+		params.InfoLogger.Println("Skipping quota data collection")
+		fmt.Println("[INFO] Skipping quota data collection")
 	}
 }

@@ -1,9 +1,9 @@
-The following table briefly explains the default variable values, environment and command line variable names.
+The following tables provide the default values and the environment and command line names for the variables used to configure the data forwarder.
 
-THe order of precedence is Command Line, Config File, Environment Variables. 
+The order of precedence is: Command Line, Config File, Environment Variables. 
 
 ## Variable Names Data Collection
-| Config Setting Name | Default | Environment Variables | Config.Properties | Command Line |
+| Config Setting Name | Default Value | Environment Variables | Config.Properties | Command Line |
 |--------|-------|-------|-------|-------|
 | Cluster Name | "" | PROMETHEUS_CLUSTER | cluster_name | clusterName | 
 | Prometheus Protocol | http | PROMETHEUS_PROTOCOL | protocol | protocol |
@@ -14,7 +14,8 @@ THe order of precedence is Command Line, Config File, Environment Variables.
 | History | 1 | PROMETHEUS_HISTORY | history | history | 
 | Sample Rate | 5 | PROMETHEUS_SAMPLERATE | sample_rate | sampleRate |
 | Offset | 0 | PROMETHEUS_OFFSET | offset | offset | 
-| Include List | container,node,nodegroup,cluster | INCLUDE_LIST | include_list | includeList |
+| Include List | container,node,nodegroup,cluster,quota | PROMETHEUS_INCLUDE | include_list | includeList |
+| Node Group List | label_cloud_google_com_gke_nodepool,label_eks_amazonaws_com_nodegroup,label_agentpool,label_pool_name,label_alpha_eksctl_io_nodegroup_name,label_kops_k8s_io_instancegroup | NODE_GROUP_LIST | node_group_list | nodeGroupList |
 | Debug | false | PROMETHEUS_DEBUG | debug | debug |
 | Config File | config | PROMETHEUS_CONFIGFILE | N/A | file |
 | Config Path | ./config | PROMETHEUS_CONFIGPATH | N/A | path |
@@ -34,7 +35,7 @@ THe order of precedence is Command Line, Config File, Environment Variables.
 | Proxy Protocol | DENSIFY_PROXYPROTOCOL | 
 | Proxy Auth | DENSIFY_PROXYAUTH |
 | Proxy User | DENSIFY_PROXYUSER |
-|Proxy Password | DENSIFY_PROXYPASSWORD | 
+| Proxy Password | DENSIFY_PROXYPASSWORD | 
 | Encrypted Proxy Password | DENSIFY_EPROXYPASSWORD | 
 | Proxy Server | DENSIFY_PROXYSERVER |
 | Proxy Domain | DENISFY_PROXYDOMAIN | 

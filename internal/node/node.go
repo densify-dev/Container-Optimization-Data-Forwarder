@@ -210,40 +210,51 @@ func Metrics(args *common.Parameters) {
 		}
 	}
 
-	query = `sum(kube_pod_container_resource_limits_cpu_cores * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)*1000`
+	query = `sum(kube_pod_container_resource_limits) by (node, resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=cpuLimit query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=cpuLimit query=" + query + " message=" + err.Error())
+	if result.(model.Matrix).Len() == 0 {
+		query = `sum(kube_pod_container_resource_limits_cpu_cores) by (node)*1000`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=cpuLimit query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=cpuLimit query=" + query + " message=" + err.Error())
+		} else {
+			getNodeMetric(result, "node", "cpuLimit")
+		}
+		query = `sum(kube_pod_container_resource_limits_memory_bytes) by (node)/1024/1024`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=memLimit query=" + query + " message=" + err.Error())
+		} else {
+			getNodeMetric(result, "node", "memLimit")
+		}
 	} else {
-		getNodeMetric(result, "node", "cpuLimit")
+		getNodeMetric(result, "node", "limits")
 	}
 
-	query = `sum(kube_pod_container_resource_requests_cpu_cores * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)*1000`
+	query = `sum(kube_pod_container_resource_requests) by (node,resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=cpuRequest query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=cpuRequest query=" + query + " message=" + err.Error())
-	} else {
-		getNodeMetric(result, "node", "cpuRequest")
-	}
+	if result.(model.Matrix).Len() == 0 {
+		query = `sum(kube_pod_container_resource_requests_cpu_cores) by (node)*1000`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=cpuRequest query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=cpuRequest query=" + query + " message=" + err.Error())
+		} else {
+			getNodeMetric(result, "node", "cpuRequest")
+		}
 
-	query = `sum(kube_pod_container_resource_limits_memory_bytes * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)/1024/1024`
-	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=memLimit query=" + query + " message=" + err.Error())
+		query = `sum(kube_pod_container_resource_requests_memory_bytes) by (node)/1024/1024`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=memRequest query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=memRequest query=" + query + " message=" + err.Error())
+		} else {
+			getNodeMetric(result, "node", "memRequest")
+		}
 	} else {
-		getNodeMetric(result, "node", "memLimit")
-	}
-
-	query = `sum(kube_pod_container_resource_requests_memory_bytes * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node)/1024/1024`
-	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=memRequest query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=memRequest query=" + query + " message=" + err.Error())
-	} else {
-		getNodeMetric(result, "node", "memRequest")
+		getNodeMetric(result, "node", "requests")
 	}
 
 	//Writes the config and attribute files
@@ -273,7 +284,7 @@ func Metrics(args *common.Parameters) {
 		queryPrefixSum = `max(sum(label_replace(`
 		querySuffix = `, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 		querySuffixSum = querySuffix
-		metricField = append(metricField, "node")
+		metricField[0] = "node"
 	}
 	//Query and store prometheus total cpu uptime in seconds
 	query = queryPrefix + `sum(irate(node_cpu_seconds_total{mode!="idle"}[` + args.SampleRateString + `m])) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100` + querySuffix

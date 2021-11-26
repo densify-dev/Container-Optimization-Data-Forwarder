@@ -45,29 +45,43 @@ func getContainerMetric(result model.Value, namespace, pod, container model.Labe
 			continue
 		}
 		//validates that the value of the entity is set and if not will default to 0
-		var value int
+		var value float64
 		if len(result.(model.Matrix)[i].Values) == 0 {
 			value = 0
 		} else {
-			value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+			value = float64(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
 		}
 
 		//Check which metric this is for and update the corresponding variable for this container in the system data structure
 		switch metric {
+		case "limits":
+			switch result.(model.Matrix)[i].Metric["resource"] {
+			case "memory":
+				systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memLimit = int(value / 1024 / 1024)
+			case "cpu":
+				systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuLimit = int(value * 1000)
+			}
+		case "requests":
+			switch result.(model.Matrix)[i].Metric["resource"] {
+			case "memory":
+				systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memRequest = int(value / 1024 / 1024)
+			case "cpu":
+				systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuRequest = int(value * 1000)
+			}
 		case "memory":
-			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memory = value
+			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memory = int(value)
 		case "cpuLimit":
-			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuLimit = value
+			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuLimit = int(value)
 		case "cpuRequest":
-			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuRequest = value
+			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].cpuRequest = int(value)
 		case "memLimit":
-			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memLimit = value
+			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memLimit = int(value)
 		case "memRequest":
-			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memRequest = value
+			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].memRequest = int(value)
 		case "restarts":
-			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].restarts = value
+			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].restarts = int(value)
 		case "powerState":
-			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].powerState = value
+			systems[string(namespaceValue)].pointers["Pod__"+string(podValue)].containers[string(containerValue)].powerState = int(value)
 		}
 		status = true
 	}
@@ -323,6 +337,7 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 		//query containers under a pod with no owner
 		query2 = aggregator + `(` + query + ` * on (pod, namespace) group_left max(kube_pod_owner{owner_name="<none>"}) by (namespace, pod, container` + args.LabelSuffix + `)) by (pod,namespace,container` + args.LabelSuffix + `)`
 		result, err = common.MetricCollect(args, query2, range5Min)
+
 		if err != nil {
 			args.WarnLogger.Println("metric=pod_" + metricName + " query=" + query2 + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=pod_" + metricName + " query=" + query2 + " message=" + err.Error())
@@ -424,7 +439,7 @@ func getDeploymentWorkload(fileName, metricName, query string, args *common.Para
 	workloadWrite.Close()
 }
 
-func getHPAWorkload(fileName, metricName, query string, args *common.Parameters) {
+func getHPAWorkload(fileName, metricName, query string, args *common.Parameters, hpaLabel model.LabelName) {
 	var historyInterval time.Duration
 	historyInterval = 0
 	var result model.Value
@@ -462,10 +477,10 @@ func getHPAWorkload(fileName, metricName, query string, args *common.Parameters)
 				if _, ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])]; !ok {
 					tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])] = map[string][]model.SamplePair{}
 				}
-				if _, ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric["hpa"])]; !ok {
-					tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric["hpa"])] = []model.SamplePair{}
+				if _, ok := tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric[hpaLabel])]; !ok {
+					tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric[hpaLabel])] = []model.SamplePair{}
 				}
-				tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric["hpa"])] = append(tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric["hpa"])], result.(model.Matrix)[i].Values[j])
+				tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric[hpaLabel])] = append(tempMap[int(historyInterval)][string(result.(model.Matrix)[i].Metric["namespace"])][string(result.(model.Matrix)[i].Metric[hpaLabel])], result.(model.Matrix)[i].Values[j])
 			}
 		}
 	}

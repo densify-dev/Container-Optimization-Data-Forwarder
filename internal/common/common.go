@@ -28,7 +28,7 @@ type Parameters struct {
 	LabelSuffix                                           string
 	InfoLogger, WarnLogger, ErrorLogger, DebugLogger      *log.Logger
 	SampleRate                                            int
-	SampleRateString, NodeGroupList                       string
+	SampleRateString                                      string
 	OAuthTokenPath                                        string
 	CaCertPath                                            string
 	Deployments, CronJobs                                 bool
@@ -166,9 +166,7 @@ func GetWorkload(fileName, metricName, query string, metricField []model.LabelNa
 		fmt.Println("entity=" + entityKind + " message=" + err.Error())
 		return
 	}
-	if entityKind == "cluster" {
-		fmt.Fprintf(workloadWrite, "cluster,Datetime,%s\n", metricName)
-	} else if entityKind == "rq" {
+	if entityKind == "rq" {
 		fmt.Fprintf(workloadWrite, "cluster,namespace,%s,Datetime,%s\n", entityKind, metricName)
 	} else {
 		fmt.Fprintf(workloadWrite, "cluster,%s,Datetime,%s\n", entityKind, metricName)
@@ -198,10 +196,9 @@ func WriteWorkload(file io.Writer, result model.Value, metricField []model.Label
 	for i := 0; i < result.(model.Matrix).Len(); i++ {
 		var field, field2 model.LabelValue
 		var ok bool
-		if entityKind != "cluster" {
-			if field, ok = result.(model.Matrix)[i].Metric[metricField[0]]; !ok {
-				continue
-			}
+
+		if field, ok = result.(model.Matrix)[i].Metric[metricField[0]]; !ok {
+			continue
 		}
 		if entityKind == "rq" {
 			if field2, ok = result.(model.Matrix)[i].Metric[metricField[1]]; !ok {
@@ -214,10 +211,7 @@ func WriteWorkload(file io.Writer, result model.Value, metricField []model.Label
 			if !math.IsNaN(float64(result.(model.Matrix)[i].Values[j].Value)) && !math.IsInf(float64(result.(model.Matrix)[i].Values[j].Value), 0) {
 				val = result.(model.Matrix)[i].Values[j].Value
 			}
-			fmt.Fprintf(file, "%s,", *args.ClusterName)
-			if entityKind != "cluster" {
-				fmt.Fprintf(file, "%s,", strings.Replace(string(field), ";", ".", -1))
-			}
+			fmt.Fprintf(file, "%s,%s,", *args.ClusterName, strings.Replace(string(field), ";", ".", -1))
 			if entityKind == "rq" {
 				fmt.Fprintf(file, "%s,", strings.Replace(string(field2), ";", ".", -1))
 			}

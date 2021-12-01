@@ -2,8 +2,6 @@ The following tables list Prometheus metrics and how they are used by Densify.
 
 - [Container Metrics](#container-metrics)
 - [Node Metrics](#node-metrics)
-- [Node Group Metrics](#node-group-metrics)
-- [Cluster Metrics](#cluster-metrics)
 - [CRQ Metrics](#crq-metrics)
 
 
@@ -101,58 +99,6 @@ The following tables list Prometheus metrics and how they are used by Densify.
 | node_network_transmit_packets_total | Network packets sent |  
 | node_cpu_seconds_total | CPU utilization | 
 | kube_node_role | Node labels |
-
-## Node Group Metrics
-| Metric | Usage |
-|--------|-------|
-| kube_node_labels | Node Group labels |
-| kube_pod_container_resource_limits_cpu_cores | CPU limit (used for workload and attribute) |
-| kube_pod_container_resource_requests_cpu_cores | CPU requests (used for workload and attribute) |
-| kube_pod_container_resource_limits_memory_bytes | Memory limit (used for workload and attribute) |
-| kube_pod_container_resource_requests_memory_bytes | Memory requests (used for workload and attribute) |
-| kube_node_status_capacity_cpu_cores | Node Group average capacity CPU cores | 
-| kube_node_status_capacity_memory_bytes | Node Group average capacity memory bytes |  
-| node_disk_written_bytes_total | Disk write bytes total (avg) |
-| node_disk_read_bytes_total | Disk read bytes total (avg) |
-| node_disk_write_time_seconds_total | Disk write operations (avg) |
-| node_disk_read_time_seconds_total | Disk read operations (avg) | 
-| node_disk_io_time_seconds_total | Disk write operations (avg) & Disk read operations (avg) |
-| node_memory_MemTotal_bytes | Total memory bytes (avg) & Raw memory utilization (avg) & Actual memory utilization (avg) |
-| node_memory_MemFree_bytes | Raw memory utilization (avg) & Actual memory utilization (avg) | 
-| node_memory_Cached_bytes | Actual memory utilization (avg) |
-| node_memory_Buffers_bytes | Actual memory utilization (avg) |
-| node_memory_Active_bytes | Actual memory bytes (avg) |  
-| node_network_receive_bytes_total | Raw net received utilization (avg) | 
-| node_network_receive_packets_total | Network packets received (avg) | 
-| node_network_transmit_bytes_total | Raw net sent utilization (avg) |  
-| node_network_transmit_packets_total | Network packets sent (avg) |  
-| node_cpu_seconds_total | CPU utilization (avg) | 
-
-## Cluster Metrics
-
-| Metric | Usage |
-|--------|-------|
-| kube_pod_container_resource_limits_cpu_cores | CPU limit (used for workload and attribute) |
-| kube_pod_container_resource_requests_cpu_cores | CPU requests (used for workload and attribute) |
-| kube_pod_container_resource_limits_memory_bytes | Memory limit (used for workload and attribute) |
-| kube_pod_container_resource_requests_memory_bytes | Memory requests (used for workload and attribute) |
-| kube_node_status_capacity_cpu_cores | Avg capacity CPU cores |
-| kube_node_status_capacity_memory_bytes | Avg capacity memory bytes |
-| node_disk_written_bytes_total | Disk write bytes total (avg) |
-| node_disk_read_bytes_total | Disk read bytes total (avg) |
-| node_disk_write_time_seconds_total | Disk write operations (avg) |
-| node_disk_read_time_seconds_total | Disk read operations (avg) |
-| node_disk_io_time_seconds_total | Disk write operations (avg) & Disk read operations (avg) |
-| node_memory_MemTotal_bytes | Total memory bytes (avg) & Raw memory utilization (avg) & Actual memory utilization (avg) |
-| node_memory_MemFree_bytes | Raw memory utilization (avg) & Actual memory utilization (avg) |
-| node_memory_Cached_bytes | Actual memory utilization (avg) |
-| node_memory_Buffers_bytes | Actual memory utilization (avg) |
-| node_memory_Active_bytes | Actual memory bytes (avg) |
-| node_network_receive_bytes_total | Raw net received utilization (avg) |
-| node_network_receive_packets_total | Network packets received (avg) |
-| node_network_transmit_bytes_total | Raw net sent utilization (avg) |
-| node_network_transmit_packets_total | Network packets sent (avg) |
-| node_cpu_seconds_total | CPU utilization (avg) |
 
 ## Cluster Resource Quota (CRQ) Metrics
 Available only for OpenShift.

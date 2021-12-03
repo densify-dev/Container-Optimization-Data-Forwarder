@@ -298,7 +298,7 @@ func Metrics(args *common.Parameters) {
 
 		getNodeMetricString(result, nodeGroupLabels[ng])
 
-		nodeGroupSuffix = ` * on (node) group_right kube_node_labels{` + string(nodeGroupLabels[ng]) + `=~".+"}) by (` + string(nodeGroupLabels[ng]) + `)`
+		nodeGroupSuffix = ` * on (node) group_left (` + string(nodeGroupLabels[ng]) + `) kube_node_labels{` + string(nodeGroupLabels[ng]) + `=~".+"}) by (` + string(nodeGroupLabels[ng]) + `)`
 
 		query = `sum(kube_pod_container_resource_limits) by (node, resource)`
 		result, err = common.MetricCollect(args, query, range5Min)
@@ -383,7 +383,7 @@ func Metrics(args *common.Parameters) {
 			requestsLabel = "unified"
 		}
 
-		query = `avg(kube_node_status_capacity` + nodeGroupSuffix
+		query = `avg(kube_node_status_capacity * on (node) group_left (` + string(nodeGroupLabels[ng]) + `) kube_node_labels{` + string(nodeGroupLabels[ng]) + `=~".+"}) by (` + string(nodeGroupLabels[ng]) + `,resource)`
 		result, err = common.MetricCollect(args, query, range5Min)
 
 		if result.(model.Matrix).Len() == 0 {

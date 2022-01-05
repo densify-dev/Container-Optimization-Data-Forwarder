@@ -14,7 +14,7 @@ RUN microdnf install -y shadow-utils \
 LABEL name="Container-Optimization-Data-Forwarder" \
       vendor="Densify" \
       maintainer="support@densify.com" \
-      version="2.2-0" \
+      version="2.4-0" \
       release="1" \
       summary="Densify container data collection" \
       description="Collects data from Prometheus and sends to Densify server for analysis"

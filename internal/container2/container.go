@@ -135,9 +135,9 @@ func Metrics(args *common.Parameters) {
 				//Create deployment as top owner and add container
 				if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+deploymentName]; !ok {
 					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName] = &midLevel{name: deploymentName, kind: "Deployment", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
-					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 1}
+					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 0}
 				} else if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName]; !ok {
-					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 1}
+					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 0}
 				}
 				if _, ok := systems[namespaceName].pointers[ownerKind+"__"+deploymentName]; !ok {
 					systems[namespaceName].pointers[ownerKind+"__"+deploymentName] = systems[namespaceName].midLevels[ownerKind+"__"+currentOwner]
@@ -148,9 +148,9 @@ func Metrics(args *common.Parameters) {
 				//Create deployment as top owner and add container
 				if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+cronJobName]; !ok {
 					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName] = &midLevel{name: cronJobName, kind: "CronJob", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
-					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 1}
+					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 0}
 				} else if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName]; !ok {
-					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 1}
+					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 0}
 				}
 				if _, ok := systems[namespaceName].pointers[ownerKind+"__"+cronJobName]; !ok {
 					systems[namespaceName].pointers[ownerKind+"__"+cronJobName] = systems[namespaceName].midLevels[ownerKind+"__"+currentOwner]
@@ -161,9 +161,9 @@ func Metrics(args *common.Parameters) {
 				//Create controller as top owner and add container
 				if _, ok := systems[namespaceName].midLevels[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName]; !ok {
 					systems[namespaceName].midLevels[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName] = &midLevel{name: controllerName, kind: podOwnersKind[podName+"__"+namespaceName], containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
-					systems[namespaceName].midLevels[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 1}
+					systems[namespaceName].midLevels[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 0}
 				} else if _, ok := systems[namespaceName].midLevels[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName].containers[containerName]; !ok {
-					systems[namespaceName].midLevels[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 1}
+					systems[namespaceName].midLevels[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 0}
 				}
 			}
 			if _, ok := systems[namespaceName].pointers[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName]; !ok {
@@ -176,7 +176,7 @@ func Metrics(args *common.Parameters) {
 			if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+podName]; !ok {
 				systems[namespaceName].midLevels[ownerKind+"__"+podName] = &midLevel{name: podName, kind: "Pod", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
 			}
-			systems[namespaceName].midLevels[ownerKind+"__"+podName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 1}
+			systems[namespaceName].midLevels[ownerKind+"__"+podName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 0}
 		}
 		if _, ok := systems[namespaceName].pointers["Pod__"+podName]; !ok {
 			systems[namespaceName].pointers["Pod__"+podName] = systems[namespaceName].midLevels[ownerKind+"__"+currentOwner]
@@ -204,40 +204,52 @@ func Metrics(args *common.Parameters) {
 		}
 	}
 
-	query = `sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000`
+	query = `sum(kube_pod_container_resource_limits) by (pod,namespace,container,resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=cpuLimit query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=cpuLimit query=" + query + " message=" + err.Error())
+	if result.(model.Matrix).Len() == 0 {
+		query = `sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=cpuLimit query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=cpuLimit query=" + query + " message=" + err.Error())
+		} else {
+			getContainerMetric(result, "namespace", "pod", "container", "cpuLimit")
+		}
+
+		query = `sum(kube_pod_container_resource_limits_memory_bytes) by (pod,namespace,container)/1024/1024`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=memLimit query=" + query + " message=" + err.Error())
+		} else {
+			getContainerMetric(result, "namespace", "pod", "container", "memLimit")
+		}
 	} else {
-		getContainerMetric(result, "namespace", "pod", "container", "cpuLimit")
+		getContainerMetric(result, "namespace", "pod", "container", "limits")
 	}
 
-	query = `sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000`
+	query = `sum(kube_pod_container_resource_requests) by (pod,namespace,container,resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=cpuRequest query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=cpuRequest query=" + query + " message=" + err.Error())
-	} else {
-		getContainerMetric(result, "namespace", "pod", "container", "cpuRequest")
-	}
+	if result.(model.Matrix).Len() == 0 {
+		query = `sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=cpuRequest query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=cpuRequest query=" + query + " message=" + err.Error())
+		} else {
+			getContainerMetric(result, "namespace", "pod", "container", "cpuRequest")
+		}
 
-	query = `sum(kube_pod_container_resource_limits_memory_bytes) by (pod,namespace,container)/1024/1024`
-	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=memLimit query=" + query + " message=" + err.Error())
+		query = `sum(kube_pod_container_resource_requests_memory_bytes) by (pod,namespace,container)/1024/1024`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=memRequest query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=memRequest query=" + query + " message=" + err.Error())
+		} else {
+			getContainerMetric(result, "namespace", "pod", "container", "memRequest")
+		}
 	} else {
-		getContainerMetric(result, "namespace", "pod", "container", "memLimit")
-	}
-
-	query = `sum(kube_pod_container_resource_requests_memory_bytes) by (pod,namespace,container)/1024/1024`
-	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=memRequest query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=memRequest query=" + query + " message=" + err.Error())
-	} else {
-		getContainerMetric(result, "namespace", "pod", "container", "memRequest")
+		getContainerMetric(result, "namespace", "pod", "container", "requests")
 	}
 
 	query = `container_spec_cpu_shares{name!~"k8s_POD_.*"}`
@@ -295,11 +307,22 @@ func Metrics(args *common.Parameters) {
 
 	query = `sum(kube_pod_container_status_terminated) by (pod,namespace,container)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=powerState query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=powerState query=" + query + " message=" + err.Error())
+	if result.(model.Matrix).Len() == 0 {
+		query = `sum(kube_pod_container_status_terminated_reason) by (pod,namespace,container)`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=powerState query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=powerState query=" + query + " message=" + err.Error())
+		} else {
+			getContainerMetric(result, "namespace", "pod", "container", "powerState")
+		}
 	} else {
-		getContainerMetric(result, "namespace", "pod", "container", "powerState")
+		if err != nil {
+			args.WarnLogger.Println("metric=powerState query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=powerState query=" + query + " message=" + err.Error())
+		} else {
+			getContainerMetric(result, "namespace", "pod", "container", "powerState")
+		}
 	}
 
 	query = `kube_pod_created`
@@ -638,11 +661,24 @@ func Metrics(args *common.Parameters) {
 	}
 	query = `kube_hpa_labels`
 	result, err = common.MetricCollect(args, query, range5Min)
+
+	var hpaName string
+	var hpaLabel model.LabelName
+	if result.(model.Matrix).Len() != 0 {
+		hpaName = "hpa"
+		hpaLabel = "hpa"
+	} else {
+		hpaName = "horizontalpodautoscaler"
+		hpaLabel = "horizontalpodautoscaler"
+		query = `kube_` + hpaName + `_labels`
+		result, err = common.MetricCollect(args, query, range5Min)
+	}
+
 	if err != nil {
 		args.WarnLogger.Println("metric=hpaLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=hpaLabels query=" + query + " message=" + err.Error())
 	} else {
-		getHPAMetricString(result, "namespace", "hpa", args)
+		getHPAMetricString(result, "namespace", hpaLabel, args)
 	}
 
 	//Current size workloads
@@ -710,7 +746,7 @@ func Metrics(args *common.Parameters) {
 			writeWorkloadMid(currentSizeWrite, result, "namespace", "job_name", args, "Job")
 		}
 
-		query = `sum(max(kube_job_spec_parallelism) by (namespace,job_name) * on (namespace,job_name) group_right max(kube_job_owner) by (namespace, job_name, owner_name)) by (owner_name, namespace)`
+		query = `max(max(kube_job_spec_parallelism) by (namespace,job_name) * on (namespace,job_name) group_right max(kube_job_owner) by (namespace, job_name, owner_name)) by (owner_name, namespace)`
 		result, err = common.MetricCollect(args, query, range5Min)
 		if err != nil {
 			args.WarnLogger.Println("metric=cronJobSpecParallelism query=" + query + " message=" + err.Error())
@@ -720,7 +756,7 @@ func Metrics(args *common.Parameters) {
 			writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", args, "CronJob")
 		}
 
-		query = `sum(max(kube_replicaset_spec_replicas) by (namespace,replicaset) * on (namespace,replicaset) group_right max(kube_replicaset_owner) by (namespace, replicaset, owner_name)) by (owner_name, namespace)`
+		query = `max(max(kube_replicaset_spec_replicas) by (namespace,replicaset) * on (namespace,replicaset) group_right max(kube_replicaset_owner) by (namespace, replicaset, owner_name)) by (owner_name, namespace)`
 		result, err = common.MetricCollect(args, query, range5Min)
 		if err != nil {
 			args.WarnLogger.Println("metric=replicaSetSpecReplicas query=" + query + " message=" + err.Error())
@@ -777,20 +813,20 @@ func Metrics(args *common.Parameters) {
 	getWorkload("restarts", "Restarts", query, "max", args)
 
 	if args.LabelSuffix == "" {
-		query = `kube_hpa_status_condition{status="true",condition="ScalingLimited"}`
+		query = `kube_` + hpaName + `_status_condition{status="true",condition="ScalingLimited"}`
 	} else {
-		query = `kube_hpa_status_condition{status="ScalingLimited",condition="true"}`
+		query = `kube_` + hpaName + `_status_condition{status="ScalingLimited",condition="true"}`
 	}
-	getHPAWorkload("condition_scaling_limited", "Scaling Limited", query, args)
+	getHPAWorkload("condition_scaling_limited", "Scaling Limited", query, args, hpaLabel)
 
 	//HPA workloads
-	query = `kube_hpa_spec_max_replicas`
-	getHPAWorkload("max_replicas", "Auto Scaling - Maximum Size", query, args)
+	query = `kube_` + hpaName + `_spec_max_replicas`
+	getHPAWorkload("max_replicas", "Auto Scaling - Maximum Size", query, args, hpaLabel)
 
-	query = `kube_hpa_spec_min_replicas`
-	getHPAWorkload("min_replicas", "Auto Scaling - Minimum Size", query, args)
+	query = `kube_` + hpaName + `_spec_min_replicas`
+	getHPAWorkload("min_replicas", "Auto Scaling - Minimum Size", query, args, hpaLabel)
 
-	query = `kube_hpa_status_current_replicas`
-	getHPAWorkload("current_replicas", "Auto Scaling - Total Instances", query, args)
+	query = `kube_` + hpaName + `_status_current_replicas`
+	getHPAWorkload("current_replicas", "Auto Scaling - Total Instances", query, args, hpaLabel)
 
 }

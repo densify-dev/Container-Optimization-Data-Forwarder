@@ -26,25 +26,41 @@ var entityKind = "cluster"
 //Gets cluster metrics from prometheus (and checks to see if they are valid)
 func getClusterMetric(result model.Value, metric string) {
 
-	//validates that the value of the entity is set and if not will default to 0
-	var value int
-	if len(result.(model.Matrix)[0].Values) == 0 {
-		value = 0
-	} else {
-		value = int(result.(model.Matrix)[0].Values[len(result.(model.Matrix)[0].Values)-1].Value)
-	}
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
+		//validates that the value of the entity is set and if not will default to 0
+		var value float64
+		if len(result.(model.Matrix)[i].Values) == 0 {
+			value = 0
+		} else {
+			value = float64(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+		}
 
-	//Check which metric this is for and update the corresponding variable for this container in the system data structure
+		//Check which metric this is for and update the corresponding variable for this container in the system data structure
 
-	switch metric {
-	case "cpuLimit":
-		clusterEntity.cpuLimit = int(value)
-	case "cpuRequest":
-		clusterEntity.cpuRequest = int(value)
-	case "memLimit":
-		clusterEntity.memLimit = int(value)
-	case "memRequest":
-		clusterEntity.memRequest = int(value)
+		switch metric {
+		case "limits":
+			switch result.(model.Matrix)[i].Metric["resource"] {
+			case "memory":
+				clusterEntity.memLimit = int(value / 1024 / 1024)
+			case "cpu":
+				clusterEntity.cpuLimit = int(value * 1000)
+			}
+		case "requests":
+			switch result.(model.Matrix)[i].Metric["resource"] {
+			case "memory":
+				clusterEntity.memRequest = int(value / 1024 / 1024)
+			case "cpu":
+				clusterEntity.cpuRequest = int(value * 1000)
+			}
+		case "cpuLimit":
+			clusterEntity.cpuLimit = int(value)
+		case "cpuRequest":
+			clusterEntity.cpuRequest = int(value)
+		case "memLimit":
+			clusterEntity.memLimit = int(value)
+		case "memRequest":
+			clusterEntity.memRequest = int(value)
+		}
 	}
 
 }
@@ -115,47 +131,60 @@ func Metrics(args *common.Parameters) {
 	//Setup variables used in the code.
 	var historyInterval time.Duration
 	historyInterval = 0
-	var query string
+	var query, requestsLabel string
 	var result model.Value
 	var err error
 
 	//Start and end time + the prometheus address used for querying
 	range5Min := common.TimeRange(args, historyInterval)
 
-	query = `sum(kube_pod_container_resource_limits_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
+	query = `sum(kube_pod_container_resource_limits) by (resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=cpuLimit query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=cpuLimit query=" + query + " message=" + err.Error())
+	if result.(model.Matrix).Len() == 0 {
+		query = `sum(kube_pod_container_resource_limits_cpu_cores*1000)`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=cpuLimit query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=cpuLimit query=" + query + " message=" + err.Error())
+		} else {
+			getClusterMetric(result, "cpuLimit")
+		}
+
+		query = `sum(kube_pod_container_resource_limits_memory_bytes/1024/1024)`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=memLimit query=" + query + " message=" + err.Error())
+		} else {
+			getClusterMetric(result, "memLimit")
+		}
 	} else {
-		getClusterMetric(result, "cpuLimit")
+		getClusterMetric(result, "limits")
 	}
 
-	query = `sum(kube_pod_container_resource_requests_cpu_cores*1000 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
+	query = `sum(kube_pod_container_resource_requests) by (resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=cpuRequest query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=cpuRequest query=" + query + " message=" + err.Error())
-	} else {
-		getClusterMetric(result, "cpuRequest")
-	}
+	if result.(model.Matrix).Len() == 0 {
+		query = `sum(kube_pod_container_resource_requests_cpu_cores*1000)`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=cpuRequest query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=cpuRequest query=" + query + " message=" + err.Error())
+		} else {
+			getClusterMetric(result, "cpuRequest")
+		}
 
-	query = `sum(kube_pod_container_resource_limits_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=memLimit query=" + query + " message=" + err.Error())
+		query = `sum(kube_pod_container_resource_requests_memory_bytes/1024/1024)`
+		result, err = common.MetricCollect(args, query, range5Min)
+		if err != nil {
+			args.WarnLogger.Println("metric=memRequest query=" + query + " message=" + err.Error())
+			fmt.Println("[WARNING] metric=memRequest query=" + query + " message=" + err.Error())
+		} else {
+			getClusterMetric(result, "memRequest")
+		}
 	} else {
-		getClusterMetric(result, "memLimit")
-	}
-
-	query = `sum(kube_pod_container_resource_requests_memory_bytes/1024/1024 * on (namespace,pod,container) group_left kube_pod_container_status_running)`
-	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=memRequest query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=memRequest query=" + query + " message=" + err.Error())
-	} else {
-		getClusterMetric(result, "memRequest")
+		getClusterMetric(result, "requests")
+		requestsLabel = "unified"
 	}
 
 	writeAttributes(args)
@@ -163,21 +192,39 @@ func Metrics(args *common.Parameters) {
 
 	var metricField []model.LabelName
 
-	//Query and store prometheus CPU requests
-	query = `avg(sum((kube_pod_container_resource_requests_cpu_cores) * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node))`
-	common.GetWorkload("cpu_requests", "CPU Reservation in Cores", query, metricField, args, entityKind)
+	if requestsLabel == "unified" {
+		//Query and store prometheus CPU requests
+		query = `avg(sum(kube_pod_container_resource_requests{resource="cpu"}) by (node))`
+		common.GetWorkload("cpu_requests", "CPU Reservation in Cores", query, metricField, args, entityKind)
 
-	//Query and store prometheus CPU requests
-	query = `avg(sum((kube_pod_container_resource_requests_cpu_cores) * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node) / sum(kube_node_status_capacity_cpu_cores) by (node)) * 100`
-	common.GetWorkload("cpu_reservation_percent", "CPU Reservation Percent", query, metricField, args, entityKind)
+		//Query and store prometheus CPU requests
+		query = `avg(sum(kube_pod_container_resource_requests{resource="cpu"}) by (node) / sum(kube_node_status_capacity{resource="cpu"}) by (node)) * 100`
+		common.GetWorkload("cpu_reservation_percent", "CPU Reservation Percent", query, metricField, args, entityKind)
 
-	//Query and store prometheus Memory requests
-	query = `avg(sum((kube_pod_container_resource_requests_memory_bytes/1024/1024) * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node))`
-	common.GetWorkload("memory_requests", "Memory Reservation in MB", query, metricField, args, entityKind)
+		//Query and store prometheus Memory requests
+		query = `avg(sum(kube_pod_container_resource_requests{resource="memory"}/1024/1024) by (node))`
+		common.GetWorkload("memory_requests", "Memory Reservation in MB", query, metricField, args, entityKind)
 
-	//Query and store prometheus Memory requests
-	query = `avg(sum((kube_pod_container_resource_requests_memory_bytes/1024/1024) * on (namespace,pod,container) group_left kube_pod_container_status_running) by (node) / sum(kube_node_status_capacity_memory_bytes/1024/1024) by (node)) * 100`
-	common.GetWorkload("memory_reservation_percent", "Memory Reservation Percent", query, metricField, args, entityKind)
+		//Query and store prometheus Memory requests
+		query = `avg(sum(kube_pod_container_resource_requests{resource="memory"}/1024/1024) by (node) / sum(kube_node_status_capacity{resource="memory"}/1024/1024) by (node)) * 100`
+		common.GetWorkload("memory_reservation_percent", "Memory Reservation Percent", query, metricField, args, entityKind)
+	} else {
+		//Query and store prometheus CPU requests
+		query = `avg(sum(kube_pod_container_resource_requests_cpu_cores) by (node))`
+		common.GetWorkload("cpu_requests", "CPU Reservation in Cores", query, metricField, args, entityKind)
+
+		//Query and store prometheus CPU requests
+		query = `avg(sum(kube_pod_container_resource_requests_cpu_cores) by (node) / sum(kube_node_status_capacity_cpu_cores) by (node)) * 100`
+		common.GetWorkload("cpu_reservation_percent", "CPU Reservation Percent", query, metricField, args, entityKind)
+
+		//Query and store prometheus Memory requests
+		query = `avg(sum(kube_pod_container_resource_requests_memory_bytes/1024/1024) by (node))`
+		common.GetWorkload("memory_requests", "Memory Reservation in MB", query, metricField, args, entityKind)
+
+		//Query and store prometheus Memory requests
+		query = `avg(sum(kube_pod_container_resource_requests_memory_bytes/1024/1024) by (node) / sum(kube_node_status_capacity_memory_bytes/1024/1024) by (node)) * 100`
+		common.GetWorkload("memory_reservation_percent", "Memory Reservation Percent", query, metricField, args, entityKind)
+	}
 
 	//For cluster we don't have to check instance field and convert to pod_ip as we aren't looking to map to the node names but rather just get the avg for nodes. So we can use just instance field in all cases.
 	//Query and store prometheus total cpu uptime in seconds

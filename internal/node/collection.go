@@ -27,9 +27,9 @@ func getNodeMetric(result model.Value, node model.LabelName, metric string) {
 			continue
 		}
 		//validates that the value of the entity is set and if not will default to 0
-		var value int
+		var value float64
 		if len(result.(model.Matrix)[i].Values) != 0 {
-			value = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+			value = float64(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
 		}
 
 		//Check which metric this is for and update the corresponding variable for this container in the system data structure
@@ -78,6 +78,20 @@ func getNodeMetric(result model.Value, node model.LabelName, metric string) {
 				nodes[string(nodeValue)].podsAllocatable = int(value)
 			case "netSpeedBytes":
 				nodes[string(nodeValue)].netSpeedBytes = int(value)
+			case "limits":
+				switch result.(model.Matrix)[i].Metric["resource"] {
+				case "memory":
+					nodes[string(nodeValue)].memLimit = int(value / 1024 / 1024)
+				case "cpu":
+					nodes[string(nodeValue)].cpuLimit = int(value * 1000)
+				}
+			case "requests":
+				switch result.(model.Matrix)[i].Metric["resource"] {
+				case "memory":
+					nodes[string(nodeValue)].memRequest = int(value / 1024 / 1024)
+				case "cpu":
+					nodes[string(nodeValue)].cpuRequest = int(value * 1000)
+				}
 			case "cpuLimit":
 				nodes[string(nodeValue)].cpuLimit = int(value)
 			case "cpuRequest":

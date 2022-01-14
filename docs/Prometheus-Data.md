@@ -2,7 +2,8 @@ The following tables list Prometheus metrics and how they are used by Densify.
 
 - [Container Metrics](#container-metrics)
 - [Node Metrics](#node-metrics)
-- [CRQ Metrics](#crq-metrics)
+- [Cluster Resource Quota (CRQ) Metrics](#cluster-resource-quota-crq-metrics)
+- [Resoure Quota Metrics](#resoure-quota-metrics)
 
 
 ## Container Metrics
@@ -15,7 +16,6 @@ The following tables list Prometheus metrics and how they are used by Densify.
 | kube_pod_container_resource_requests_cpu_cores | Container CPU requests |
 | container_memory_usage_bytes | Container raw memory utilization |
 | container_memory_rss | Container actual memory utilization | 
-| container_spec_memory_limit_bytes | Container memory | 
 | kube_pod_container_resource_limit_memory_bytes | Container memory limit |
 | kube_pod_container_resource_requests_memory_bytes | Container memory requests |
 | container_fs_usage_bytes | Container raw disk utilization |  

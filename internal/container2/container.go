@@ -3,183 +3,350 @@ package container2
 
 import (
 	"fmt"
-	"os"
 	"runtime"
-	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/prometheus/common/model"
 )
 
-var systems = map[string]*namespace{}
-var entityKind = "Container"
+var systems = map[string]*Namespace{}
+var entityKind = "container"
 
-type namespace struct {
-	pointers                                              map[string]*midLevel
-	midLevels                                             map[string]*midLevel
-	cpuLimit, cpuRequest, memLimit, memRequest, podsLimit int
-	labelMap                                              map[string]string
+type Cluster struct {
+	Name       string                `json:"name,omitempty"`
+	Namespaces map[string]*Namespace `json:"namespaces,omitempty"`
+}
+
+type Namespace struct {
+	LabelMap map[string]map[string]string    `json:"labels,omitempty"`
+	Entities map[string]map[string]*MidLevel `json:"entities,omitempty"`
 }
 
 //midLevel is used to hold information related to the highest owner of any containers
-type midLevel struct {
-	name, kind            string
-	containers            map[string]*container
-	currentSize, restarts int
-	creationTime          int64
-	labelMap              map[string]string
+type MidLevel struct {
+	OwnerName          string                       `json:"ownerName,omitempty"`
+	OwnerKind          string                       `json:"ownerKind,omitempty"`
+	NextSchedTime      int64                        `json:"nextScheduledTime,omitempty"`
+	StatusActive       int64                        `json:"statusActive,omitempty"`
+	LastSchedTime      int64                        `json:"lastScheduledTime,omitempty"`
+	MetadataGeneration int64                        `json:"metadataGeneration,omitempty"`
+	MaxSurge           int64                        `json:"maxSurge,omitempty"`
+	MaxUnavailable     int64                        `json:"maxUnavailable,omitempty"`
+	Completions        int64                        `json:"completions,omitempty"`
+	Parallelism        int64                        `json:"parallelism,omitempty"`
+	CompletionTime     int64                        `json:"CompletionTime,omitempty"`
+	Containers         map[string]*Container        `json:"containers,omitempty"`
+	CreationTime       int64                        `json:"creationTime,omitempty"`
+	LabelMap           map[string]map[string]string `json:"labels,omitempty"`
 }
 
 //container is used to hold information related to containers
-type container struct {
-	memory, cpuLimit, cpuRequest, memLimit, memRequest, restarts, powerState int
-	name                                                                     string
-	labelMap                                                                 map[string]string
+type Container struct {
+	CpuLimit   int                          `json:"cpuLimit,omitempty"`
+	CpuRequest int                          `json:"cpuRequest,omitempty"`
+	MemLimit   int                          `json:"memoryLimit,omitempty"`
+	MemRequest int                          `json:"memoryRequest,omitempty"`
+	PowerState int                          `json:"powerState,omitempty"`
+	LabelMap   map[string]map[string]string `json:"labels,omitempty"`
+}
+
+//getContainerMetric is used to parse the results from Prometheus related to Container Entities and store them in the systems data structure.
+func getContainerMetric(result model.Value, pod, container model.LabelName, metric string) bool {
+	var status = false
+	//Validate there is data in the results.
+	if result == nil {
+		return status
+	}
+	//Loop through the different entities in the results.
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
+		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
+		namespaceValue, test := result.(model.Matrix)[i].Metric["namespace"]
+		if test == false {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)]; !ok {
+			continue
+		}
+		//Validate that the data contains the pod label with value and check it exists in our systems structure
+		podValue, test := result.(model.Matrix)[i].Metric[pod]
+		if test == false {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)].Entities["Pods"][string(podValue)]; !ok {
+			continue
+		}
+		//Validate that the data contains the container label with value and check it exists in our systems structure
+		containerValue, test := result.(model.Matrix)[i].Metric[container]
+		if test == false {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)]; !ok {
+			continue
+		}
+
+		//validates that the value of the entity is set and if not will default to 0
+		var value float64
+		if len(result.(model.Matrix)[i].Values) == 0 {
+			value = 0
+		} else {
+			value = float64(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+		}
+
+		//Check which metric this is for and update the corresponding variable for this container in the system data structure
+		switch metric {
+		case "limits":
+			switch result.(model.Matrix)[i].Metric["resource"] {
+			case "memory":
+				systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].MemLimit = int(value / 1024 / 1024)
+			case "cpu":
+				systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].CpuLimit = int(value * 1000)
+			}
+		case "requests":
+			switch result.(model.Matrix)[i].Metric["resource"] {
+			case "memory":
+				systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].MemRequest = int(value / 1024 / 1024)
+			case "cpu":
+				systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].CpuRequest = int(value * 1000)
+			}
+		case "cpuLimit":
+			systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].CpuLimit = int(value)
+		case "cpuRequest":
+			systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].CpuRequest = int(value)
+		case "memLimit":
+			systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].MemLimit = int(value)
+		case "memRequest":
+			systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].MemRequest = int(value)
+		case "powerState":
+			systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].PowerState = int(value)
+		default:
+			if _, ok := systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].LabelMap[metric]; !ok {
+				systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].LabelMap[metric] = map[string]string{}
+			}
+			//loop through all the labels for an entity and store them in a map. For controller based entities where there will be multiple copies of containers they will have there values concatinated together.
+			for key, value := range result.(model.Matrix)[i].Metric {
+				common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].LabelMap[metric])
+			}
+		}
+		status = true
+	}
+
+	return status
+}
+
+//getmidMetric is used to parse the results from Prometheus related to mid Entities and store them in the systems data structure.
+func getMidMetric(result model.Value, mid model.LabelName, metric, kind, query string) {
+	//Validate there is data in the results.
+	if result == nil {
+		return
+	}
+	//Loop through the different entities in the results.
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
+		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
+		namespaceValue, ok := result.(model.Matrix)[i].Metric["namespace"]
+		if !ok {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)]; !ok {
+			continue
+		}
+		//Validate that the data contains the mid label with value and check it exists in our systems structure
+		midValue, ok := result.(model.Matrix)[i].Metric[mid]
+		if !ok {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)].Entities[kind][string(midValue)]; !ok {
+			continue
+		}
+
+		//validates that the value of the entity is set and if not will default to 0
+		var value int64
+		if len(result.(model.Matrix)[i].Values) == 0 {
+			value = 0
+		} else {
+			value = int64(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+		}
+		//Check which metric this is for and update the corresponding variable for this mid in the system data structure
+		switch metric {
+		case "label":
+			if _, ok := systems[string(namespaceValue)].Entities[kind][string(midValue)].LabelMap[query]; !ok {
+				systems[string(namespaceValue)].Entities[kind][string(midValue)].LabelMap[query] = map[string]string{}
+			}
+			//loop through all the labels for an entity and store them in a map. For controller based entities where there will be multiple copies of containers they will have there values concatinated together.
+			for key, value := range result.(model.Matrix)[i].Metric {
+				common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].Entities[kind][string(midValue)].LabelMap[query])
+			}
+		case "creationTime":
+			systems[string(namespaceValue)].Entities[kind][string(midValue)].CreationTime = value
+		case "kube_cronjob_next_schedule_time":
+			systems[string(namespaceValue)].Entities[kind][string(midValue)].NextSchedTime = value
+		case "kube_cronjob_status_active":
+			systems[string(namespaceValue)].Entities[kind][string(midValue)].StatusActive = value
+		case "kube_cronjob_status_last_schedule_time":
+			systems[string(namespaceValue)].Entities[kind][string(midValue)].LastSchedTime = value
+		case "kube_deployment_metadata_generation":
+			systems[string(namespaceValue)].Entities[kind][string(midValue)].MetadataGeneration = value
+		case "kube_deployment_spec_strategy_rollingupdate_max_surge":
+			systems[string(namespaceValue)].Entities[kind][string(midValue)].MaxSurge = value
+		case "kube_deployment_spec_strategy_rollingupdate_max_unavailable":
+			systems[string(namespaceValue)].Entities[kind][string(midValue)].MaxUnavailable = value
+		case "kube_job_status_completion_time":
+			systems[string(namespaceValue)].Entities[kind][string(midValue)].CompletionTime = value
+		case "kube_job_spec_completions":
+			systems[string(namespaceValue)].Entities[kind][string(midValue)].Completions = value
+		case "kube_job_spec_parallelism":
+			systems[string(namespaceValue)].Entities[kind][string(midValue)].Parallelism = value
+		}
+	}
+}
+
+//getNamespaceMetric is used to parse the label based results from Prometheus related to Namespace Entities and store them in the systems data structure.
+func getNamespaceMetric(result model.Value, query string) {
+	//Validate there is data in the results.
+	if result == nil {
+		return
+	}
+	//Loop through the different entities in the results.
+	for i := 0; i < result.(model.Matrix).Len(); i++ {
+		//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
+		namespaceValue, ok := result.(model.Matrix)[i].Metric["namespace"]
+		if !ok {
+			continue
+		}
+		if _, ok := systems[string(namespaceValue)]; !ok {
+			continue
+		}
+		systems[string(namespaceValue)].LabelMap[query] = map[string]string{}
+		//loop through all the labels for an entity and store them in a map.
+		for key, value := range result.(model.Matrix)[i].Metric {
+			common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].LabelMap[query])
+		}
+	}
 }
 
 //Metrics function to collect data related to containers.
 func Metrics(args *common.Parameters) {
 	//Setup variables used in the code.
-	var historyInterval time.Duration
-	historyInterval = 0
-	var query string
+	var query, labelSuffix string
 	var result model.Value
 	var err error
 	var mem runtime.MemStats
 
-	var podOwners = map[string]string{}
-	var podOwnersKind = map[string]string{}
-	var replicaSetOwners = map[string]string{}
-	var jobOwners = map[string]string{}
-
-	range5Min := common.TimeRange(args, historyInterval)
 	if args.Debug {
 		runtime.ReadMemStats(&mem)
 		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
-	//querys gathering hierarchy information for the containers
+
+	query = `kube_pod_container_info`
+	result, err = common.MetricCollect(args, query, "discovery")
+	if err != nil {
+		args.ErrorLogger.Println("metric=containers query=" + query + " message=" + err.Error())
+		fmt.Println("[ERROR] metric=containers query=" + query + " message=" + err.Error())
+		return
+	} else {
+		//Add containers to pods structure
+		for i := 0; i < result.(model.Matrix).Len(); i++ {
+
+			containerName := string(result.(model.Matrix)[i].Metric["container"])
+			podName := string(result.(model.Matrix)[i].Metric["pod"])
+			namespaceName := string(result.(model.Matrix)[i].Metric["namespace"])
+
+			if _, ok := systems[namespaceName]; !ok {
+				systems[namespaceName] = &Namespace{LabelMap: map[string]map[string]string{}, Entities: map[string]map[string]*MidLevel{}}
+				systems[namespaceName].Entities["Pods"] = map[string]*MidLevel{}
+			}
+			if _, ok := systems[namespaceName].Entities["Pods"][podName]; !ok {
+				systems[namespaceName].Entities["Pods"][podName] = &MidLevel{Containers: map[string]*Container{}, LabelMap: map[string]map[string]string{}}
+			}
+			if _, ok := systems[namespaceName].Entities["Pods"][podName].Containers[containerName]; !ok {
+				systems[namespaceName].Entities["Pods"][podName].Containers[containerName] = &Container{LabelMap: map[string]map[string]string{}}
+				getContainerMetric(result, "pod", "container", query)
+			}
+		}
+	}
+
 	query = `sum(kube_pod_owner{owner_name!="<none>"}) by (namespace, pod, owner_name, owner_kind)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.ErrorLogger.Println("metric=pods query=" + query + " message=" + err.Error())
 		fmt.Println("[ERROR] metric=pods query=" + query + " message=" + err.Error())
 		return
+	} else {
+		for i := 0; i < result.(model.Matrix).Len(); i++ {
+			podName := string(result.(model.Matrix)[i].Metric["pod"])
+			namespaceName := string(result.(model.Matrix)[i].Metric["namespace"])
+			ownerKind := string(result.(model.Matrix)[i].Metric["owner_kind"])
+			ownerName := string(result.(model.Matrix)[i].Metric["owner_name"])
+
+			if _, ok := systems[namespaceName].Entities["Pods"][podName]; !ok {
+				continue
+			}
+
+			systems[namespaceName].Entities["Pods"][podName].OwnerKind = ownerKind
+			systems[namespaceName].Entities["Pods"][podName].OwnerName = ownerName
+			if _, ok := systems[namespaceName].Entities[ownerKind]; !ok {
+				systems[namespaceName].Entities[ownerKind] = map[string]*MidLevel{}
+			}
+			if _, ok := systems[namespaceName].Entities[ownerKind][ownerName]; !ok {
+				systems[namespaceName].Entities[ownerKind][ownerName] = &MidLevel{LabelMap: map[string]map[string]string{}, OwnerName: "", OwnerKind: ""}
+			}
+		}
 	}
 
-	for i := 0; i < result.(model.Matrix).Len(); i++ {
-		podOwners[string(result.(model.Matrix)[i].Metric["pod"])+"__"+string(result.(model.Matrix)[i].Metric["namespace"])] = string(result.(model.Matrix)[i].Metric["owner_name"])
-		podOwnersKind[string(result.(model.Matrix)[i].Metric["pod"])+"__"+string(result.(model.Matrix)[i].Metric["namespace"])] = string(result.(model.Matrix)[i].Metric["owner_kind"])
-	}
-
-	query = `sum(kube_replicaset_owner{owner_name!="<none>"}) by (namespace, replicaset, owner_name)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	query = `sum(kube_replicaset_owner{owner_name!="<none>"}) by (namespace, replicaset, owner_name, owner_kind)`
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=replicasets query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=replicasets query=" + query + " message=" + err.Error())
 	} else {
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
-			replicaSetOwners[string(result.(model.Matrix)[i].Metric["replicaset"])+"__"+string(result.(model.Matrix)[i].Metric["namespace"])] = string(result.(model.Matrix)[i].Metric["owner_name"])
-			args.Deployments = true
+			replicaSetName := string(result.(model.Matrix)[i].Metric["replicaset"])
+			namespaceName := string(result.(model.Matrix)[i].Metric["namespace"])
+			ownerKind := string(result.(model.Matrix)[i].Metric["owner_kind"])
+			ownerName := string(result.(model.Matrix)[i].Metric["owner_name"])
+
+			if _, ok := systems[namespaceName].Entities["ReplicaSet"][replicaSetName]; !ok {
+				continue
+			}
+
+			systems[namespaceName].Entities["ReplicaSet"][replicaSetName].OwnerKind = ownerKind
+			systems[namespaceName].Entities["ReplicaSet"][replicaSetName].OwnerName = ownerName
+
+			if _, ok := systems[namespaceName].Entities[ownerKind]; !ok {
+				systems[namespaceName].Entities[ownerKind] = map[string]*MidLevel{}
+			}
+
+			if _, ok := systems[namespaceName].Entities[ownerKind][ownerName]; !ok {
+				systems[namespaceName].Entities[ownerKind][ownerName] = &MidLevel{LabelMap: map[string]map[string]string{}, OwnerName: "", OwnerKind: ""}
+			}
 		}
 	}
 
-	query = `sum(kube_job_owner{owner_name!="<none>"}) by (namespace, job_name, owner_name)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	query = `sum(kube_job_owner{owner_name!="<none>"}) by (namespace, job_name, owner_name, owner_kind)`
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=jobs query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobs query=" + query + " message=" + err.Error())
 	} else {
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
-			jobOwners[string(result.(model.Matrix)[i].Metric["job_name"])+"__"+string(result.(model.Matrix)[i].Metric["namespace"])] = string(result.(model.Matrix)[i].Metric["owner_name"])
-			args.CronJobs = true
-		}
-	}
+			jobName := string(result.(model.Matrix)[i].Metric["job_name"])
+			namespaceName := string(result.(model.Matrix)[i].Metric["namespace"])
+			ownerKind := string(result.(model.Matrix)[i].Metric["owner_kind"])
+			ownerName := string(result.(model.Matrix)[i].Metric["owner_name"])
 
-	query = `max(kube_pod_container_info) by (container, pod, namespace)`
-	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.ErrorLogger.Println("metric=containers query=" + query + " message=" + err.Error())
-		fmt.Println("[ERROR] metric=containers query=" + query + " message=" + err.Error())
-		return
-	}
-
-	var currentOwner string
-
-	if !args.CronJobs {
-		args.InfoLogger.Println("No CronJobs found")
-		fmt.Println("[Info] No CronJobs found")
-	}
-	if !args.Deployments {
-		args.InfoLogger.Println("No Deployments found")
-		fmt.Println("[Info] No Deployments found")
-	}
-
-	//Add containers and top owners to structure
-	for i := 0; i < result.(model.Matrix).Len(); i++ {
-
-		containerName := string(result.(model.Matrix)[i].Metric["container"])
-		podName := string(result.(model.Matrix)[i].Metric["pod"])
-		var ownerKind string
-
-		namespaceName := string(result.(model.Matrix)[i].Metric["namespace"])
-		if _, ok := systems[namespaceName]; !ok {
-			systems[namespaceName] = &namespace{pointers: map[string]*midLevel{}, midLevels: map[string]*midLevel{}, cpuRequest: -1, cpuLimit: -1, memRequest: -1, memLimit: -1, podsLimit: -1, labelMap: map[string]string{}}
-		}
-
-		//systems[namespaceName].pods[podName] = &pod{labelMap: map[string]string{}}
-		if controllerName, ok := podOwners[podName+"__"+namespaceName]; ok {
-			if deploymentName, ok := replicaSetOwners[controllerName+"__"+namespaceName]; ok && podOwnersKind[podName+"__"+namespaceName] == "ReplicaSet" {
-				currentOwner = deploymentName
-				ownerKind = "Deployment"
-				//Create deployment as top owner and add container
-				if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+deploymentName]; !ok {
-					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName] = &midLevel{name: deploymentName, kind: "Deployment", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
-					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 0}
-				} else if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName]; !ok {
-					systems[namespaceName].midLevels[ownerKind+"__"+deploymentName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 0}
-				}
-				if _, ok := systems[namespaceName].pointers[ownerKind+"__"+deploymentName]; !ok {
-					systems[namespaceName].pointers[ownerKind+"__"+deploymentName] = systems[namespaceName].midLevels[ownerKind+"__"+currentOwner]
-				}
-			} else if cronJobName, ok := jobOwners[controllerName+"__"+namespaceName]; ok && podOwnersKind[podName+"__"+namespaceName] == "Job" {
-				currentOwner = cronJobName
-				ownerKind = "CronJob"
-				//Create deployment as top owner and add container
-				if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+cronJobName]; !ok {
-					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName] = &midLevel{name: cronJobName, kind: "CronJob", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
-					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 0}
-				} else if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName]; !ok {
-					systems[namespaceName].midLevels[ownerKind+"__"+cronJobName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 0}
-				}
-				if _, ok := systems[namespaceName].pointers[ownerKind+"__"+cronJobName]; !ok {
-					systems[namespaceName].pointers[ownerKind+"__"+cronJobName] = systems[namespaceName].midLevels[ownerKind+"__"+currentOwner]
-				}
-			} else {
-				currentOwner = controllerName
-				ownerKind = podOwnersKind[podName+"__"+namespaceName]
-				//Create controller as top owner and add container
-				if _, ok := systems[namespaceName].midLevels[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName]; !ok {
-					systems[namespaceName].midLevels[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName] = &midLevel{name: controllerName, kind: podOwnersKind[podName+"__"+namespaceName], containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
-					systems[namespaceName].midLevels[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 0}
-				} else if _, ok := systems[namespaceName].midLevels[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName].containers[containerName]; !ok {
-					systems[namespaceName].midLevels[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 0}
-				}
+			if _, ok := systems[namespaceName].Entities["Job"][jobName]; !ok {
+				continue
 			}
-			if _, ok := systems[namespaceName].pointers[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName]; !ok {
-				systems[namespaceName].pointers[podOwnersKind[podName+"__"+namespaceName]+"__"+controllerName] = systems[namespaceName].midLevels[ownerKind+"__"+currentOwner]
+
+			systems[namespaceName].Entities["Job"][jobName].OwnerKind = ownerKind
+			systems[namespaceName].Entities["Job"][jobName].OwnerName = ownerName
+
+			if _, ok := systems[namespaceName].Entities[ownerKind]; !ok {
+				systems[namespaceName].Entities[ownerKind] = map[string]*MidLevel{}
 			}
-		} else {
-			currentOwner = podName
-			ownerKind = "Pod"
-			//Create pod as top owner and add container
-			if _, ok := systems[namespaceName].midLevels[ownerKind+"__"+podName]; !ok {
-				systems[namespaceName].midLevels[ownerKind+"__"+podName] = &midLevel{name: podName, kind: "Pod", containers: map[string]*container{}, labelMap: map[string]string{}, currentSize: -1}
+			if _, ok := systems[namespaceName].Entities[ownerKind][ownerName]; !ok {
+				systems[namespaceName].Entities[ownerKind][ownerName] = &MidLevel{LabelMap: map[string]map[string]string{}, OwnerName: "", OwnerKind: ""}
 			}
-			systems[namespaceName].midLevels[ownerKind+"__"+podName].containers[containerName] = &container{name: containerName, labelMap: map[string]string{}, cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, memory: -1, restarts: -1, powerState: 0}
-		}
-		if _, ok := systems[namespaceName].pointers["Pod__"+podName]; !ok {
-			systems[namespaceName].pointers["Pod__"+podName] = systems[namespaceName].midLevels[ownerKind+"__"+currentOwner]
 		}
 	}
 
@@ -190,84 +357,66 @@ func Metrics(args *common.Parameters) {
 		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
-	//Container metrics
-	query = `container_spec_memory_limit_bytes{name!~"k8s_POD_.*"}/1024/1024`
-	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=memory query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=memory query=" + query + " message=" + err.Error())
-	} else {
-		if args.LabelSuffix == "" && getContainerMetric(result, "namespace", "pod", "container", "memory") {
-			//Don't do anything
-		} else if getContainerMetric(result, "namespace", "pod_name", "container_name", "memory") {
-			args.LabelSuffix = "_name"
-		}
-	}
 
 	query = `sum(kube_pod_container_resource_limits) by (pod,namespace,container,resource)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if result.(model.Matrix).Len() == 0 {
 		query = `sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000`
-		result, err = common.MetricCollect(args, query, range5Min)
+		result, err = common.MetricCollect(args, query, "discovery")
 		if err != nil {
 			args.WarnLogger.Println("metric=cpuLimit query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=cpuLimit query=" + query + " message=" + err.Error())
 		} else {
-			getContainerMetric(result, "namespace", "pod", "container", "cpuLimit")
+			getContainerMetric(result, "pod", "container", "cpuLimit")
 		}
 
 		query = `sum(kube_pod_container_resource_limits_memory_bytes) by (pod,namespace,container)/1024/1024`
-		result, err = common.MetricCollect(args, query, range5Min)
+		result, err = common.MetricCollect(args, query, "discovery")
 		if err != nil {
 			args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=memLimit query=" + query + " message=" + err.Error())
 		} else {
-			getContainerMetric(result, "namespace", "pod", "container", "memLimit")
+			getContainerMetric(result, "pod", "container", "memLimit")
 		}
 	} else {
-		getContainerMetric(result, "namespace", "pod", "container", "limits")
+		getContainerMetric(result, "pod", "container", "limits")
 	}
 
 	query = `sum(kube_pod_container_resource_requests) by (pod,namespace,container,resource)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if result.(model.Matrix).Len() == 0 {
 		query = `sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000`
-		result, err = common.MetricCollect(args, query, range5Min)
+		result, err = common.MetricCollect(args, query, "discovery")
 		if err != nil {
 			args.WarnLogger.Println("metric=cpuRequest query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=cpuRequest query=" + query + " message=" + err.Error())
 		} else {
-			getContainerMetric(result, "namespace", "pod", "container", "cpuRequest")
+			getContainerMetric(result, "pod", "container", "cpuRequest")
 		}
 
 		query = `sum(kube_pod_container_resource_requests_memory_bytes) by (pod,namespace,container)/1024/1024`
-		result, err = common.MetricCollect(args, query, range5Min)
+		result, err = common.MetricCollect(args, query, "discovery")
 		if err != nil {
 			args.WarnLogger.Println("metric=memRequest query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=memRequest query=" + query + " message=" + err.Error())
 		} else {
-			getContainerMetric(result, "namespace", "pod", "container", "memRequest")
+			getContainerMetric(result, "pod", "container", "memRequest")
 		}
 	} else {
-		getContainerMetric(result, "namespace", "pod", "container", "requests")
+		getContainerMetric(result, "pod", "container", "requests")
 	}
 
-	query = `container_spec_cpu_shares{name!~"k8s_POD_.*"}`
-	result, err = common.MetricCollect(args, query, range5Min)
+	query = `container_spec_cpu_shares`
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=conLabel query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=conLabel query=" + query + " message=" + err.Error())
 	} else {
-		getContainerMetricString(result, "namespace", model.LabelName("pod"+args.LabelSuffix), model.LabelName("container"+args.LabelSuffix))
-	}
-
-	query = `kube_pod_container_info`
-	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=conInfo query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=conInfo query=" + query + " message=" + err.Error())
-	} else {
-		getContainerMetricString(result, "namespace", "pod", "container")
+		if getContainerMetric(result, "pod", "container", query) {
+			//Don't do anything
+		} else if getContainerMetric(result, "pod_name", "container_name", query) {
+			labelSuffix = "_name"
+		}
 	}
 
 	//Pod metrics
@@ -279,59 +428,50 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_pod_info`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=podInfo query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=podInfo query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetricString(result, "namespace", "pod", "Pod")
+		getMidMetric(result, "pod", "label", "Pods", query)
 	}
 
 	query = `kube_pod_labels`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=podLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=podLabels query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetricString(result, "namespace", "pod", "Pod")
-	}
-
-	query = `sum(kube_pod_container_status_restarts_total) by (pod,namespace,container)`
-	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=restarts query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=restarts query=" + query + " message=" + err.Error())
-	} else {
-		getContainerMetric(result, "namespace", "pod", "container", "restarts")
+		getMidMetric(result, "pod", "label", "Pods", query)
 	}
 
 	query = `sum(kube_pod_container_status_terminated) by (pod,namespace,container)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if result.(model.Matrix).Len() == 0 {
 		query = `sum(kube_pod_container_status_terminated_reason) by (pod,namespace,container)`
-		result, err = common.MetricCollect(args, query, range5Min)
+		result, err = common.MetricCollect(args, query, "discovery")
 		if err != nil {
 			args.WarnLogger.Println("metric=powerState query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=powerState query=" + query + " message=" + err.Error())
 		} else {
-			getContainerMetric(result, "namespace", "pod", "container", "powerState")
+			getContainerMetric(result, "pod", "container", "powerState")
 		}
 	} else {
 		if err != nil {
 			args.WarnLogger.Println("metric=powerState query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=powerState query=" + query + " message=" + err.Error())
 		} else {
-			getContainerMetric(result, "namespace", "pod", "container", "powerState")
+			getContainerMetric(result, "pod", "container", "powerState")
 		}
 	}
 
 	query = `kube_pod_created`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=podCreationTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=podCreationTime query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "pod", "creationTime", "Pod")
+		getMidMetric(result, "pod", "creationTime", "Pod", query)
 	}
 
 	//Namespace metrics
@@ -343,31 +483,21 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_namespace_labels`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=namespaceLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=namespaceLabels query=" + query + " message=" + err.Error())
 	} else {
-		getNamespaceMetricString(result, "namespace")
+		getNamespaceMetric(result, query)
 	}
 
 	query = `kube_namespace_annotations`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=namespaceAnnotations query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=namespaceAnnotations query=" + query + " message=" + err.Error())
 	} else {
-		getNamespaceMetricString(result, "namespace")
-	}
-
-	//This is min as want to know what the most restrictive quota is if there are multiple.
-	query = `min(kube_resourcequota{type="hard"}) by (resource, namespace)`
-	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=namespaceResourceQuota query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=namespaceResourceQuota query=" + query + " message=" + err.Error())
-	} else {
-		getNamespacelimits(result, "namespace")
+		getNamespaceMetric(result, query)
 	}
 
 	//Deployment metrics
@@ -379,48 +509,48 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_deployment_labels`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=labels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=labels query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetricString(result, "namespace", "deployment", "Deployment")
+		getMidMetric(result, "deployment", "label", "Deployment", query)
 	}
 
 	query = `kube_deployment_spec_strategy_rollingupdate_max_surge`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=maxSurge query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=maxSurge query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "deployment", "maxSurge", "Deployment")
+		getMidMetric(result, "deployment", query, "Deployment", query)
 	}
 
 	query = `kube_deployment_spec_strategy_rollingupdate_max_unavailable`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=maxUnavailable query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=maxUnavailable query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "deployment", "maxUnavailable", "Deployment")
+		getMidMetric(result, "deployment", query, "Deployment", query)
 	}
 
 	query = `kube_deployment_metadata_generation`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=metadataGeneration query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=metadataGeneration query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "deployment", "metadataGeneration", "Deployment")
+		getMidMetric(result, "deployment", query, "Deployment", query)
 	}
 
 	query = `kube_deployment_created`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=deploymentCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=deploymentCreated query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "deployment", "creationTime", "Deployment")
+		getMidMetric(result, "deployment", "creationTime", "Deployment", query)
 	}
 
 	//ReplicaSet metrics
@@ -432,21 +562,21 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_replicaset_labels`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=replicaSetLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=replicaSetLabels query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetricString(result, "namespace", "replicaset", "ReplicaSet")
+		getMidMetric(result, "replicaset", "label", "ReplicaSet", query)
 	}
 
 	query = `kube_replicaset_created`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=replicaSetCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=replicaSetCreated query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "replicaset", "creationTime", "ReplicaSet")
+		getMidMetric(result, "replicaset", "creationTime", "ReplicaSet", query)
 	}
 
 	//ReplicationController metrics
@@ -458,12 +588,12 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_replicationcontroller_created`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=replicationControllerCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=replicationControllerCreated query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "replicationcontroller", "creationTime", "ReplicationController")
+		getMidMetric(result, "replicationcontroller", "creationTime", "ReplicationController", query)
 	}
 
 	//DaemonSet metrics
@@ -475,21 +605,21 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_daemonset_labels`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=daemonSetLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=daemonSetLabels query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetricString(result, "namespace", "daemonset", "DaemonSet")
+		getMidMetric(result, "daemonset", "label", "DaemonSet", query)
 	}
 
 	query = `kube_daemonset_created`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=daemonSetCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=daemonSetCreated query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "daemonset", "creationTime", "DaemonSet")
+		getMidMetric(result, "daemonset", "creationTime", "DaemonSet", query)
 	}
 
 	//StatefulSet metrics
@@ -501,21 +631,21 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_statefulset_labels`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=statefulSetLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=statefulSetLabels query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetricString(result, "namespace", "statefulset", "StatefulSet")
+		getMidMetric(result, "statefulset", "label", "StatefulSet", query)
 	}
 
 	query = `kube_statefulset_created`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=statefulSetCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=statefulSetCreated query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "statefulset", "creationTime", "StatefulSet")
+		getMidMetric(result, "statefulset", "creationTime", "StatefulSet", query)
 	}
 
 	//Job metrics
@@ -526,67 +656,67 @@ func Metrics(args *common.Parameters) {
 		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
-	query = `kube_job_info * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	query = `kube_job_info`
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=jobInfo query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobInfo query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetricString(result, "namespace", "job_name", "Job")
+		getMidMetric(result, "job_name", "label", "Job", query)
 	}
 
-	query = `kube_job_labels * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	query = `kube_job_labels`
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=jobLabel query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobLabel query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetricString(result, "namespace", "job_name", "Job")
+		getMidMetric(result, "job_name", "label", "Job", query)
 	}
 
-	query = `kube_job_spec_completions * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	query = `kube_job_spec_completions`
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=jobSpecCompletions query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobSpecCompletions query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "job_name", "specCompletions", "Job")
+		getMidMetric(result, "job_name", query, "Job", query)
 	}
 
-	query = `kube_job_spec_parallelism * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	query = `kube_job_spec_parallelism`
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=jobSpecParallelism query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobSpecParallelism query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "job_name", "specParallelism", "Job")
+		getMidMetric(result, "job_name", query, "Job", query)
 	}
 
-	query = `kube_job_status_completion_time * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	query = `kube_job_status_completion_time`
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=jobStatusCompletionTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobStatusCompletionTime query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "job_name", "statusCompletionTime", "Job")
+		getMidMetric(result, "job_name", query, "Job", query)
 	}
 
-	query = `kube_job_status_start_time * on (namespace,job_name) group_left (owner_name) max(kube_job_owner) by (namespace, job_name, owner_name)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	query = `kube_job_status_start_time`
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=jobStatusStartTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobStatusStartTime query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "job_name", "statusStartTime", "Job")
+		getMidMetric(result, "job_name", "creationTime", "Job", query)
 	}
 
 	query = `kube_job_created`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=jobCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobCreated query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "job", "creationTime", "Job")
+		getMidMetric(result, "job", "creationTime", "Job", query)
 	}
 
 	//CronJob metrics
@@ -598,57 +728,57 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_cronjob_labels`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=cronJobLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobLabels query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetricString(result, "namespace", "cronjob", "CronJob")
+		getMidMetric(result, "cronjob", "label", "CronJob", query)
 	}
 
 	query = `kube_cronjob_info`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=cronJobInfo query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobInfo query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetricString(result, "namespace", "cronjob", "CronJob")
+		getMidMetric(result, "cronjob", "label", "CronJob", query)
 	}
 
 	query = `kube_cronjob_next_schedule_time`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=cronJobNextScheduleTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobNextScheduleTime query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "cronjob", "nextScheduleTime", "CronJob")
+		getMidMetric(result, "cronjob", query, "CronJob", query)
 	}
 
 	query = `kube_cronjob_status_last_schedule_time`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=cronJobStatusLastScheduleTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobStatusLastScheduleTime query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "cronjob", "lastScheduleTime", "CronJob")
+		getMidMetric(result, "cronjob", query, "CronJob", query)
 	}
 
 	query = `kube_cronjob_status_active`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=cronJobStatusActive query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobStatusActive query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "cronjob", "statusActive", "CronJob")
+		getMidMetric(result, "cronjob", query, "CronJob", query)
 	}
 
 	query = `kube_cronjob_created`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=cronJobCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobCreated query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "namespace", "cronjob", "creationTime", "CronJob")
+		getMidMetric(result, "cronjob", "creationTime", "CronJob", query)
 	}
 
 	//HPA metrics
@@ -660,7 +790,7 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_hpa_labels`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 
 	var hpaName string
 	var hpaLabel model.LabelName
@@ -671,113 +801,19 @@ func Metrics(args *common.Parameters) {
 		hpaName = "horizontalpodautoscaler"
 		hpaLabel = "horizontalpodautoscaler"
 		query = `kube_` + hpaName + `_labels`
-		result, err = common.MetricCollect(args, query, range5Min)
+		result, err = common.MetricCollect(args, query, "discovery")
 	}
 
 	if err != nil {
 		args.WarnLogger.Println("metric=hpaLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=hpaLabels query=" + query + " message=" + err.Error())
 	} else {
-		getHPAMetricString(result, "namespace", hpaLabel, args)
+		getMidMetric(result, hpaLabel, "label", "Deployment", query)
 	}
 
-	//Current size workloads
-	if args.Debug {
-		args.DebugLogger.Println("message=Collecting Current Size Metric")
-		fmt.Println("[DEBUG] message=Collecting Current Size Metric")
-		runtime.ReadMemStats(&mem)
-		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
-		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
-	}
-	currentSizeWrite, err := os.Create("./data/container/currentSize.csv")
-	if err != nil {
-		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
-		fmt.Println("[ERROR] entity=" + entityKind + " message=" + err.Error())
-	} else {
-		fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,Auto Scaling - In Service Instances\n")
-
-		query = `kube_replicaset_spec_replicas`
-		result, err = common.MetricCollect(args, query, range5Min)
-		if err != nil {
-			args.WarnLogger.Println("metric=replicaSetSpecReplicas query=" + query + " message=" + err.Error())
-			fmt.Println("[WARNING] metric=replicaSetSpecReplicas query=" + query + " message=" + err.Error())
-		} else {
-			getMidMetric(result, "namespace", "replicaset", "currentSize", "ReplicaSet")
-			writeWorkloadMid(currentSizeWrite, result, "namespace", "replicaset", args, "ReplicaSet")
-		}
-
-		query = `kube_replicationcontroller_spec_replicas`
-		result, err = common.MetricCollect(args, query, range5Min)
-		if err != nil {
-			args.WarnLogger.Println("metric=replicationcontroller_spec_replicas query=" + query + " message=" + err.Error())
-			fmt.Println("[WARNING] metric=replicationcontroller_spec_replicas query=" + query + " message=" + err.Error())
-		} else {
-			getMidMetric(result, "namespace", "replicationcontroller", "currentSize", "ReplicationController")
-			writeWorkloadMid(currentSizeWrite, result, "namespace", "replicationcontroller", args, "ReplicationController")
-		}
-
-		query = `kube_daemonset_status_number_available`
-		result, err = common.MetricCollect(args, query, range5Min)
-		if err != nil {
-			args.WarnLogger.Println("metric=daemonSetStatusNumberAvailable query=" + query + " message=" + err.Error())
-			fmt.Println("[WARNING] metric=daemonSetStatusNumberAvailable query=" + query + " message=" + err.Error())
-		} else {
-			getMidMetric(result, "namespace", "daemonset", "currentSize", "DaemonSet")
-			writeWorkloadMid(currentSizeWrite, result, "namespace", "daemonset", args, "DaemonSet")
-		}
-
-		query = `kube_statefulset_replicas`
-		result, err = common.MetricCollect(args, query, range5Min)
-		if err != nil {
-			args.WarnLogger.Println("metric=statefulSetReplicas query=" + query + " message=" + err.Error())
-			fmt.Println("[WARNING] metric=statefulSetReplicas query=" + query + " message=" + err.Error())
-		} else {
-			getMidMetric(result, "namespace", "statefulset", "currentSize", "StatefulSet")
-			writeWorkloadMid(currentSizeWrite, result, "namespace", "statefulset", args, "StatefulSet")
-		}
-
-		query = `kube_job_spec_parallelism`
-		result, err = common.MetricCollect(args, query, range5Min)
-		if err != nil {
-			args.WarnLogger.Println("metric=jobSpecParallelism query=" + query + " message=" + err.Error())
-			fmt.Println("[WARNING] metric=jobSpecParallelism query=" + query + " message=" + err.Error())
-		} else {
-			getMidMetric(result, "namespace", "job_name", "currentSize", "Job")
-			writeWorkloadMid(currentSizeWrite, result, "namespace", "job_name", args, "Job")
-		}
-
-		query = `max(max(kube_job_spec_parallelism) by (namespace,job_name) * on (namespace,job_name) group_right max(kube_job_owner) by (namespace, job_name, owner_name)) by (owner_name, namespace)`
-		result, err = common.MetricCollect(args, query, range5Min)
-		if err != nil {
-			args.WarnLogger.Println("metric=cronJobSpecParallelism query=" + query + " message=" + err.Error())
-			fmt.Println("[WARNING] metric=cronJobSpecParallelism query=" + query + " message=" + err.Error())
-		} else {
-			getMidMetric(result, "namespace", "owner_name", "currentSize", "CronJob")
-			writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", args, "CronJob")
-		}
-
-		query = `max(max(kube_replicaset_spec_replicas) by (namespace,replicaset) * on (namespace,replicaset) group_right max(kube_replicaset_owner) by (namespace, replicaset, owner_name)) by (owner_name, namespace)`
-		result, err = common.MetricCollect(args, query, range5Min)
-		if err != nil {
-			args.WarnLogger.Println("metric=replicaSetSpecReplicas query=" + query + " message=" + err.Error())
-			fmt.Println("[WARNING] metric=replicaSetSpecReplicas query=" + query + " message=" + err.Error())
-		} else {
-			getMidMetric(result, "namespace", "owner_name", "currentSize", "Deployment")
-			writeWorkloadMid(currentSizeWrite, result, "namespace", "owner_name", args, "Deployment")
-		}
-
-		currentSizeWrite.Close()
-	}
-
-	writeAttributes(args)
-	writeConfig(args)
-
-	queryPrefix := ``
-	querySuffix := ``
-	if args.LabelSuffix != "" {
-		queryPrefix = `label_replace(`
-		querySuffix = `, "pod", "$1", "pod_name", "(.*)")`
-	}
+	var cluster = map[string]*Cluster{}
+	cluster["cluster"] = &Cluster{Namespaces: systems, Name: *args.ClusterName}
+	common.WriteDiscovery(args, cluster, entityKind)
 
 	//Container workloads
 	if args.Debug {
@@ -787,46 +823,36 @@ func Metrics(args *common.Parameters) {
 		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
-	query = queryPrefix + `round(max(irate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[` + args.SampleRateString + `m])) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)*1000,1)` + querySuffix
-	getWorkload("cpu_mCores_workload", "CPU Utilization in mCores", query, "max", args)
-	getWorkload("cpu_mCores_workload", "Prometheus CPU Utilization in mCores", query, "avg", args)
 
-	query = queryPrefix + `max(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
-	getWorkload("mem_workload", "Raw Mem Utilization", query, "max", args)
-	query = queryPrefix + `max(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `) / (1024 * 1024)` + querySuffix
-	getWorkload("mem_workload", "Prometheus Raw Mem Utilization", query, "avg", args)
+	query = `container_cpu_usage_seconds_total`
+	common.GetWorkload("container_cpu_usage_seconds_total", query, args, entityKind)
 
-	query = queryPrefix + `max(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
-	getWorkload("rss_workload", "Actual Memory Utilization", query, "max", args)
-	query = queryPrefix + `max(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `) / (1024 * 1024)` + querySuffix
-	getWorkload("rss_workload", "Prometheus Actual Memory Utilization", query, "avg", args)
+	query = `container_memory_usage_bytes`
+	common.GetWorkload("container_memory_usage_bytes", query, args, entityKind)
 
-	query = queryPrefix + `max(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
-	getWorkload("disk_workload", "Raw Disk Utilization", query, "max", args)
-	getWorkload("disk_workload", "Prometheus Raw Disk Utilization", query, "avg", args)
+	query = `container_memory_rss`
+	common.GetWorkload("container_memory_rss", query, args, entityKind)
 
-	if args.LabelSuffix != "" {
-		queryPrefix = `label_replace(`
-		querySuffix = `, "container_name", "$1", "container", "(.*)")`
-	}
-	query = queryPrefix + `max(irate(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}[` + args.SampleRateString + `m])) by (instance,pod,namespace,container)` + querySuffix
-	getWorkload("restarts", "Restarts", query, "max", args)
+	query = `container_fs_usage_bytes`
+	common.GetWorkload("container_fs_usage_bytes", query, args, entityKind)
 
-	if args.LabelSuffix == "" {
+	query = `kube_pod_container_status_restarts_total`
+	common.GetWorkload("kube_pod_container_status_restarts_total", query, args, entityKind)
+
+	if labelSuffix == "" {
 		query = `kube_` + hpaName + `_status_condition{status="true",condition="ScalingLimited"}`
 	} else {
 		query = `kube_` + hpaName + `_status_condition{status="ScalingLimited",condition="true"}`
 	}
-	getHPAWorkload("condition_scaling_limited", "Scaling Limited", query, args, hpaLabel)
+	common.GetWorkload(`kube_`+hpaName+`_status_condition`, query, args, entityKind)
 
 	//HPA workloads
 	query = `kube_` + hpaName + `_spec_max_replicas`
-	getHPAWorkload("max_replicas", "Auto Scaling - Maximum Size", query, args, hpaLabel)
+	common.GetWorkload(`kube_`+hpaName+`_spec_max_replicas`, query, args, entityKind)
 
 	query = `kube_` + hpaName + `_spec_min_replicas`
-	getHPAWorkload("min_replicas", "Auto Scaling - Minimum Size", query, args, hpaLabel)
+	common.GetWorkload(`kube_`+hpaName+`_spec_min_replicas`, query, args, entityKind)
 
 	query = `kube_` + hpaName + `_status_current_replicas`
-	getHPAWorkload("current_replicas", "Auto Scaling - Total Instances", query, args, hpaLabel)
-
+	common.GetWorkload(`kube_`+hpaName+`_status_current_replicas`, query, args, entityKind)
 }

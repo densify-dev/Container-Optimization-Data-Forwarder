@@ -15,6 +15,7 @@ import (
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/crq"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/resourcequota"
+	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/spf13/viper"
 )
 
@@ -34,19 +35,17 @@ func initParameters() {
 	var promPort = "9090"
 	var interval = "hours"
 	var intervalSize = 1
-	var history = 1
 	var offset int
 	var debug = false
 	var configFile = "config"
 	var configPath = "./config"
-	var sampleRate = 5
 	var include = "container,node,quota"
 	var oAuthTokenPath = ""
 	var caCertPath = ""
 
 	//Temporary variables for procassing flags
 	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp, oAuthTokenPathTemp, caCertPathTemp, includeTemp string
-	var intervalSizeTemp, historyTemp, offsetTemp, sampleRateTemp int
+	var intervalSizeTemp, offsetTemp int
 	var debugTemp bool
 
 	//Set settings using environment variables
@@ -74,20 +73,6 @@ func initParameters() {
 		intervalSizeTemp, err := strconv.ParseInt(tempEnvVar, 10, 64)
 		if err == nil {
 			intervalSize = int(intervalSizeTemp)
-		}
-	}
-
-	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_SAMPLERATE"); ok {
-		sampleRateTemp, err := strconv.ParseInt(tempEnvVar, 10, 64)
-		if err == nil {
-			sampleRate = int(sampleRateTemp)
-		}
-	}
-
-	if tempEnvVar, ok := os.LookupEnv("PROMETHEUS_HISTORY"); ok {
-		historyTemp, err := strconv.ParseInt(tempEnvVar, 10, 64)
-		if err == nil {
-			history = int(historyTemp)
 		}
 	}
 
@@ -132,9 +117,7 @@ func initParameters() {
 	flag.StringVar(&promPortTemp, "port", promPort, "Prometheus Port")
 	flag.StringVar(&intervalTemp, "interval", interval, "Interval to use for data collection. Can be days, hours or minutes")
 	flag.IntVar(&intervalSizeTemp, "intervalSize", intervalSize, "Interval size to be used for querying. eg. default of 1 with default interval of hours queries 1 last hour of info")
-	flag.IntVar(&historyTemp, "history", history, "Amount of time to go back for data collection works with the interval and intervalSize settings")
 	flag.IntVar(&offsetTemp, "offset", offset, "Amount of units (based on interval value) to offset the data collection backwards in time")
-	flag.IntVar(&sampleRateTemp, "sampleRate", sampleRate, "Rate of sample points to collect. default is 5 for 1 sample for every 5 minutes.")
 	flag.BoolVar(&debugTemp, "debug", debug, "Enable debug logging")
 	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
 	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
@@ -152,8 +135,6 @@ func initParameters() {
 		viper.SetDefault("prometheus_port", promPort)
 		viper.SetDefault("interval", interval)
 		viper.SetDefault("interval_size", intervalSize)
-		viper.SetDefault("sample_rate", sampleRate)
-		viper.SetDefault("history", history)
 		viper.SetDefault("offset", offset)
 		viper.SetDefault("debug", debug)
 		viper.SetDefault("include_list", include)
@@ -172,8 +153,6 @@ func initParameters() {
 			promPort = viper.GetString("prometheus_port")
 			interval = viper.GetString("interval")
 			intervalSize = viper.GetInt("interval_size")
-			sampleRate = viper.GetInt("sample_rate")
-			history = viper.GetInt("history")
 			offset = viper.GetInt("offset")
 			debug = viper.GetBool("debug")
 			include = viper.GetString("include_list")
@@ -196,10 +175,6 @@ func initParameters() {
 			interval = intervalTemp
 		case "intervalSize":
 			intervalSize = intervalSizeTemp
-		case "sampleRate":
-			sampleRate = sampleRateTemp
-		case "history":
-			history = historyTemp
 		case "offset":
 			offset = offsetTemp
 		case "debug":
@@ -252,24 +227,18 @@ func initParameters() {
 
 	params = &common.Parameters{
 
-		ClusterName:      &clusterName,
-		PromAddress:      &promAddr,
-		PromURL:          &promURL,
-		Interval:         &interval,
-		IntervalSize:     &intervalSize,
-		History:          &history,
-		Offset:           &offset,
-		Debug:            debug,
-		InfoLogger:       infoLogger,
-		WarnLogger:       warnLogger,
-		ErrorLogger:      errorLogger,
-		DebugLogger:      debugLogger,
-		SampleRate:       sampleRate,
-		SampleRateString: strconv.Itoa(sampleRate),
-		OAuthTokenPath:   oAuthTokenPath,
-		CaCertPath:       caCertPath,
+		ClusterName:    &clusterName,
+		PromURL:        &promURL,
+		Debug:          debug,
+		InfoLogger:     infoLogger,
+		WarnLogger:     warnLogger,
+		ErrorLogger:    errorLogger,
+		DebugLogger:    debugLogger,
+		OAuthTokenPath: oAuthTokenPath,
+		CaCertPath:     caCertPath,
 	}
 	parseIncludeParam(include)
+	timeRange(interval, intervalSize, offset)
 }
 
 func parseIncludeParam(param string) {
@@ -285,26 +254,37 @@ func parseIncludeParam(param string) {
 	}
 }
 
+//timeRange allows you to define the start and end values of the range will pass to the Prometheus for the query.
+func timeRange(interval string, intervalSize, offset int) {
+
+	var start, currentTime, timeUTC time.Time
+
+	timeUTC = time.Now().UTC()
+
+	if interval == "days" {
+		currentTime = time.Date(timeUTC.Year(), timeUTC.Month(), timeUTC.Day()-offset, 0, 0, 0, 0, timeUTC.Location())
+		start = currentTime.Add(time.Hour * -24 * time.Duration(intervalSize))
+		params.History = strconv.Itoa(intervalSize) + "d"
+	} else if interval == "hours" {
+		currentTime = time.Date(timeUTC.Year(), timeUTC.Month(), timeUTC.Day(), timeUTC.Hour()-offset, 0, 0, 0, timeUTC.Location())
+		start = currentTime.Add(time.Hour * -1 * time.Duration(intervalSize))
+		params.History = strconv.Itoa(intervalSize) + "h"
+	} else {
+		currentTime = time.Date(timeUTC.Year(), timeUTC.Month(), timeUTC.Day(), timeUTC.Hour(), timeUTC.Minute()-offset, 0, 0, timeUTC.Location())
+		start = currentTime.Add(time.Minute * -1 * time.Duration(intervalSize))
+		params.History = strconv.Itoa(intervalSize) + "m"
+	}
+	//step is 5 minutes in nanoseconds
+	params.Range5Min = v1.Range{Start: start, End: currentTime, Step: 300000000000}
+	params.CurrentTime = &currentTime
+}
+
 //main function.
 func main() {
-
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
-	params.InfoLogger.Println("Version 2.3.0")
-	fmt.Println("[INFO] Version 2.3.0")
-
-	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
-	var t time.Time
-	t = time.Now().UTC()
-	var currentTime time.Time
-	if *params.Interval == "days" {
-		currentTime = time.Date(t.Year(), t.Month(), t.Day()-*params.Offset, 0, 0, 0, 0, t.Location())
-	} else if *params.Interval == "hours" {
-		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour()-*params.Offset, 0, 0, 0, t.Location())
-	} else {
-		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute()-*params.Offset, 0, 0, t.Location())
-	}
-	params.CurrentTime = &currentTime
+	params.InfoLogger.Println("Version 3.0.0-beta")
+	fmt.Println("[INFO] Version 3.0.0-beta")
 
 	if includeContainer {
 		container2.Metrics(params)

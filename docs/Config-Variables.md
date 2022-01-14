@@ -11,8 +11,6 @@ The order of precedence is: Command Line, Config File, Environment Variables.
 | Prometheus Port | 9090 | PROMETHEUS_PORT | prometheus_port | port |
 | Interval | hours | PROMETHEUS_INTERVAL | interval | interval |
 | Interval Size | 1 | PROMETHEUS_INTERVALSIZE | interval_size | intervalSize |
-| History | 1 | PROMETHEUS_HISTORY | history | history | 
-| Sample Rate | 5 | PROMETHEUS_SAMPLERATE | sample_rate | sampleRate |
 | Offset | 0 | PROMETHEUS_OFFSET | offset | offset | 
 | Include List | container,node,quota | PROMETHEUS_INCLUDE | include_list | includeList |
 | Debug | false | PROMETHEUS_DEBUG | debug | debug |

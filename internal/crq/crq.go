@@ -2,25 +2,28 @@ package crq
 
 import (
 	"fmt"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/prometheus/common/model"
 )
 
-type crq struct {
+type Crq struct {
 	//Labels & general information about each node
-	labelMap map[string]string
+	LabelMap map[string]map[string]string `json:"labels,omitempty"`
 
-	selectorType, selectorKey, selectorValue                                                                                              string
-	resources, namespaces                                                                                                                 string
-	cpuLimit, cpuRequest, memLimit, memRequest, usageCpuLimit, usageCpuRequest, usageMemLimit, usageMemRequest, podsLimit, usagePodsLimit int
-	createTime                                                                                                                            time.Time
+	SelectorType  string    `json:"selectorType,omitempty"`
+	SelectorKey   string    `json:"selectorKey,omitempty"`
+	SelectorValue string    `json:"selectorValue,omitempty"`
+	Namespaces    string    `json:"namespaces,omitempty"`
+	CreateTime    time.Time `json:"creationTime,omitempty"`
+}
+type Cluster struct {
+	Name string          `json:"name,omitempty"`
+	CRQs map[string]*Crq `json:"clusterResourceQuotas,omitempty"`
 }
 
-var crqs = map[string]*crq{}
+var crqs = map[string]*Crq{}
 
 var entityKind = "crq"
 
@@ -39,76 +42,20 @@ func extractCRQAttributes(result model.Value) {
 		for labelName, labelVal := range val.Metric {
 			switch labelName {
 			case "type":
-				crqs[crqName].selectorType = string(labelVal)
+				crqs[crqName].SelectorType = string(labelVal)
 			case "key":
-				crqs[crqName].selectorKey = string(labelVal)
+				crqs[crqName].SelectorKey = string(labelVal)
 			case "value":
-				crqs[crqName].selectorValue = string(labelVal)
+				crqs[crqName].SelectorValue = string(labelVal)
 			case "namespace":
-				crqs[crqName].namespaces += string(labelVal) + "|"
-			default: //Do nothing
-			}
-		}
-	}
-}
-
-func getExistingQuotas(result model.Value) {
-	for _, val := range result.(model.Matrix) {
-		crqNameLabel, ok := val.Metric["name"]
-		if !ok {
-			continue
-		}
-		crqName := string(crqNameLabel)
-
-		if _, ok := crqs[crqName]; !ok {
-			continue
-		}
-
-		resourceLabel, ok := val.Metric["resource"]
-		if !ok {
-			continue
-		}
-		resource := string(resourceLabel)
-
-		if typeHard := val.Metric["type"]; typeHard == "hard" {
-			crqs[crqName].resources += resource + ": " + val.Values[0].Value.String() + "|"
-
-			if len(val.Values) < 1 {
-				continue
-			}
-			switch resource {
-			case "limits.cpu":
-				crqs[crqName].cpuLimit = int(val.Values[0].Value) * 1000
-			case "requests.cpu", "cpu":
-				crqs[crqName].cpuRequest = int(val.Values[0].Value) * 1000
-			case "limits.memory":
-				crqs[crqName].memLimit = int(val.Values[0].Value) / (1024 * 1024)
-			case "requests.memory", "memory":
-				crqs[crqName].memRequest = int(val.Values[0].Value) / (1024 * 1024)
-			case "pods":
-				crqs[crqName].podsLimit = int(val.Values[0].Value)
-			default:
-			}
-		} else if typeUsed := val.Metric["type"]; typeUsed == "used" {
-			switch resource {
-			case "limits.cpu":
-				crqs[crqName].usageCpuLimit = int(val.Values[0].Value) * 1000
-			case "requests.cpu", "cpu":
-				crqs[crqName].usageCpuRequest = int(val.Values[0].Value) * 1000
-			case "limits.memory":
-				crqs[crqName].usageMemLimit = int(val.Values[0].Value) / (1024 * 1024)
-			case "requests.memory", "memory":
-				crqs[crqName].usageMemRequest = int(val.Values[0].Value) / (1024 * 1024)
-			case "pods":
-				crqs[crqName].usagePodsLimit = int(val.Values[0].Value)
-			default:
+				crqs[crqName].Namespaces += string(labelVal) + "|"
 			}
 		}
 	}
 }
 
 //populateLabelMap is used to parse the label based results from Prometheus related to CRQ Entities and store them in the system's data structure.
-func populateLabelMap(result model.Value, nameLabel model.LabelName) {
+func populateLabelMap(result model.Value, nameLabel model.LabelName, label string) {
 	//Loop through the different entities in the results.
 	for i := 0; i < result.(model.Matrix).Len(); i++ {
 		crqName, ok := result.(model.Matrix)[i].Metric[nameLabel]
@@ -118,145 +65,24 @@ func populateLabelMap(result model.Value, nameLabel model.LabelName) {
 		if _, ok := crqs[string(crqName)]; !ok {
 			continue
 		}
+		if _, ok := crqs[string(crqName)].LabelMap[label]; !ok {
+			crqs[string(crqName)].LabelMap[label] = map[string]string{}
+		}
 		for key, value := range result.(model.Matrix)[i].Metric {
-			common.AddToLabelMap(string(key), string(value), crqs[string(crqName)].labelMap)
+			common.AddToLabelMap(string(key), string(value), crqs[string(crqName)].LabelMap[label])
 		}
-	}
-}
-
-//writeNodeGroupConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
-func writeConfig(args *common.Parameters) {
-
-	//Create the config file and open it for writing.
-	configWrite, err := os.Create("./data/crq/config.csv")
-	if err != nil {
-		args.ErrorLogger.Println("entity=crq message=" + err.Error())
-		fmt.Println("[ERROR] entity=crq message=" + err.Error())
-		return
-	}
-
-	//Write out the header.
-	fmt.Fprintln(configWrite, "cluster,crq")
-
-	for crqName := range crqs {
-		fmt.Fprintf(configWrite, "%s,%s\n", *args.ClusterName, crqName)
-	}
-	configWrite.Close()
-}
-
-func writeAttributes(args *common.Parameters) {
-	//Create the attributes file and open it for writing
-	attributeWrite, err := os.Create("./data/crq/attributes.csv")
-	if err != nil {
-		args.ErrorLogger.Println("entity=crq message=" + err.Error())
-		fmt.Println("[ERROR] entity=crq message=" + err.Error())
-		return
-	}
-
-	defer attributeWrite.Close()
-
-	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,crq,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Selector Type,Selector Key,Selector Value,Create Time,Namespace Labels,Resource Metadata,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Current Size,Namespace CPU Limit,Namespace CPU Request,Namespace Memory Limit,Namespace Memory Request,Namespace Pods Limit,Namespaces")
-
-	//Loop through the CRQs and write out the attributes data for each system.
-	for crqName, crq := range crqs {
-
-		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-		fmt.Fprintf(attributeWrite, "%s,%s,ClusterResourceQuota,%s,%s,%s,%s,%s,%s,%s,", *args.ClusterName, crqName, *args.ClusterName, crq.selectorType, crq.selectorKey, crq.selectorType, crq.selectorKey, crq.selectorValue, crq.createTime.Format("2006-01-02 15:04:05.000"))
-
-		for key, value := range crq.labelMap {
-			if len(key) >= 250 {
-				continue
-			}
-			value = strings.Replace(value, ",", " ", -1)
-			if len(value)+3+len(key) < 256 {
-				fmt.Fprintf(attributeWrite, key+" : "+value+"|")
-			} else {
-				templength := 256 - 3 - len(key)
-				fmt.Fprintf(attributeWrite, key+" : "+value[:templength]+"|")
-			}
-		}
-
-		fmt.Fprintf(attributeWrite, ",%s", crq.resources)
-
-		if crq.cpuLimit == -1 {
-			fmt.Fprintf(attributeWrite, ",")
-		} else {
-			fmt.Fprintf(attributeWrite, ",%d", crq.usageCpuLimit)
-		}
-
-		if crq.cpuRequest == -1 {
-			fmt.Fprintf(attributeWrite, ",")
-		} else {
-			fmt.Fprintf(attributeWrite, ",%d", crq.usageCpuRequest)
-		}
-
-		if crq.memLimit == -1 {
-			fmt.Fprintf(attributeWrite, ",")
-		} else {
-			fmt.Fprintf(attributeWrite, ",%d", crq.usageMemRequest)
-		}
-
-		if crq.memRequest == -1 {
-			fmt.Fprintf(attributeWrite, ",")
-		} else {
-			fmt.Fprintf(attributeWrite, ",%d", crq.usageMemRequest)
-		}
-
-		if crq.podsLimit == -1 {
-			fmt.Fprintf(attributeWrite, ",")
-		} else {
-			fmt.Fprintf(attributeWrite, ",%d", crq.usagePodsLimit)
-		}
-
-		if crq.cpuLimit == -1 {
-			fmt.Fprintf(attributeWrite, ",")
-		} else {
-			fmt.Fprintf(attributeWrite, ",%d", crq.cpuLimit)
-		}
-
-		if crq.cpuRequest == -1 {
-			fmt.Fprintf(attributeWrite, ",")
-		} else {
-			fmt.Fprintf(attributeWrite, ",%d", crq.cpuRequest)
-		}
-
-		if crq.memLimit == -1 {
-			fmt.Fprintf(attributeWrite, ",")
-		} else {
-			fmt.Fprintf(attributeWrite, ",%d", crq.memLimit)
-		}
-
-		if crq.memRequest == -1 {
-			fmt.Fprintf(attributeWrite, ",")
-		} else {
-			fmt.Fprintf(attributeWrite, ",%d", crq.memRequest)
-		}
-
-		if crq.podsLimit == -1 {
-			fmt.Fprintf(attributeWrite, ",")
-		} else {
-			fmt.Fprintf(attributeWrite, ",%d", crq.podsLimit)
-		}
-
-		fmt.Fprintf(attributeWrite, ",%s\n", crq.namespaces)
 	}
 }
 
 //Metrics a global func for collecting quota level metrics in prometheus
 func Metrics(args *common.Parameters) {
 	//Setup variables used in the code.
-	var historyInterval time.Duration
-	historyInterval = 0
 	var query string
 	var result model.Value
 	var err error
 
-	//Start and end time + the prometheus address used for querying
-	range5Min := common.TimeRange(args, historyInterval)
-
 	query = `max(openshift_clusterresourcequota_created) by (namespace,name)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 
 	if err != nil {
 		args.ErrorLogger.Println("metric=clusterResourceQuotas query=" + query + " message=" + err.Error())
@@ -267,21 +93,16 @@ func Metrics(args *common.Parameters) {
 	for i := 0; i < rsltIndex.Len(); i++ {
 
 		unixTimeInt := int64(rsltIndex[i].Values[len(rsltIndex[i].Values)-1].Value)
-		if err != nil {
-			fmt.Println("ERROR: Unable to parse unix time into int")
-		}
 		crqs[string(rsltIndex[i].Metric["name"])] =
-			&crq{
-				labelMap:     map[string]string{},
-				selectorType: "", selectorKey: "", selectorValue: "",
-				resources: "", namespaces: "",
-				cpuLimit: -1, cpuRequest: -1, memLimit: -1, memRequest: -1, podsLimit: -1,
-				createTime: time.Unix(unixTimeInt, 0),
+			&Crq{
+				LabelMap:     map[string]map[string]string{},
+				SelectorType: "", SelectorKey: "", SelectorValue: "", Namespaces: "",
+				CreateTime: time.Unix(unixTimeInt, 0),
 			}
 	}
 
 	query = `max(openshift_clusterresourcequota_selector) by (name, key, type, value)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=openshift_clusterresourcequota_selector query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=openshift_clusterresourcequota_selector query=" + query + " message=" + err.Error())
@@ -290,25 +111,16 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `openshift_clusterresourcequota_labels`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=openshift_clusterresourcequota_labels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=openshift_clusterresourcequota_labels query=" + query + " message=" + err.Error())
 	} else {
-		populateLabelMap(result, "name")
-	}
-
-	query = `max(openshift_clusterresourcequota_usage) by (name, resource, type)`
-	result, err = common.MetricCollect(args, query, range5Min)
-	if err != nil {
-		args.WarnLogger.Println("metric=openshift_clusterresourcequota_usage query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=openshift_clusterresourcequota_usage query=" + query + " message=" + err.Error())
-	} else {
-		getExistingQuotas(result)
+		populateLabelMap(result, "name", query)
 	}
 
 	query = `max(openshift_clusterresourcequota_namespace_usage) by (name, namespace)`
-	result, err = common.MetricCollect(args, query, range5Min)
+	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=openshift_clusterresourcequota_namespace_usage query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=openshift_clusterresourcequota_namespace_usage query=" + query + " message=" + err.Error())
@@ -316,24 +128,11 @@ func Metrics(args *common.Parameters) {
 		extractCRQAttributes(result)
 	}
 
-	writeAttributes(args)
-	writeConfig(args)
+	var cluster = map[string]*Cluster{}
+	cluster["cluster"] = &Cluster{CRQs: crqs, Name: *args.ClusterName}
+	common.WriteDiscovery(args, cluster, entityKind)
 
-	var metricField []model.LabelName
-	metricField = append(metricField, "name")
-	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="limits.cpu"}) by (name) * 1000`
-	common.GetWorkload("cpu_limits", "CPU Utilization in mCores", query, metricField, args, entityKind)
-
-	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="requests.cpu"}) by (name) * 1000`
-	common.GetWorkload("cpu_requests", "Prometheus CPU Utilization in mCores", query, metricField, args, entityKind)
-
-	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="limits.memory"}) by (name)`
-	common.GetWorkload("mem_limits", "Raw Mem Utilization", query, metricField, args, entityKind)
-
-	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="requests.memory"}) by (name) / (1024 * 1024)`
-	common.GetWorkload("mem_requests", "Prometheus Raw Mem Utilization", query, metricField, args, entityKind)
-
-	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="pods"}) by (name)`
-	common.GetWorkload("pods", "Auto Scaling - In Service Instances", query, metricField, args, entityKind)
+	query = `openshift_clusterresourcequota_usage`
+	common.GetWorkload("openshift_clusterresourcequota_usage", query, args, entityKind)
 
 }

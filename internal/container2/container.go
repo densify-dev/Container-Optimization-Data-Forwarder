@@ -3,52 +3,15 @@ package container2
 
 import (
 	"fmt"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
 	"runtime"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/prometheus/common/model"
 )
 
-var systems = map[string]*Namespace{}
+var systems = map[string]*datamodel.Namespace{}
 var entityKind = "container"
-
-type Cluster struct {
-	Name       string                `json:"name,omitempty"`
-	Namespaces map[string]*Namespace `json:"namespaces,omitempty"`
-}
-
-type Namespace struct {
-	LabelMap map[string]map[string]string    `json:"labels,omitempty"`
-	Entities map[string]map[string]*MidLevel `json:"entities,omitempty"`
-}
-
-//midLevel is used to hold information related to the highest owner of any containers
-type MidLevel struct {
-	OwnerName          string                       `json:"ownerName,omitempty"`
-	OwnerKind          string                       `json:"ownerKind,omitempty"`
-	NextSchedTime      int64                        `json:"nextScheduledTime,omitempty"`
-	StatusActive       int64                        `json:"statusActive,omitempty"`
-	LastSchedTime      int64                        `json:"lastScheduledTime,omitempty"`
-	MetadataGeneration int64                        `json:"metadataGeneration,omitempty"`
-	MaxSurge           int64                        `json:"maxSurge,omitempty"`
-	MaxUnavailable     int64                        `json:"maxUnavailable,omitempty"`
-	Completions        int64                        `json:"completions,omitempty"`
-	Parallelism        int64                        `json:"parallelism,omitempty"`
-	CompletionTime     int64                        `json:"CompletionTime,omitempty"`
-	Containers         map[string]*Container        `json:"containers,omitempty"`
-	CreationTime       int64                        `json:"creationTime,omitempty"`
-	LabelMap           map[string]map[string]string `json:"labels,omitempty"`
-}
-
-//container is used to hold information related to containers
-type Container struct {
-	CpuLimit   int                          `json:"cpuLimit,omitempty"`
-	CpuRequest int                          `json:"cpuRequest,omitempty"`
-	MemLimit   int                          `json:"memoryLimit,omitempty"`
-	MemRequest int                          `json:"memoryRequest,omitempty"`
-	PowerState int                          `json:"powerState,omitempty"`
-	LabelMap   map[string]map[string]string `json:"labels,omitempty"`
-}
 
 //getContainerMetric is used to parse the results from Prometheus related to Container Entities and store them in the systems data structure.
 func getContainerMetric(result model.Value, pod, container model.LabelName, metric string) bool {
@@ -252,14 +215,14 @@ func Metrics(args *common.Parameters) {
 			namespaceName := string(result.(model.Matrix)[i].Metric["namespace"])
 
 			if _, ok := systems[namespaceName]; !ok {
-				systems[namespaceName] = &Namespace{LabelMap: map[string]map[string]string{}, Entities: map[string]map[string]*MidLevel{}}
-				systems[namespaceName].Entities["Pods"] = map[string]*MidLevel{}
+				systems[namespaceName] = &datamodel.Namespace{LabelMap: map[string]map[string]string{}, Entities: map[string]map[string]*datamodel.MidLevel{}}
+				systems[namespaceName].Entities["Pods"] = map[string]*datamodel.MidLevel{}
 			}
 			if _, ok := systems[namespaceName].Entities["Pods"][podName]; !ok {
-				systems[namespaceName].Entities["Pods"][podName] = &MidLevel{Containers: map[string]*Container{}, LabelMap: map[string]map[string]string{}}
+				systems[namespaceName].Entities["Pods"][podName] = &datamodel.MidLevel{Containers: map[string]*datamodel.Container{}, LabelMap: map[string]map[string]string{}}
 			}
 			if _, ok := systems[namespaceName].Entities["Pods"][podName].Containers[containerName]; !ok {
-				systems[namespaceName].Entities["Pods"][podName].Containers[containerName] = &Container{LabelMap: map[string]map[string]string{}}
+				systems[namespaceName].Entities["Pods"][podName].Containers[containerName] = &datamodel.Container{LabelMap: map[string]map[string]string{}}
 				getContainerMetric(result, "pod", "container", query)
 			}
 		}
@@ -285,10 +248,10 @@ func Metrics(args *common.Parameters) {
 			systems[namespaceName].Entities["Pods"][podName].OwnerKind = ownerKind
 			systems[namespaceName].Entities["Pods"][podName].OwnerName = ownerName
 			if _, ok := systems[namespaceName].Entities[ownerKind]; !ok {
-				systems[namespaceName].Entities[ownerKind] = map[string]*MidLevel{}
+				systems[namespaceName].Entities[ownerKind] = map[string]*datamodel.MidLevel{}
 			}
 			if _, ok := systems[namespaceName].Entities[ownerKind][ownerName]; !ok {
-				systems[namespaceName].Entities[ownerKind][ownerName] = &MidLevel{LabelMap: map[string]map[string]string{}, OwnerName: "", OwnerKind: ""}
+				systems[namespaceName].Entities[ownerKind][ownerName] = &datamodel.MidLevel{LabelMap: map[string]map[string]string{}, OwnerName: "", OwnerKind: ""}
 			}
 		}
 	}
@@ -313,11 +276,11 @@ func Metrics(args *common.Parameters) {
 			systems[namespaceName].Entities["ReplicaSet"][replicaSetName].OwnerName = ownerName
 
 			if _, ok := systems[namespaceName].Entities[ownerKind]; !ok {
-				systems[namespaceName].Entities[ownerKind] = map[string]*MidLevel{}
+				systems[namespaceName].Entities[ownerKind] = map[string]*datamodel.MidLevel{}
 			}
 
 			if _, ok := systems[namespaceName].Entities[ownerKind][ownerName]; !ok {
-				systems[namespaceName].Entities[ownerKind][ownerName] = &MidLevel{LabelMap: map[string]map[string]string{}, OwnerName: "", OwnerKind: ""}
+				systems[namespaceName].Entities[ownerKind][ownerName] = &datamodel.MidLevel{LabelMap: map[string]map[string]string{}, OwnerName: "", OwnerKind: ""}
 			}
 		}
 	}
@@ -342,10 +305,10 @@ func Metrics(args *common.Parameters) {
 			systems[namespaceName].Entities["Job"][jobName].OwnerName = ownerName
 
 			if _, ok := systems[namespaceName].Entities[ownerKind]; !ok {
-				systems[namespaceName].Entities[ownerKind] = map[string]*MidLevel{}
+				systems[namespaceName].Entities[ownerKind] = map[string]*datamodel.MidLevel{}
 			}
 			if _, ok := systems[namespaceName].Entities[ownerKind][ownerName]; !ok {
-				systems[namespaceName].Entities[ownerKind][ownerName] = &MidLevel{LabelMap: map[string]map[string]string{}, OwnerName: "", OwnerKind: ""}
+				systems[namespaceName].Entities[ownerKind][ownerName] = &datamodel.MidLevel{LabelMap: map[string]map[string]string{}, OwnerName: "", OwnerKind: ""}
 			}
 		}
 	}
@@ -811,8 +774,8 @@ func Metrics(args *common.Parameters) {
 		getMidMetric(result, hpaLabel, "label", "Deployment", query)
 	}
 
-	var cluster = map[string]*Cluster{}
-	cluster["cluster"] = &Cluster{Namespaces: systems, Name: *args.ClusterName}
+	var cluster = map[string]*datamodel.ContainerCluster{}
+	cluster["cluster"] = &datamodel.ContainerCluster{Namespaces: systems, Name: *args.ClusterName}
 	common.WriteDiscovery(args, cluster, entityKind)
 
 	//Container workloads

@@ -3,29 +3,14 @@ package node
 
 import (
 	"fmt"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/prometheus/common/model"
 )
 
-//A node structure. Used for storing attributes and config details.
-type Node struct {
-
-	//Labels & general information about each node
-	LabelMap map[string]map[string]string `json:"labels,omitempty"`
-
-	//Value fields
-	NetSpeedBytes   int    `json:"netSpeedBytes,omitempty"`
-	AltWorkloadName string `json:"altWorkloadName,omitempty"`
-}
-
-type Cluster struct {
-	Name  string           `json:"name,omitempty"`
-	Nodes map[string]*Node `json:"nodes,omitempty"`
-}
-
 //Map that labels and values will be stored in
-var nodes = map[string]*Node{}
+var nodes = map[string]*datamodel.Node{}
 
 //Hard-coded string for log file warnings
 var entityKind = "node"
@@ -83,7 +68,7 @@ func Metrics(args *common.Parameters) {
 	var rsltIndex = result.(model.Matrix)
 	for i := 0; i < rsltIndex.Len(); i++ {
 		nodes[string(rsltIndex[i].Metric["node"])] =
-			&Node{LabelMap: map[string]map[string]string{}}
+			&datamodel.Node{LabelMap: map[string]map[string]string{}}
 	}
 
 	//Additonal config/attribute queries
@@ -135,8 +120,8 @@ func Metrics(args *common.Parameters) {
 		getNodeMetric(result, "altWorkloadName")
 	}
 
-	var cluster = map[string]*Cluster{}
-	cluster["cluster"] = &Cluster{Nodes: nodes, Name: *args.ClusterName}
+	var cluster = map[string]*datamodel.NodeCluster{}
+	cluster["cluster"] = &datamodel.NodeCluster{Nodes: nodes, Name: *args.ClusterName}
 	//Writes the config and attribute files
 	common.WriteDiscovery(args, cluster, entityKind)
 

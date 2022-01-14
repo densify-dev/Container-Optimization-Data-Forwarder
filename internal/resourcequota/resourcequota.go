@@ -2,6 +2,7 @@ package resourcequota
 
 import (
 	"fmt"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
@@ -10,11 +11,6 @@ import (
 
 var resourceQuotas = map[string]map[string]time.Time{}
 var entityKind = "rq"
-
-type Cluster struct {
-	Name       string                          `json:"name,omitempty"`
-	Namespaces map[string]map[string]time.Time `json:"namespaces,omitempty"`
-}
 
 //Metrics a global func for collecting quota level metrics in prometheus
 func Metrics(args *common.Parameters) {
@@ -45,8 +41,8 @@ func Metrics(args *common.Parameters) {
 
 	}
 
-	var cluster = map[string]*Cluster{}
-	cluster["cluster"] = &Cluster{Namespaces: resourceQuotas, Name: *args.ClusterName}
+	var cluster = map[string]*datamodel.RQCluster{}
+	cluster["cluster"] = &datamodel.RQCluster{Namespaces: resourceQuotas, Name: *args.ClusterName}
 	common.WriteDiscovery(args, cluster, entityKind)
 
 	query = `kube_resourcequota`

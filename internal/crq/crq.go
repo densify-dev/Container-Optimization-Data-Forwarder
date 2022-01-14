@@ -2,28 +2,14 @@ package crq
 
 import (
 	"fmt"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/prometheus/common/model"
 )
 
-type Crq struct {
-	//Labels & general information about each node
-	LabelMap map[string]map[string]string `json:"labels,omitempty"`
-
-	SelectorType  string    `json:"selectorType,omitempty"`
-	SelectorKey   string    `json:"selectorKey,omitempty"`
-	SelectorValue string    `json:"selectorValue,omitempty"`
-	Namespaces    string    `json:"namespaces,omitempty"`
-	CreateTime    time.Time `json:"creationTime,omitempty"`
-}
-type Cluster struct {
-	Name string          `json:"name,omitempty"`
-	CRQs map[string]*Crq `json:"clusterResourceQuotas,omitempty"`
-}
-
-var crqs = map[string]*Crq{}
+var crqs = map[string]*datamodel.CRQ{}
 
 var entityKind = "crq"
 
@@ -94,7 +80,7 @@ func Metrics(args *common.Parameters) {
 
 		unixTimeInt := int64(rsltIndex[i].Values[len(rsltIndex[i].Values)-1].Value)
 		crqs[string(rsltIndex[i].Metric["name"])] =
-			&Crq{
+			&datamodel.CRQ{
 				LabelMap:     map[string]map[string]string{},
 				SelectorType: "", SelectorKey: "", SelectorValue: "", Namespaces: "",
 				CreateTime: time.Unix(unixTimeInt, 0),
@@ -128,8 +114,8 @@ func Metrics(args *common.Parameters) {
 		extractCRQAttributes(result)
 	}
 
-	var cluster = map[string]*Cluster{}
-	cluster["cluster"] = &Cluster{CRQs: crqs, Name: *args.ClusterName}
+	var cluster = map[string]*datamodel.CRQCluster{}
+	cluster["cluster"] = &datamodel.CRQCluster{CRQs: crqs, Name: *args.ClusterName}
 	common.WriteDiscovery(args, cluster, entityKind)
 
 	query = `openshift_clusterresourcequota_usage`

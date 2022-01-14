@@ -61,7 +61,7 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 	for i := 0; i < result.(model.Matrix).Len(); i++ {
 		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
 		namespaceValue, test := result.(model.Matrix)[i].Metric["namespace"]
-		if test == false {
+		if !test {
 			continue
 		}
 		if _, ok := systems[string(namespaceValue)]; !ok {
@@ -69,7 +69,7 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 		}
 		//Validate that the data contains the pod label with value and check it exists in our systems structure
 		podValue, test := result.(model.Matrix)[i].Metric[pod]
-		if test == false {
+		if !test {
 			continue
 		}
 		if _, ok := systems[string(namespaceValue)].Entities["Pods"][string(podValue)]; !ok {
@@ -77,7 +77,7 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 		}
 		//Validate that the data contains the container label with value and check it exists in our systems structure
 		containerValue, test := result.(model.Matrix)[i].Metric[container]
-		if test == false {
+		if !test {
 			continue
 		}
 		if _, ok := systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)]; !ok {

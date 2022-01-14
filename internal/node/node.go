@@ -15,7 +15,8 @@ type Node struct {
 	LabelMap map[string]map[string]string `json:"labels,omitempty"`
 
 	//Value fields
-	NetSpeedBytes int `json:"netSpeedBytes,omitempty"`
+	NetSpeedBytes   int    `json:"netSpeedBytes,omitempty"`
+	AltWorkloadName string `json:"altWorkloadName,omitempty"`
 }
 
 type Cluster struct {
@@ -50,6 +51,8 @@ func getNodeMetric(result model.Value, metric string) {
 			if len(result.(model.Matrix)[i].Values) != 0 {
 				nodes[string(nodeValue)].NetSpeedBytes = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
 			}
+		case "altWorkloadName":
+			nodes[string(nodeValue)].AltWorkloadName = string(result.(model.Matrix)[i].Metric["instance"])
 		default:
 			if _, ok := nodes[string(nodeValue)].LabelMap[metric]; !ok {
 				nodes[string(nodeValue)].LabelMap[metric] = map[string]string{}
@@ -126,10 +129,10 @@ func Metrics(args *common.Parameters) {
 	query = `max(max(label_replace(sum(node_cpu_seconds_total{mode!="idle"}) by (instance), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip,instance) * on (pod_ip) group_left(node) kube_pod_info{pod=~".*node-exporter.*"}) by (node, instance)`
 	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
-		args.WarnLogger.Println("metric=altNameInfo query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=altNameInfo query=" + query + " message=" + err.Error())
+		args.WarnLogger.Println("metric=altWorkloadName query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=altWorkloadName query=" + query + " message=" + err.Error())
 	} else {
-		getNodeMetric(result, "altNameInfo")
+		getNodeMetric(result, "altWorkloadName")
 	}
 
 	var cluster = map[string]*Cluster{}

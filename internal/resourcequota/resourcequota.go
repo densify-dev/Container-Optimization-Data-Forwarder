@@ -1,9 +1,11 @@
+//Package resourcequota collects data related to resource quotas and formats into json files to send to Densify.
 package resourcequota
 
 import (
 	"fmt"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
 	"time"
+
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/prometheus/common/model"

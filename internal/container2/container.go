@@ -1,10 +1,11 @@
-//Package container2 collects data related to containers and formats into csv files to send to Densify.
+//Package container2 collects data related to containers and formats into json files to send to Densify.
 package container2
 
 import (
 	"fmt"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
 	"runtime"
+
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/prometheus/common/model"
@@ -85,7 +86,7 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 			if _, ok := systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].LabelMap[metric]; !ok {
 				systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].LabelMap[metric] = map[string]string{}
 			}
-			//loop through all the labels for an entity and store them in a map. For controller based entities where there will be multiple copies of containers they will have there values concatinated together.
+			//loop through all the labels for an entity and store them in a map.
 			for key, value := range result.(model.Matrix)[i].Metric {
 				common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerValue)].LabelMap[metric])
 			}
@@ -134,7 +135,7 @@ func getMidMetric(result model.Value, mid model.LabelName, metric, kind, query s
 			if _, ok := systems[string(namespaceValue)].Entities[kind][string(midValue)].LabelMap[query]; !ok {
 				systems[string(namespaceValue)].Entities[kind][string(midValue)].LabelMap[query] = map[string]string{}
 			}
-			//loop through all the labels for an entity and store them in a map. For controller based entities where there will be multiple copies of containers they will have there values concatinated together.
+			//loop through all the labels for an entity and store them in a map.
 			for key, value := range result.(model.Matrix)[i].Metric {
 				common.AddToLabelMap(string(key), string(value), systems[string(namespaceValue)].Entities[kind][string(midValue)].LabelMap[query])
 			}
@@ -200,6 +201,7 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 
+	//query to get info about what containers exist. Using this query that is part of kube-state-metrics means very likely will miss collecting anything related to the k8s_pause container side cars as don't tend to show up in KSM.
 	query = `kube_pod_container_info`
 	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
@@ -210,10 +212,12 @@ func Metrics(args *common.Parameters) {
 		//Add containers to pods structure
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
 
+			// Get the container, pod and namespace names.
 			containerName := string(result.(model.Matrix)[i].Metric["container"])
 			podName := string(result.(model.Matrix)[i].Metric["pod"])
 			namespaceName := string(result.(model.Matrix)[i].Metric["namespace"])
 
+			//check if already have setup namespace, pod in system structure and if not add them.
 			if _, ok := systems[namespaceName]; !ok {
 				systems[namespaceName] = &datamodel.Namespace{LabelMap: map[string]map[string]string{}, Entities: map[string]map[string]*datamodel.MidLevel{}}
 				systems[namespaceName].Entities["Pods"] = map[string]*datamodel.MidLevel{}
@@ -221,6 +225,7 @@ func Metrics(args *common.Parameters) {
 			if _, ok := systems[namespaceName].Entities["Pods"][podName]; !ok {
 				systems[namespaceName].Entities["Pods"][podName] = &datamodel.MidLevel{Containers: map[string]*datamodel.Container{}, LabelMap: map[string]map[string]string{}}
 			}
+			//If the container doesn't exist then look to add and call getContainerMetric to set labels.
 			if _, ok := systems[namespaceName].Entities["Pods"][podName].Containers[containerName]; !ok {
 				systems[namespaceName].Entities["Pods"][podName].Containers[containerName] = &datamodel.Container{LabelMap: map[string]map[string]string{}}
 				getContainerMetric(result, "pod", "container", query)
@@ -228,6 +233,7 @@ func Metrics(args *common.Parameters) {
 		}
 	}
 
+	//Create any entities based on pods that are owned by them. This will create replicasets, jobs, daemonsets, etc.
 	query = `sum(kube_pod_owner{owner_name!="<none>"}) by (namespace, pod, owner_name, owner_kind)`
 	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
@@ -236,17 +242,21 @@ func Metrics(args *common.Parameters) {
 		return
 	} else {
 		for i := 0; i < result.(model.Matrix).Len(); i++ {
+			//Get the pod, and namespace names as well as what the owner name and kind is.
 			podName := string(result.(model.Matrix)[i].Metric["pod"])
 			namespaceName := string(result.(model.Matrix)[i].Metric["namespace"])
 			ownerKind := string(result.(model.Matrix)[i].Metric["owner_kind"])
 			ownerName := string(result.(model.Matrix)[i].Metric["owner_name"])
 
+			//If we have an owner but haven't seen the pod we skip it as currently metrics for analysis is based on pod\container so having info for non-existant pod isn't of use.
 			if _, ok := systems[namespaceName].Entities["Pods"][podName]; !ok {
 				continue
 			}
 
+			//For the pod set who its owner is for mapping later.
 			systems[namespaceName].Entities["Pods"][podName].OwnerKind = ownerKind
 			systems[namespaceName].Entities["Pods"][podName].OwnerName = ownerName
+			//Create the entity if doesn't exist.
 			if _, ok := systems[namespaceName].Entities[ownerKind]; !ok {
 				systems[namespaceName].Entities[ownerKind] = map[string]*datamodel.MidLevel{}
 			}
@@ -256,6 +266,7 @@ func Metrics(args *common.Parameters) {
 		}
 	}
 
+	//Check for any replicaset that are owned by deployments.
 	query = `sum(kube_replicaset_owner{owner_name!="<none>"}) by (namespace, replicaset, owner_name, owner_kind)`
 	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
@@ -272,9 +283,11 @@ func Metrics(args *common.Parameters) {
 				continue
 			}
 
+			//Update the replicaset with info about the deployment that owns it.
 			systems[namespaceName].Entities["ReplicaSet"][replicaSetName].OwnerKind = ownerKind
 			systems[namespaceName].Entities["ReplicaSet"][replicaSetName].OwnerName = ownerName
 
+			//Check if the deployment exists and if not add it.
 			if _, ok := systems[namespaceName].Entities[ownerKind]; !ok {
 				systems[namespaceName].Entities[ownerKind] = map[string]*datamodel.MidLevel{}
 			}
@@ -285,6 +298,7 @@ func Metrics(args *common.Parameters) {
 		}
 	}
 
+	//Check for any jobs that are owned by Cronjobs
 	query = `sum(kube_job_owner{owner_name!="<none>"}) by (namespace, job_name, owner_name, owner_kind)`
 	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
@@ -301,9 +315,11 @@ func Metrics(args *common.Parameters) {
 				continue
 			}
 
+			//Set the owner of the job to be the name of the cronjob.
 			systems[namespaceName].Entities["Job"][jobName].OwnerKind = ownerKind
 			systems[namespaceName].Entities["Job"][jobName].OwnerName = ownerName
 
+			//Check if the Cronjob exists and if not add it
 			if _, ok := systems[namespaceName].Entities[ownerKind]; !ok {
 				systems[namespaceName].Entities[ownerKind] = map[string]*datamodel.MidLevel{}
 			}
@@ -321,6 +337,7 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 
+	//query for the Container resource limits (cpu and memory) if we get no results for the newer combined metric then will fall back to older metrics which get just CPU and Memory.
 	query = `sum(kube_pod_container_resource_limits) by (pod,namespace,container,resource)`
 	result, err = common.MetricCollect(args, query, "discovery")
 	if result.(model.Matrix).Len() == 0 {
@@ -345,6 +362,7 @@ func Metrics(args *common.Parameters) {
 		getContainerMetric(result, "pod", "container", "limits")
 	}
 
+	//Query for the Container resource requests (cpu and memory) if we get no results for the newer combined metric then will fall back to older metrics which get just CPU and Memory.
 	query = `sum(kube_pod_container_resource_requests) by (pod,namespace,container,resource)`
 	result, err = common.MetricCollect(args, query, "discovery")
 	if result.(model.Matrix).Len() == 0 {
@@ -369,12 +387,14 @@ func Metrics(args *common.Parameters) {
 		getContainerMetric(result, "pod", "container", "requests")
 	}
 
+	//Getting info from cAdvisor metric that will be stored as labels.
 	query = `container_spec_cpu_shares`
 	result, err = common.MetricCollect(args, query, "discovery")
 	if err != nil {
 		args.WarnLogger.Println("metric=conLabel query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=conLabel query=" + query + " message=" + err.Error())
 	} else {
+		//Based on setup older versions of Prometheus may have the _name appended to metric fields so we are checking if we see results using new or old method and set labelSuffix if need for use in other queries.
 		if getContainerMetric(result, "pod", "container", query) {
 			//Don't do anything
 		} else if getContainerMetric(result, "pod_name", "container_name", query) {
@@ -408,6 +428,7 @@ func Metrics(args *common.Parameters) {
 		getMidMetric(result, "pod", "label", "Pods", query)
 	}
 
+	//Depending on version of KSM will determine what metric need to use to see if containers are terminated or not for there state.
 	query = `sum(kube_pod_container_status_terminated) by (pod,namespace,container)`
 	result, err = common.MetricCollect(args, query, "discovery")
 	if result.(model.Matrix).Len() == 0 {
@@ -752,9 +773,10 @@ func Metrics(args *common.Parameters) {
 		args.DebugLogger.Printf("Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
+
+	//Query to see what hpa labels may be there and if need to use newer or older versions of the query based on what we see for results. Note if you don't have any then will default to using newer version.
 	query = `kube_hpa_labels`
 	result, err = common.MetricCollect(args, query, "discovery")
-
 	var hpaName string
 	var hpaLabel model.LabelName
 	if result.(model.Matrix).Len() != 0 {

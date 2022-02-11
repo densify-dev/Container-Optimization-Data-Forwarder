@@ -51,7 +51,7 @@ type CRQ struct {
 	SelectorType  string                       `json:"selectorType,omitempty"`
 	SelectorKey   string                       `json:"selectorKey,omitempty"`
 	SelectorValue string                       `json:"selectorValue,omitempty"`
-	Namespaces    string                       `json:"namespaces,omitempty"`
+	Namespaces    []string                     `json:"namespaces,omitempty"`
 	CreateTime    time.Time                    `json:"creationTime,omitempty"`
 }
 

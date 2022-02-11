@@ -2,8 +2,9 @@ package crq
 
 import (
 	"fmt"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
 	"time"
+
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/prometheus/common/model"
@@ -34,7 +35,7 @@ func extractCRQAttributes(result model.Value) {
 			case "value":
 				crqs[crqName].SelectorValue = string(labelVal)
 			case "namespace":
-				crqs[crqName].Namespaces += string(labelVal) + "|"
+				crqs[crqName].Namespaces = append(crqs[crqName].Namespaces, string(labelVal))
 			}
 		}
 	}
@@ -81,8 +82,7 @@ func Metrics(args *common.Parameters) {
 		unixTimeInt := int64(rsltIndex[i].Values[len(rsltIndex[i].Values)-1].Value)
 		crqs[string(rsltIndex[i].Metric["name"])] =
 			&datamodel.CRQ{
-				LabelMap:     map[string]map[string]string{},
-				SelectorType: "", SelectorKey: "", SelectorValue: "", Namespaces: "",
+				LabelMap:   map[string]map[string]string{},
 				CreateTime: time.Unix(unixTimeInt, 0),
 			}
 	}

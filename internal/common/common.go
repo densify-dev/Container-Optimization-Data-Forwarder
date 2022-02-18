@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/api"
@@ -31,8 +30,7 @@ type Parameters struct {
 }
 
 //MetricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
-func MetricCollect(args *Parameters, query, queryType string) (value model.Value, err error) {
-
+func MetricCollect(args *Parameters, query string) (value model.Value, err error) {
 	//setup the context to use for the API calls
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -53,7 +51,7 @@ func MetricCollect(args *Parameters, query, queryType string) (value model.Value
 	}
 
 	if args.OAuthTokenPath != "" {
-		roundTripper = config.NewBearerAuthFileRoundTripper(args.OAuthTokenPath, roundTripper)
+		roundTripper = config.NewAuthorizationCredentialsFileRoundTripper("Bearer", args.OAuthTokenPath, roundTripper)
 	}
 	//Setup the API client connection
 	client, err := api.NewClient(api.Config{Address: *args.PromURL, RoundTripper: roundTripper})
@@ -63,12 +61,9 @@ func MetricCollect(args *Parameters, query, queryType string) (value model.Value
 
 	//Query prometheus with the values defined above as well as the query that was passed into the function.
 	q := v1.NewAPI(client)
-	//Will query with just query for workload as we use the range vector to get all data points in the period for a system we are querying. Where we use range to find all the distinct systems during that period of time.
-	if queryType == "workload" {
-		value, _, err = q.Query(ctx, query, *args.CurrentTime)
-	} else {
-		value, _, err = q.QueryRange(ctx, query, args.Range5Min)
-	}
+	// use Query API, not QueryRange for both discovery and workload
+	query += `[` + args.History + `]`
+	value, _, err = q.Query(ctx, query, *args.CurrentTime)
 	if err != nil {
 		return value, err
 	}
@@ -86,6 +81,7 @@ func MetricCollect(args *Parameters, query, queryType string) (value model.Value
 	return value, err
 }
 
+/*
 // AddToLabelMap used to add values to label map used for attributes.
 func AddToLabelMap(key string, value string, labelPath map[string]string) {
 	if _, ok := labelPath[key]; !ok {
@@ -132,11 +128,11 @@ func AddToLabelMap(key string, value string, labelPath map[string]string) {
 		}
 	}
 }
+*/
 
 //GetWorkload used to query for the workload data and then calls write workload
 func GetWorkload(fileName, query string, args *Parameters, entityKind string) {
-	query += `[` + args.History + `]`
-	result, err := MetricCollect(args, query, "workload")
+	result, err := MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=" + fileName + " query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=" + fileName + " query=" + query + " message=" + err.Error())

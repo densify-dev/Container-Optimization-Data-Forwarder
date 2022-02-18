@@ -3,6 +3,7 @@ package node
 
 import (
 	"fmt"
+	"net"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
 
@@ -11,44 +12,68 @@ import (
 )
 
 //Map that labels and values will be stored in
-var nodes = map[string]*datamodel.Node{}
+var nodes = make(map[string]*datamodel.Node)
+var nodesByAltName = make(map[string]*datamodel.Node)
 
 //Hard-coded string for log file warnings
 var entityKind = "node"
 
+var nodeNameKeys = map[string]string{"netSpeedBytes": "instance"}
+
 //getNodeMetric takes data from prometheus and adds to nodes structure
 func getNodeMetric(result model.Value, metric string) {
-
-	if result == nil {
+	mat, ok := result.(model.Matrix)
+	if !ok {
 		return
 	}
-	//Loop through the different entities in the results.
-	for i := 0; i < result.(model.Matrix).Len(); i++ {
-		//Check to see if we have a value for node field if not skip as won't be able to join to the system.
-		nodeValue, ok := result.(model.Matrix)[i].Metric["node"]
+	nodeNameKey, ok := nodeNameKeys[metric]
+	if !ok {
+		nodeNameKey = "node"
+	}
+	// Loop through the different entities in the results.
+	n := mat.Len()
+	for i := 0; i < n; i++ {
+		nodeNameValue, ok := mat[i].Metric[model.LabelName(nodeNameKey)]
 		if !ok {
 			continue
 		}
-		if _, ok := nodes[string(nodeValue)]; !ok {
-			continue
-		}
+		nodeName := string(nodeNameValue)
+		var no *datamodel.Node
 		switch metric {
 		case "netSpeedBytes":
-			//validates that the value of the entity is set and if not will default to 0
-			if len(result.(model.Matrix)[i].Values) != 0 {
-				nodes[string(nodeValue)].NetSpeedBytes = int(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
+			// strip off port, if part of addr
+			if host, _, err := net.SplitHostPort(nodeName); err == nil {
+				nodeName = host
 			}
+			// first try in nodes
+			if no, ok = nodes[nodeName]; !ok {
+				// then in nodes by alt-name
+				if no, ok = nodesByAltName[nodeName]; !ok {
+					continue
+				}
+			}
+			_ = no.NetSpeedBytesMap.AppendSampleStreamWithValue(mat[i], "device", nil)
 		case "altWorkloadName":
-			nodes[string(nodeValue)].AltWorkloadName = string(result.(model.Matrix)[i].Metric["instance"])
+			if no, ok = nodes[nodeName]; !ok {
+				continue
+			}
+			podIp := string(mat[i].Metric["pod_ip"])
+			no.AltWorkloadName = podIp
+			// now insert the node to nodesByAltName
+			if _, f := nodesByAltName[podIp]; !f {
+				nodesByAltName[podIp] = no
+			}
 		default:
-			if _, ok := nodes[string(nodeValue)].LabelMap[metric]; !ok {
-				nodes[string(nodeValue)].LabelMap[metric] = map[string]string{}
+			if no, ok = nodes[nodeName]; !ok {
+				continue
 			}
-			for key, value := range result.(model.Matrix)[i].Metric {
-				common.AddToLabelMap(string(key), string(value), nodes[string(nodeValue)].LabelMap[metric])
+			var labels *datamodel.Labels
+			if labels, ok = no.LabelMap[metric]; !ok {
+				labels = &datamodel.Labels{}
+				no.LabelMap[metric] = labels
 			}
+			_ = labels.AppendSampleStream(mat[i])
 		}
-
 	}
 }
 
@@ -60,8 +85,8 @@ func Metrics(args *common.Parameters) {
 	var err error
 
 	//Query and store kubernetes node labels
-	query = "max(kube_node_labels) by (instance, node)"
-	result, err = common.MetricCollect(args, query, "discovery")
+	query = `kube_node_labels`
+	result, err = common.MetricCollect(args, query)
 	if err != nil {
 		args.ErrorLogger.Println("metric=nodes query=" + query + " message=" + err.Error())
 		fmt.Println("[ERROR] metric=nodes query=" + query + " message=" + err.Error())
@@ -69,23 +94,20 @@ func Metrics(args *common.Parameters) {
 	}
 	var rsltIndex = result.(model.Matrix)
 	for i := 0; i < rsltIndex.Len(); i++ {
-		nodes[string(rsltIndex[i].Metric["node"])] =
-			&datamodel.Node{LabelMap: map[string]map[string]string{}}
+		if nodeName := string(rsltIndex[i].Metric["node"]); nodeName != "" {
+			if _, ok := nodes[nodeName]; !ok {
+				nodes[nodeName] = &datamodel.Node{
+					LabelMap:         make(datamodel.LabelMap),
+					NetSpeedBytesMap: &datamodel.Labels{},
+				}
+			}
+		}
 	}
-
-	//query for node labels
-	query = `kube_node_labels`
-	result, err = common.MetricCollect(args, query, "discovery")
-	if err != nil {
-		args.WarnLogger.Println("metric=nodeLabels query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=nodeLabels query=" + query + " message=" + err.Error())
-	} else {
-		getNodeMetric(result, query)
-	}
+	getNodeMetric(result, query)
 
 	//query for node annotations
 	query = `kube_node_annotations`
-	result, err = common.MetricCollect(args, query, "discovery")
+	result, err = common.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=nodeAnnotations query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=nodeAnnotations query=" + query + " message=" + err.Error())
@@ -95,7 +117,7 @@ func Metrics(args *common.Parameters) {
 
 	//query for node info and store into labels structure
 	query = `kube_node_info`
-	result, err = common.MetricCollect(args, query, "discovery")
+	result, err = common.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=nodeInfo query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=nodeInfo query=" + query + " message=" + err.Error())
@@ -105,7 +127,7 @@ func Metrics(args *common.Parameters) {
 
 	//query to get what roles may have been assigned to this node.
 	query = `kube_node_role`
-	result, err = common.MetricCollect(args, query, "discovery")
+	result, err = common.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=nodeRole query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=nodeRole query=" + query + " message=" + err.Error())
@@ -113,24 +135,25 @@ func Metrics(args *common.Parameters) {
 		getNodeMetric(result, query)
 	}
 
-	//Gets the network speed in bytes as an attribute/config value for each node
-	query = `label_replace(node_network_speed_bytes, "pod_ip", "$1", "instance", "(.*):.*")`
-	result, err = common.MetricCollect(args, query, "discovery")
-	if err != nil {
-		args.WarnLogger.Println("metric=networkSpeedBytes query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=networkSpeedBytes query=" + query + " message=" + err.Error())
-	} else {
-		getNodeMetric(result, "netSpeedBytes")
-	}
-
-	//Gets the conversion value for workload name for each node if needed.
-	query = `max(max(label_replace(sum(node_cpu_seconds_total{mode!="idle"}) by (instance), "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip,instance) * on (pod_ip) group_left(node) kube_pod_info{pod=~".*node-exporter.*"}) by (node, instance)`
-	result, err = common.MetricCollect(args, query, "discovery")
+	// Gets the alternative node name (pod_ip of node exporter)
+	// This needs to be done before node_network_speed_bytes
+	query = `kube_pod_info{pod=~".*node-exporter.*"}`
+	result, err = common.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=altWorkloadName query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=altWorkloadName query=" + query + " message=" + err.Error())
 	} else {
 		getNodeMetric(result, "altWorkloadName")
+	}
+
+	//Gets the network speed in bytes as an attribute/config value for each node
+	query = `node_network_speed_bytes{device!~"veth.*"}`
+	result, err = common.MetricCollect(args, query)
+	if err != nil {
+		args.WarnLogger.Println("metric=networkSpeedBytes query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=networkSpeedBytes query=" + query + " message=" + err.Error())
+	} else {
+		getNodeMetric(result, "netSpeedBytes")
 	}
 
 	var cluster = map[string]*datamodel.NodeCluster{}
@@ -140,7 +163,7 @@ func Metrics(args *common.Parameters) {
 
 	//Queries the capacity fields of all nodes if we don't see any data then will try to use the older queries for capacity.
 	query = `kube_node_status_capacity`
-	result, err = common.MetricCollect(args, query, "discovery")
+	result, err = common.MetricCollect(args, query)
 	if result.(model.Matrix).Len() == 0 {
 
 		//Query and store prometheus total cpu cores
@@ -162,7 +185,7 @@ func Metrics(args *common.Parameters) {
 
 	//Queries the allocatable fields of all nodes if we don't see data then will try to query the older metrics for allocations.
 	query = `kube_node_status_allocatable`
-	result, err = common.MetricCollect(args, query, "discovery")
+	result, err = common.MetricCollect(args, query)
 	if result.(model.Matrix).Len() == 0 {
 
 		//Query and store prometheus total cpu cores.

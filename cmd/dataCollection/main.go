@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container2"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/crq"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/resourcequota"
@@ -43,7 +43,7 @@ func initParameters() {
 	var oAuthTokenPath = ""
 	var caCertPath = ""
 
-	//Temporary variables for procassing flags
+	//Temporary variables for processing flags
 	var clusterNameTemp, promAddrTemp, promPortTemp, promProtocolTemp, intervalTemp, oAuthTokenPathTemp, caCertPathTemp, includeTemp string
 	var intervalSizeTemp, offsetTemp int
 	var debugTemp bool
@@ -119,7 +119,7 @@ func initParameters() {
 	flag.IntVar(&intervalSizeTemp, "intervalSize", intervalSize, "Interval size to be used for querying. eg. default of 1 with default interval of hours queries 1 last hour of info")
 	flag.IntVar(&offsetTemp, "offset", offset, "Amount of units (based on interval value) to offset the data collection backwards in time")
 	flag.BoolVar(&debugTemp, "debug", debug, "Enable debug logging")
-	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
+	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extension. Default config")
 	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
 	flag.StringVar(&includeTemp, "includeList", include, "Comma separated list of data to include in collection (node, container, quota) Ex: \"node,quota\"")
 	flag.StringVar(&oAuthTokenPathTemp, "oAuthToken", oAuthTokenPath, "Path to oAuth token file required to authenticate with the Cluster where Prometheus is running.")
@@ -287,7 +287,7 @@ func main() {
 	fmt.Println("[INFO] Version 3.0.0-beta")
 
 	if includeContainer {
-		container2.Metrics(params)
+		container.Metrics(params)
 	} else {
 		params.InfoLogger.Println("Skipping container data collection")
 		fmt.Println("[INFO] Skipping container data collection")

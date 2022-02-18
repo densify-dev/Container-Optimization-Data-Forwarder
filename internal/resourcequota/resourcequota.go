@@ -21,8 +21,8 @@ func Metrics(args *common.Parameters) {
 	var result model.Value
 	var err error
 
-	query = `max(kube_resourcequota_created) by (namespace,resourcequota)`
-	result, err = common.MetricCollect(args, query, "discovery")
+	query = `kube_resourcequota_created`
+	result, err = common.MetricCollect(args, query)
 
 	if err != nil {
 		args.ErrorLogger.Println("metric=resourceQuotas query=" + query + " message=" + err.Error())
@@ -31,7 +31,6 @@ func Metrics(args *common.Parameters) {
 	}
 	var rsltIndex = result.(model.Matrix)
 	for i := 0; i < rsltIndex.Len(); i++ {
-
 		namespaceName := string(result.(model.Matrix)[i].Metric["namespace"])
 		unixTimeInt := int64(rsltIndex[i].Values[len(rsltIndex[i].Values)-1].Value)
 		if _, ok := resourceQuotas[namespaceName]; !ok {
@@ -40,7 +39,6 @@ func Metrics(args *common.Parameters) {
 		if _, ok := resourceQuotas[namespaceName][string(rsltIndex[i].Metric["resourcequota"])]; !ok {
 			resourceQuotas[namespaceName][string(rsltIndex[i].Metric["resourcequota"])] = time.Unix(unixTimeInt, 0)
 		}
-
 	}
 
 	var cluster = map[string]*datamodel.RQCluster{}

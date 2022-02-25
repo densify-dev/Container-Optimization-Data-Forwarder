@@ -1,18 +1,20 @@
-//Package resourcequota collects data related to resource quotas and formats into json files to send to Densify.
+// Package resourcequota collects data related to resource quotas and formats into json files to send to Densify.
 package resourcequota
 
 import (
 	"fmt"
-	"time"
-
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/prometheus/common/model"
 )
 
-var resourceQuotas = map[string]map[string]time.Time{}
-var entityKind = "rq"
+const (
+	entityKind = "rq"
+	rqKey      = "resourcequota"
+)
+
+var resourceQuotas = make(map[string]map[string]*datamodel.ResourceQuota)
 
 //Metrics a global func for collecting quota level metrics in prometheus
 func Metrics(args *common.Parameters) {
@@ -29,23 +31,27 @@ func Metrics(args *common.Parameters) {
 		fmt.Println("[ERROR] metric=resourceQuotas query=" + query + " message=" + err.Error())
 		return
 	}
-	var rsltIndex = result.(model.Matrix)
-	for i := 0; i < rsltIndex.Len(); i++ {
-		namespaceName := string(result.(model.Matrix)[i].Metric["namespace"])
-		unixTimeInt := int64(rsltIndex[i].Values[len(rsltIndex[i].Values)-1].Value)
-		if _, ok := resourceQuotas[namespaceName]; !ok {
-			resourceQuotas[namespaceName] = map[string]time.Time{}
+
+	mat := result.(model.Matrix)
+	n := mat.Len()
+	for i := 0; i < n; i++ {
+		nsName := string(mat[i].Metric[common.NamespaceKey])
+		rqName := string(mat[i].Metric[rqKey])
+		var ok bool
+		if _, ok = resourceQuotas[nsName]; !ok {
+			resourceQuotas[nsName] = make(map[string]*datamodel.ResourceQuota)
 		}
-		if _, ok := resourceQuotas[namespaceName][string(rsltIndex[i].Metric["resourcequota"])]; !ok {
-			resourceQuotas[namespaceName][string(rsltIndex[i].Metric["resourcequota"])] = time.Unix(unixTimeInt, 0)
+		var rq *datamodel.ResourceQuota
+		if rq, ok = resourceQuotas[nsName][rqName]; !ok {
+			rq = &datamodel.ResourceQuota{CreationTime: &datamodel.Labels{}}
+			resourceQuotas[nsName][rqName] = rq
 		}
+		_ = rq.CreationTime.AppendSampleStreamWithValue(mat[i], "", datamodel.TimeStampConverter())
 	}
 
-	var cluster = map[string]*datamodel.RQCluster{}
-	cluster["cluster"] = &datamodel.RQCluster{Namespaces: resourceQuotas, Name: *args.ClusterName}
+	cluster := &datamodel.RQCluster{Namespaces: resourceQuotas, Name: *args.ClusterName}
 	common.WriteDiscovery(args, cluster, entityKind)
 
 	query = `kube_resourcequota`
-	common.GetWorkload("kube_resourcequota", query, args, entityKind)
-
+	common.GetWorkload(query, query, args, entityKind)
 }

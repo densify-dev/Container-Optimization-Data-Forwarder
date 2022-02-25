@@ -1,18 +1,32 @@
-//Package container2 collects data related to containers and formats into json files to send to Densify.
+// Package container collects data related to containers and formats into json files to send to Densify.
 package container
 
 import (
 	"fmt"
-	"runtime"
-
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
+	"runtime"
+	"strings"
 
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
 	"github.com/prometheus/common/model"
 )
 
 var systems = map[string]*datamodel.Namespace{}
-var entityKind = "container"
+
+const (
+	entityKind          = "container"
+	ownerKindKey        = "owner_kind"
+	ownerNameKey        = "owner_name"
+	podEntityKey        = "Pods"
+	podMetricKey        = "pod"
+	replicaSetEntityKey = "ReplicaSet"
+	replicaSetMetricKey = "replicaset"
+	jobEntityKey        = "Job"
+	jobMetricKey        = "job_name"
+)
+
+var ownerKindFilter = []string{ownerKindKey}
+var ownerNameFilter = []string{ownerNameKey}
 
 //getContainerMetric is used to parse the results from Prometheus related to Container Entities and store them in the systems data structure.
 func getContainerMetric(result model.Value, pod, container model.LabelName, metric string) bool {
@@ -24,7 +38,7 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 	n := mat.Len()
 	for i := 0; i < n; i++ {
 		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
-		namespaceValue, ok := mat[i].Metric["namespace"]
+		namespaceValue, ok := mat[i].Metric[common.NamespaceKey]
 		if !ok {
 			continue
 		}
@@ -36,7 +50,7 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 		if !ok {
 			continue
 		}
-		if _, ok = systems[string(namespaceValue)].Entities["Pods"][string(podValue)]; !ok {
+		if _, ok = systems[string(namespaceValue)].Entities[podEntityKey][string(podValue)]; !ok {
 			continue
 		}
 		//Validate that the data contains the container label with value and check it exists in our systems structure
@@ -45,7 +59,7 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 			continue
 		}
 		var container *datamodel.Container
-		if container, ok = systems[string(namespaceValue)].Entities["Pods"][string(podValue)].Containers[string(containerNameValue)]; !ok {
+		if container, ok = systems[string(namespaceValue)].Entities[podEntityKey][string(podValue)].Containers[string(containerNameValue)]; !ok {
 			continue
 		}
 
@@ -76,24 +90,26 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 		case "powerState":
 			_ = container.PowerState.AppendSampleStreamWithValue(mat[i], "", nil)
 		default:
-			var labels *datamodel.Labels
-			if labels, ok = container.LabelMap[metric]; !ok {
-				labels = &datamodel.Labels{}
-				container.LabelMap[metric] = labels
-			}
+			labels := datamodel.EnsureLabels(container.LabelMap, metric)
 			_ = labels.AppendSampleStream(mat[i])
 		}
 	}
 	return true
 }
 
-func cpuConvert(value float64) float64 {
+func cpuConv(value float64) float64 {
 	return value * 1000
 }
 
-func memConvert(value float64) float64 {
+func memConv(value float64) float64 {
 	return value / 1024 / 1024
 }
+
+var cpuConvert = &datamodel.Converter{VCF: cpuConv}
+
+var memConvert = &datamodel.Converter{VCF: memConv}
+
+var timeConv = datamodel.TimeStampConverter()
 
 //getmidMetric is used to parse the results from Prometheus related to mid Entities and store them in the systems data structure.
 func getMidMetric(result model.Value, mid model.LabelName, metric, kind, query string) {
@@ -105,58 +121,49 @@ func getMidMetric(result model.Value, mid model.LabelName, metric, kind, query s
 	n := mat.Len()
 	for i := 0; i < n; i++ {
 		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
-		namespaceValue, ok := mat[i].Metric["namespace"]
+		nsVal, ok := mat[i].Metric[common.NamespaceKey]
 		if !ok {
 			continue
 		}
-		if _, ok = systems[string(namespaceValue)]; !ok {
+		namespaceValue := string(nsVal)
+		if _, ok = systems[namespaceValue]; !ok {
 			continue
 		}
 		//Validate that the data contains the mid label with value and check it exists in our systems structure
-		midValue, ok := mat[i].Metric[mid]
+		midVal, ok := mat[i].Metric[mid]
 		if !ok {
 			continue
 		}
-		if _, ok := systems[string(namespaceValue)].Entities[kind][string(midValue)]; !ok {
+		midValue := string(midVal)
+		if _, ok := systems[namespaceValue].Entities[kind][midValue]; !ok {
 			continue
 		}
 
-		//validates that the value of the entity is set and if not will default to 0
-		var value int64
-		if len(mat[i].Values) == 0 {
-			value = 0
-		} else {
-			value = int64(mat[i].Values[len(mat[i].Values)-1].Value)
-		}
 		//Check which metric this is for and update the corresponding variable for this mid in the system data structure
 		switch metric {
 		case "label":
-			var labels *datamodel.Labels
-			if labels, ok = systems[string(namespaceValue)].Entities[kind][string(midValue)].LabelMap[query]; !ok {
-				labels = &datamodel.Labels{}
-				systems[string(namespaceValue)].Entities[kind][string(midValue)].LabelMap[query] = labels
-			}
+			labels := datamodel.EnsureLabels(systems[namespaceValue].Entities[kind][midValue].LabelMap, query)
 			_ = labels.AppendSampleStream(mat[i])
 		case "creationTime":
-			systems[string(namespaceValue)].Entities[kind][string(midValue)].CreationTime = value
+			_ = systems[namespaceValue].Entities[kind][midValue].CreationTime.AppendSampleStreamWithValue(mat[i], "", timeConv)
 		case "kube_cronjob_next_schedule_time":
-			systems[string(namespaceValue)].Entities[kind][string(midValue)].NextSchedTime = value
+			_ = systems[namespaceValue].Entities[kind][midValue].NextSchedTime.AppendSampleStreamWithValue(mat[i], "", timeConv)
 		case "kube_cronjob_status_active":
-			systems[string(namespaceValue)].Entities[kind][string(midValue)].StatusActive = value
+			_ = systems[namespaceValue].Entities[kind][midValue].StatusActive.AppendSampleStreamWithValue(mat[i], "", nil)
 		case "kube_cronjob_status_last_schedule_time":
-			systems[string(namespaceValue)].Entities[kind][string(midValue)].LastSchedTime = value
+			_ = systems[namespaceValue].Entities[kind][midValue].LastSchedTime.AppendSampleStreamWithValue(mat[i], "", timeConv)
 		case "kube_deployment_metadata_generation":
-			systems[string(namespaceValue)].Entities[kind][string(midValue)].MetadataGeneration = value
+			_ = systems[namespaceValue].Entities[kind][midValue].MetadataGeneration.AppendSampleStreamWithValue(mat[i], "", nil)
 		case "kube_deployment_spec_strategy_rollingupdate_max_surge":
-			systems[string(namespaceValue)].Entities[kind][string(midValue)].MaxSurge = value
+			_ = systems[namespaceValue].Entities[kind][midValue].MaxSurge.AppendSampleStreamWithValue(mat[i], "", nil)
 		case "kube_deployment_spec_strategy_rollingupdate_max_unavailable":
-			systems[string(namespaceValue)].Entities[kind][string(midValue)].MaxUnavailable = value
+			_ = systems[namespaceValue].Entities[kind][midValue].MaxUnavailable.AppendSampleStreamWithValue(mat[i], "", nil)
 		case "kube_job_status_completion_time":
-			systems[string(namespaceValue)].Entities[kind][string(midValue)].CompletionTime = value
+			_ = systems[namespaceValue].Entities[kind][midValue].CompletionTime.AppendSampleStreamWithValue(mat[i], "", timeConv)
 		case "kube_job_spec_completions":
-			systems[string(namespaceValue)].Entities[kind][string(midValue)].Completions = value
+			_ = systems[namespaceValue].Entities[kind][midValue].Completions.AppendSampleStreamWithValue(mat[i], "", nil)
 		case "kube_job_spec_parallelism":
-			systems[string(namespaceValue)].Entities[kind][string(midValue)].Parallelism = value
+			_ = systems[namespaceValue].Entities[kind][midValue].Parallelism.AppendSampleStreamWithValue(mat[i], "", nil)
 		}
 	}
 }
@@ -171,15 +178,16 @@ func getNamespaceMetric(result model.Value, query string) {
 	n := mat.Len()
 	for i := 0; i < n; i++ {
 		//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
-		namespaceValue, ok := mat[i].Metric["namespace"]
+		nsValue, ok := mat[i].Metric[common.NamespaceKey]
 		if !ok {
 			continue
 		}
-		if _, ok := systems[string(namespaceValue)]; !ok {
+		namespaceValue := string(nsValue)
+		if _, ok := systems[namespaceValue]; !ok {
 			continue
 		}
 		labels := &datamodel.Labels{}
-		systems[string(namespaceValue)].LabelMap[query] = labels
+		systems[namespaceValue].LabelMap[query] = labels
 		_ = labels.AppendSampleStream(mat[i])
 	}
 }
@@ -210,145 +218,37 @@ func Metrics(args *common.Parameters) {
 		mat := result.(model.Matrix)
 		n := mat.Len()
 		for i := 0; i < n; i++ {
-
 			// Get the container, pod and namespace names.
 			containerName := string(mat[i].Metric["container"])
-			podName := string(mat[i].Metric["pod"])
-			namespaceName := string(mat[i].Metric["namespace"])
-
+			podName := string(mat[i].Metric[podMetricKey])
+			namespaceName := string(mat[i].Metric[common.NamespaceKey])
 			//check if already have setup namespace, pod in system structure and if not add them.
 			if _, ok := systems[namespaceName]; !ok {
-				systems[namespaceName] = &datamodel.Namespace{LabelMap: make(datamodel.LabelMap), Entities: map[string]map[string]*datamodel.MidLevel{}}
-				systems[namespaceName].Entities["Pods"] = map[string]*datamodel.MidLevel{}
+				systems[namespaceName] = &datamodel.Namespace{LabelMap: make(datamodel.LabelMap), Entities: make(map[string]map[string]*datamodel.MidLevel)}
+				systems[namespaceName].Entities[podEntityKey] = make(map[string]*datamodel.MidLevel)
 			}
-			if _, ok := systems[namespaceName].Entities["Pods"][podName]; !ok {
-				systems[namespaceName].Entities["Pods"][podName] = &datamodel.MidLevel{Containers: map[string]*datamodel.Container{}, LabelMap: make(datamodel.LabelMap)}
+			if _, ok := systems[namespaceName].Entities[podEntityKey][podName]; !ok {
+				systems[namespaceName].Entities[podEntityKey][podName] = newMidLevel()
 			}
 			//If the container doesn't exist then look to add and call getContainerMetric to set labels.
-			if _, ok := systems[namespaceName].Entities["Pods"][podName].Containers[containerName]; !ok {
-				systems[namespaceName].Entities["Pods"][podName].Containers[containerName] = &datamodel.Container{
-					CpuLimit:   &datamodel.Labels{},
-					CpuRequest: &datamodel.Labels{},
-					MemLimit:   &datamodel.Labels{},
-					MemRequest: &datamodel.Labels{},
-					PowerState: &datamodel.Labels{},
-					LabelMap:   make(datamodel.LabelMap),
-				}
+			if _, ok := systems[namespaceName].Entities[podEntityKey][podName].Containers[containerName]; !ok {
+				systems[namespaceName].Entities[podEntityKey][podName].Containers[containerName] = newContainer()
 				getContainerMetric(result, "pod", "container", query)
 			}
 		}
 	}
 
-	//Create any entities based on pods that are owned by them. This will create replicasets, jobs, daemonsets, etc.
-	query = `kube_pod_owner{owner_name!="<none>"}`
-	result, err = common.MetricCollect(args, query)
-	if err != nil {
-		args.ErrorLogger.Println("metric=pods query=" + query + " message=" + err.Error())
-		fmt.Println("[ERROR] metric=pods query=" + query + " message=" + err.Error())
+	// Create any entities based on pods that are owned by them.
+	// This will create replicasets, jobs, daemonsets, etc.
+	if err = getMidLevelOwner(args, "kube_pod_owner", podEntityKey, podMetricKey); err != nil {
 		return
-	} else {
-		mat := result.(model.Matrix)
-		n := mat.Len()
-		for i := 0; i < n; i++ {
-			//Get the pod, and namespace names as well as what the owner name and kind is.
-			podName := string(mat[i].Metric["pod"])
-			namespaceName := string(mat[i].Metric["namespace"])
-			ownerKind := string(mat[i].Metric["owner_kind"])
-			ownerName := string(mat[i].Metric["owner_name"])
-			if podName == "" || namespaceName == "" || ownerKind == "" || ownerName == "" {
-				continue
-			}
-
-			//If we have an owner but haven't seen the pod we skip it as currently metrics for analysis is based on pod\container so having info for non-existant pod isn't of use.
-			if _, ok := systems[namespaceName].Entities["Pods"][podName]; !ok {
-				continue
-			}
-
-			//For the pod set who its owner is for mapping later.
-			systems[namespaceName].Entities["Pods"][podName].OwnerKind = ownerKind
-			systems[namespaceName].Entities["Pods"][podName].OwnerName = ownerName
-			//Create the entity if doesn't exist.
-			if _, ok := systems[namespaceName].Entities[ownerKind]; !ok {
-				systems[namespaceName].Entities[ownerKind] = map[string]*datamodel.MidLevel{}
-			}
-			if _, ok := systems[namespaceName].Entities[ownerKind][ownerName]; !ok {
-				systems[namespaceName].Entities[ownerKind][ownerName] = &datamodel.MidLevel{LabelMap: make(datamodel.LabelMap), OwnerName: "", OwnerKind: ""}
-			}
-		}
 	}
 
-	//Check for any replicaset that are owned by deployments.
-	query = `kube_replicaset_owner{owner_name!="<none>"}`
-	result, err = common.MetricCollect(args, query)
-	if err != nil {
-		args.WarnLogger.Println("metric=replicasets query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=replicasets query=" + query + " message=" + err.Error())
-	} else {
-		mat := result.(model.Matrix)
-		n := mat.Len()
-		for i := 0; i < n; i++ {
-			replicaSetName := string(mat[i].Metric["replicaset"])
-			namespaceName := string(mat[i].Metric["namespace"])
-			ownerKind := string(mat[i].Metric["owner_kind"])
-			ownerName := string(mat[i].Metric["owner_name"])
-			if replicaSetName == "" || namespaceName == "" || ownerKind == "" || ownerName == "" {
-				continue
-			}
-
-			if _, ok := systems[namespaceName].Entities["ReplicaSet"][replicaSetName]; !ok {
-				continue
-			}
-
-			//Update the replicaset with info about the deployment that owns it.
-			systems[namespaceName].Entities["ReplicaSet"][replicaSetName].OwnerKind = ownerKind
-			systems[namespaceName].Entities["ReplicaSet"][replicaSetName].OwnerName = ownerName
-
-			//Check if the deployment exists and if not add it.
-			if _, ok := systems[namespaceName].Entities[ownerKind]; !ok {
-				systems[namespaceName].Entities[ownerKind] = map[string]*datamodel.MidLevel{}
-			}
-
-			if _, ok := systems[namespaceName].Entities[ownerKind][ownerName]; !ok {
-				systems[namespaceName].Entities[ownerKind][ownerName] = &datamodel.MidLevel{LabelMap: make(datamodel.LabelMap), OwnerName: "", OwnerKind: ""}
-			}
-		}
-	}
+	// Check for any replicaset that are owned by deployments.
+	_ = getMidLevelOwner(args, "kube_replicaset_owner", replicaSetEntityKey, replicaSetMetricKey)
 
 	//Check for any jobs that are owned by Cronjobs
-	query = `kube_job_owner{owner_name!="<none>"}`
-	result, err = common.MetricCollect(args, query)
-	if err != nil {
-		args.WarnLogger.Println("metric=jobs query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=jobs query=" + query + " message=" + err.Error())
-	} else {
-		mat := result.(model.Matrix)
-		n := mat.Len()
-		for i := 0; i < n; i++ {
-			jobName := string(mat[i].Metric["job_name"])
-			namespaceName := string(mat[i].Metric["namespace"])
-			ownerKind := string(mat[i].Metric["owner_kind"])
-			ownerName := string(mat[i].Metric["owner_name"])
-			if jobName == "" || namespaceName == "" || ownerKind == "" || ownerName == "" {
-				continue
-			}
-
-			if _, ok := systems[namespaceName].Entities["Job"][jobName]; !ok {
-				continue
-			}
-
-			//Set the owner of the job to be the name of the cronjob.
-			systems[namespaceName].Entities["Job"][jobName].OwnerKind = ownerKind
-			systems[namespaceName].Entities["Job"][jobName].OwnerName = ownerName
-
-			//Check if the Cronjob exists and if not add it
-			if _, ok := systems[namespaceName].Entities[ownerKind]; !ok {
-				systems[namespaceName].Entities[ownerKind] = map[string]*datamodel.MidLevel{}
-			}
-			if _, ok := systems[namespaceName].Entities[ownerKind][ownerName]; !ok {
-				systems[namespaceName].Entities[ownerKind][ownerName] = &datamodel.MidLevel{LabelMap: make(datamodel.LabelMap), OwnerName: "", OwnerKind: ""}
-			}
-		}
-	}
+	_ = getMidLevelOwner(args, "kube_job_owner", jobEntityKey, jobMetricKey)
 
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting Container Metrics")
@@ -412,7 +312,7 @@ func Metrics(args *common.Parameters) {
 		getContainerMetric(result, "pod", "container", "requests")
 	}
 
-	//Getting info from cAdvisor metric that will be stored as labels.
+	// Getting info from cAdvisor metric that will be stored as labels.
 	query = `container_spec_cpu_shares`
 	result, err = common.MetricCollect(args, query)
 	if err != nil {
@@ -441,7 +341,7 @@ func Metrics(args *common.Parameters) {
 		args.WarnLogger.Println("metric=podInfo query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=podInfo query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "pod", "label", "Pods", query)
+		getMidMetric(result, "pod", "label", podEntityKey, query)
 	}
 
 	query = `kube_pod_labels`
@@ -450,7 +350,7 @@ func Metrics(args *common.Parameters) {
 		args.WarnLogger.Println("metric=podLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=podLabels query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "pod", "label", "Pods", query)
+		getMidMetric(result, "pod", "label", podEntityKey, query)
 	}
 
 	//Depending on version of KSM will determine what metric need to use to see if containers are terminated or not for there state.
@@ -825,8 +725,7 @@ func Metrics(args *common.Parameters) {
 		getMidMetric(result, hpaLabel, "label", "Deployment", query)
 	}
 
-	var cluster = map[string]*datamodel.ContainerCluster{}
-	cluster["cluster"] = &datamodel.ContainerCluster{Namespaces: systems, Name: *args.ClusterName}
+	cluster := &datamodel.ContainerCluster{Namespaces: systems, Name: *args.ClusterName}
 	common.WriteDiscovery(args, cluster, entityKind)
 
 	//Container workloads
@@ -869,4 +768,76 @@ func Metrics(args *common.Parameters) {
 
 	query = `kube_` + hpaName + `_status_current_replicas`
 	common.GetWorkload(`kube_`+hpaName+`_status_current_replicas`, query, args, entityKind)
+}
+
+func newMidLevel() *datamodel.MidLevel {
+	return &datamodel.MidLevel{
+		OwnerName:          &datamodel.Labels{},
+		OwnerKind:          &datamodel.Labels{},
+		CreationTime:       &datamodel.Labels{},
+		NextSchedTime:      &datamodel.Labels{},
+		StatusActive:       &datamodel.Labels{},
+		LastSchedTime:      &datamodel.Labels{},
+		MetadataGeneration: &datamodel.Labels{},
+		MaxSurge:           &datamodel.Labels{},
+		MaxUnavailable:     &datamodel.Labels{},
+		Completions:        &datamodel.Labels{},
+		Parallelism:        &datamodel.Labels{},
+		CompletionTime:     &datamodel.Labels{},
+		Containers:         make(map[string]*datamodel.Container),
+		LabelMap:           make(datamodel.LabelMap),
+	}
+}
+
+func newContainer() *datamodel.Container {
+	return &datamodel.Container{
+		CpuLimit:   &datamodel.Labels{},
+		CpuRequest: &datamodel.Labels{},
+		MemLimit:   &datamodel.Labels{},
+		MemRequest: &datamodel.Labels{},
+		PowerState: &datamodel.Labels{},
+		LabelMap:   make(datamodel.LabelMap),
+	}
+}
+
+func getMidLevelOwner(args *common.Parameters, query, entityKey, metricKey string) error {
+	var result model.Value
+	var err error
+	query += `{owner_name!="<none>"}`
+	result, err = common.MetricCollect(args, query)
+	if err != nil {
+		errMsg := fmt.Sprintf("metric=%s query=%s message=%v", strings.ToLower(entityKey), query, err)
+		args.ErrorLogger.Println(errMsg)
+		fmt.Printf("[ERROR] %s\n", errMsg)
+		return err
+	}
+	mat := result.(model.Matrix)
+	n := mat.Len()
+	for i := 0; i < n; i++ {
+		// Get the entity, namespace owner kind and owner kind
+		entityName := string(mat[i].Metric[model.LabelName(metricKey)])
+		namespaceName := string(mat[i].Metric[common.NamespaceKey])
+		ownerKind := string(mat[i].Metric[ownerKindKey])
+		ownerName := string(mat[i].Metric[ownerNameKey])
+		if entityName == "" || namespaceName == "" || ownerKind == "" || ownerName == "" {
+			continue
+		}
+		var entity *datamodel.MidLevel
+		var ok bool
+		// If we have an owner but haven't seen the entity - skip it
+		if entity, ok = systems[namespaceName].Entities[entityKey][entityName]; !ok {
+			continue
+		}
+
+		_ = entity.OwnerKind.AppendSampleStreamWithFilter(mat[i], ownerKindFilter)
+		_ = entity.OwnerName.AppendSampleStreamWithFilter(mat[i], ownerNameFilter)
+		// Create the entity if doesn't exist.
+		if _, ok := systems[namespaceName].Entities[ownerKind]; !ok {
+			systems[namespaceName].Entities[ownerKind] = make(map[string]*datamodel.MidLevel)
+		}
+		if _, ok := systems[namespaceName].Entities[ownerKind][ownerName]; !ok {
+			systems[namespaceName].Entities[ownerKind][ownerName] = newMidLevel()
+		}
+	}
+	return nil
 }

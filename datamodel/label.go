@@ -5,6 +5,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/common/model"
 	"github.com/r3labs/diff/v2"
+	"math"
 	"sort"
 	"time"
 )
@@ -72,21 +73,87 @@ func (l *Labels) AppendSample(s *model.Sample) error {
 	return l.append(s.Metric, []*time.Time{&t})
 }
 
-type ValueConversionFunction func(float64) float64
+func (l *Labels) AppendSampleStreamWithFilter(ss *model.SampleStream, filter []string) error {
+	if m, err := filterMetric(ss.Metric, filter); err == nil {
+		fss := &model.SampleStream{Metric: m, Values: ss.Values}
+		return l.AppendSampleStream(fss)
+	} else {
+		return err
+	}
+}
 
-func (l *Labels) AppendSampleStreamWithValue(ss *model.SampleStream, key string, vcf ValueConversionFunction) error {
+func (l *Labels) AppendSampleWithFilter(s *model.Sample, filter []string) error {
+	if m, err := filterMetric(s.Metric, filter); err == nil {
+		fs := &model.Sample{Metric: m, Value: s.Value, Timestamp: s.Timestamp}
+		return l.AppendSample(fs)
+	} else {
+		return err
+	}
+}
+
+type ValueConversionFunction func(float64) float64
+type StringerConversionFunction func(float64) fmt.Stringer
+
+type Converter struct {
+	VCF ValueConversionFunction
+	SCF StringerConversionFunction
+}
+
+func ToString(c *Converter, v model.SampleValue) string {
+	var s fmt.Stringer
+	if c != nil {
+		f := float64(v)
+		if c.VCF != nil {
+			s = model.SampleValue(c.VCF(f))
+		} else if c.SCF != nil {
+			s = c.SCF(f)
+		}
+	}
+	if s == nil {
+		s = v
+	}
+	return s.String()
+}
+
+func timeConv(value float64) fmt.Stringer {
+	sec, frac := math.Modf(value)
+	return time.Unix(int64(sec), int64(float64(time.Second)*frac))
+}
+
+func boolConv(value float64) fmt.Stringer {
+	b := value != 0.0
+	return &BoolStringer{Value: b}
+}
+
+func TimeStampConverter() *Converter {
+	return &Converter{SCF: timeConv}
+}
+
+func BoolConverter() *Converter {
+	return &Converter{SCF: boolConv}
+}
+
+type BoolStringer struct {
+	Value bool
+}
+
+func (bs *BoolStringer) String() string {
+	return fmt.Sprintf("%t", bs.Value)
+}
+
+func (l *Labels) AppendSampleStreamWithValue(ss *model.SampleStream, key string, c *Converter) error {
 	for _, sp := range ss.Values {
 		t := sp.Timestamp.Time()
-		if err := l.appendValue(ss.Metric, key, sp.Value, vcf, &t); err != nil {
+		if err := l.appendValue(ss.Metric, key, sp.Value, c, &t); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (l *Labels) AppendSampleWithValue(s *model.Sample, key string, vcf ValueConversionFunction) error {
+func (l *Labels) AppendSampleWithValue(s *model.Sample, key string, c *Converter) error {
 	t := s.Timestamp.Time()
-	return l.appendValue(s.Metric, key, s.Value, vcf, &t)
+	return l.appendValue(s.Metric, key, s.Value, c, &t)
 }
 
 func (l *Labels) ToTimeRangeLabels() ([]*TimeRangeLabels, error) {
@@ -116,6 +183,16 @@ func (l *Labels) ToTimeRangeLabels() ([]*TimeRangeLabels, error) {
 	return res, err
 }
 
+func EnsureLabels(lm LabelMap, key string) *Labels {
+	var labels *Labels
+	var f bool
+	if labels, f = lm[key]; !f {
+		labels = &Labels{}
+		lm[key] = labels
+	}
+	return labels
+}
+
 func (l *Labels) append(met model.Metric, ts []*time.Time) error {
 	m := make(map[string]string, len(met))
 	for ln, lv := range met {
@@ -124,7 +201,7 @@ func (l *Labels) append(met model.Metric, ts []*time.Time) error {
 	return l.AppendMap(m, ts)
 }
 
-func (l *Labels) appendValue(met model.Metric, key string, v model.SampleValue, vcf ValueConversionFunction, t *time.Time) error {
+func (l *Labels) appendValue(met model.Metric, key string, v model.SampleValue, c *Converter, t *time.Time) error {
 	var actualKey string
 	if key == "" {
 		actualKey = SingleValueKey
@@ -135,13 +212,24 @@ func (l *Labels) appendValue(met model.Metric, key string, v model.SampleValue, 
 			return fmt.Errorf("key %s not found in labelset %v", key, met)
 		}
 	}
-	var val model.SampleValue
-	if vcf == nil {
-		val = v
-	} else {
-		val = model.SampleValue(vcf(float64(v)))
+	return l.AppendMap(map[string]string{actualKey: ToString(c, v)}, []*time.Time{t})
+}
+
+func filterMetric(met model.Metric, f []string) (model.Metric, error) {
+	n := len(f)
+	if n == 0 {
+		return nil, fmt.Errorf("empty filter provided")
 	}
-	return l.AppendMap(map[string]string{actualKey: val.String()}, []*time.Time{t})
+	m := make(model.Metric, n)
+	for _, key := range f {
+		ln := model.LabelName(key)
+		if lv, ok := met[ln]; ok {
+			m[ln] = lv
+		} else {
+			return nil, fmt.Errorf("no value for key %s", key)
+		}
+	}
+	return m, nil
 }
 
 func (l *Labels) setCurrents(m map[string]string, r *Range) {

@@ -11,14 +11,21 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-//Map that labels and values will be stored in
+// Map of labels and values
 var nodes = make(map[string]*datamodel.Node)
 var nodesByAltName = make(map[string]*datamodel.Node)
 
-//Hard-coded string for log file warnings
-var entityKind = "node"
-
 var nodeNameKeys = map[string]string{"netSpeedBytes": "instance"}
+
+const (
+	entityKind = "node"
+	nodeKey    = entityKind
+	podIpKey   = "pod_ip"
+	roleKey    = "role"
+	deviceKey  = "device"
+)
+
+var podIpFilter = []string{podIpKey}
 
 //getNodeMetric takes data from prometheus and adds to nodes structure
 func getNodeMetric(result model.Value, metric string) {
@@ -28,7 +35,7 @@ func getNodeMetric(result model.Value, metric string) {
 	}
 	nodeNameKey, ok := nodeNameKeys[metric]
 	if !ok {
-		nodeNameKey = "node"
+		nodeNameKey = nodeKey
 	}
 	// Loop through the different entities in the results.
 	n := mat.Len()
@@ -40,6 +47,13 @@ func getNodeMetric(result model.Value, metric string) {
 		nodeName := string(nodeNameValue)
 		var no *datamodel.Node
 		switch metric {
+		case "kube_node_role":
+			if no, ok = nodes[nodeName]; !ok {
+				continue
+			}
+			role := string(mat[i].Metric[roleKey])
+			roleLabels := datamodel.EnsureLabels(no.Roles, role)
+			_ = roleLabels.AppendSampleStream(mat[i])
 		case "netSpeedBytes":
 			// strip off port, if part of addr
 			if host, _, err := net.SplitHostPort(nodeName); err == nil {
@@ -52,26 +66,24 @@ func getNodeMetric(result model.Value, metric string) {
 					continue
 				}
 			}
-			_ = no.NetSpeedBytesMap.AppendSampleStreamWithValue(mat[i], "device", nil)
+			device := string(mat[i].Metric[deviceKey])
+			deviceLabels := datamodel.EnsureLabels(no.NetSpeedBytesMap, device)
+			_ = deviceLabels.AppendSampleStreamWithValue(mat[i], deviceKey, nil)
 		case "altWorkloadName":
 			if no, ok = nodes[nodeName]; !ok {
 				continue
 			}
-			podIp := string(mat[i].Metric["pod_ip"])
-			no.AltWorkloadName = podIp
+			podIp := string(mat[i].Metric[podIpKey])
 			// now insert the node to nodesByAltName
 			if _, f := nodesByAltName[podIp]; !f {
 				nodesByAltName[podIp] = no
 			}
+			_ = no.AltWorkloadName.AppendSampleStreamWithFilter(mat[i], podIpFilter)
 		default:
 			if no, ok = nodes[nodeName]; !ok {
 				continue
 			}
-			var labels *datamodel.Labels
-			if labels, ok = no.LabelMap[metric]; !ok {
-				labels = &datamodel.Labels{}
-				no.LabelMap[metric] = labels
-			}
+			labels := datamodel.EnsureLabels(no.LabelMap, metric)
 			_ = labels.AppendSampleStream(mat[i])
 		}
 	}
@@ -92,13 +104,16 @@ func Metrics(args *common.Parameters) {
 		fmt.Println("[ERROR] metric=nodes query=" + query + " message=" + err.Error())
 		return
 	}
-	var rsltIndex = result.(model.Matrix)
-	for i := 0; i < rsltIndex.Len(); i++ {
-		if nodeName := string(rsltIndex[i].Metric["node"]); nodeName != "" {
+	mat := result.(model.Matrix)
+	n := mat.Len()
+	for i := 0; i < n; i++ {
+		if nodeName := string(mat[i].Metric[nodeKey]); nodeName != "" {
 			if _, ok := nodes[nodeName]; !ok {
 				nodes[nodeName] = &datamodel.Node{
 					LabelMap:         make(datamodel.LabelMap),
-					NetSpeedBytesMap: &datamodel.Labels{},
+					Roles:            make(datamodel.LabelMap),
+					NetSpeedBytesMap: make(datamodel.LabelMap),
+					AltWorkloadName:  &datamodel.Labels{},
 				}
 			}
 		}
@@ -156,8 +171,7 @@ func Metrics(args *common.Parameters) {
 		getNodeMetric(result, "netSpeedBytes")
 	}
 
-	var cluster = map[string]*datamodel.NodeCluster{}
-	cluster["cluster"] = &datamodel.NodeCluster{Nodes: nodes, Name: *args.ClusterName}
+	cluster := &datamodel.NodeCluster{Nodes: nodes, Name: *args.ClusterName}
 	//Writes the config and attribute files
 	common.WriteDiscovery(args, cluster, entityKind)
 

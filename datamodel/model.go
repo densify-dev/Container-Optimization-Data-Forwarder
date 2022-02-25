@@ -1,7 +1,5 @@
 package datamodel
 
-import "time"
-
 type ContainerCluster struct {
 	Name       string                `json:"name,omitempty"`
 	Namespaces map[string]*Namespace `json:"namespaces,omitempty"`
@@ -14,19 +12,19 @@ type Namespace struct {
 
 // MidLevel is used to hold information related to the highest owner of any containers
 type MidLevel struct {
-	OwnerName          string                `json:"ownerName,omitempty"`
-	OwnerKind          string                `json:"ownerKind,omitempty"`
-	NextSchedTime      int64                 `json:"nextScheduledTime,omitempty"`
-	StatusActive       int64                 `json:"statusActive,omitempty"`
-	LastSchedTime      int64                 `json:"lastScheduledTime,omitempty"`
-	MetadataGeneration int64                 `json:"metadataGeneration,omitempty"`
-	MaxSurge           int64                 `json:"maxSurge,omitempty"`
-	MaxUnavailable     int64                 `json:"maxUnavailable,omitempty"`
-	Completions        int64                 `json:"completions,omitempty"`
-	Parallelism        int64                 `json:"parallelism,omitempty"`
-	CompletionTime     int64                 `json:"CompletionTime,omitempty"`
+	OwnerName          *Labels               `json:"ownerName,omitempty"`
+	OwnerKind          *Labels               `json:"ownerKind,omitempty"`
+	NextSchedTime      *Labels               `json:"nextScheduledTime,omitempty"`
+	StatusActive       *Labels               `json:"statusActive,omitempty"`
+	LastSchedTime      *Labels               `json:"lastScheduledTime,omitempty"`
+	MetadataGeneration *Labels               `json:"metadataGeneration,omitempty"`
+	MaxSurge           *Labels               `json:"maxSurge,omitempty"`
+	MaxUnavailable     *Labels               `json:"maxUnavailable,omitempty"`
+	Completions        *Labels               `json:"completions,omitempty"`
+	Parallelism        *Labels               `json:"parallelism,omitempty"`
+	CompletionTime     *Labels               `json:"CompletionTime,omitempty"`
+	CreationTime       *Labels               `json:"creationTime,omitempty"`
 	Containers         map[string]*Container `json:"containers,omitempty"`
-	CreationTime       int64                 `json:"creationTime,omitempty"`
 	LabelMap           LabelMap              `json:"labels,omitempty"`
 }
 
@@ -44,21 +42,6 @@ type Container struct {
 	LabelMap   LabelMap `json:"labels,omitempty"`
 }
 
-type CRQCluster struct {
-	Name string          `json:"name,omitempty"`
-	CRQs map[string]*CRQ `json:"clusterResourceQuotas,omitempty"`
-}
-
-type CRQ struct {
-	//Labels & general information about each node
-	LabelMap      LabelMap  `json:"labels,omitempty"`
-	SelectorType  string    `json:"selectorType,omitempty"`
-	SelectorKey   string    `json:"selectorKey,omitempty"`
-	SelectorValue string    `json:"selectorValue,omitempty"`
-	Namespaces    []string  `json:"namespaces,omitempty"`
-	CreateTime    time.Time `json:"creationTime,omitempty"`
-}
-
 type NodeCluster struct {
 	Name  string           `json:"name,omitempty"`
 	Nodes map[string]*Node `json:"nodes,omitempty"`
@@ -68,11 +51,29 @@ type NodeCluster struct {
 type Node struct {
 	// Labels & general information about each node
 	LabelMap         LabelMap `json:"labels,omitempty"`
-	NetSpeedBytesMap *Labels  `json:"netSpeedBytes,omitempty"`
-	AltWorkloadName  string   `json:"altWorkloadName,omitempty"`
+	Roles            LabelMap `json:"roles,omitempty"`
+	NetSpeedBytesMap LabelMap `json:"netSpeedBytesMap,omitempty"`
+	AltWorkloadName  *Labels  `json:"altWorkloadName,omitempty"`
 }
 
 type RQCluster struct {
-	Name       string                          `json:"name,omitempty"`
-	Namespaces map[string]map[string]time.Time `json:"namespaces,omitempty"`
+	Name       string                               `json:"name,omitempty"`
+	Namespaces map[string]map[string]*ResourceQuota `json:"namespaces,omitempty"`
+}
+
+type ResourceQuota struct {
+	CreationTime *Labels `json:"creationTime,omitempty"`
+}
+
+type CRQCluster struct {
+	Name string                           `json:"name,omitempty"`
+	CRQs map[string]*ClusterResourceQuota `json:"clusterResourceQuotas,omitempty"`
+}
+
+type ClusterResourceQuota struct {
+	LabelMap      LabelMap `json:"labels,omitempty"`
+	SelectorType  *Labels  `json:"selectorType,omitempty"`
+	SelectorKey   *Labels  `json:"selectorKey,omitempty"`
+	SelectorValue *Labels  `json:"selectorValue,omitempty"`
+	CreationTime  *Labels  `json:"creationTime,omitempty"`
 }

@@ -37,6 +37,128 @@ func (r *Range) Equal(other *Range) bool {
 	}
 }
 
+// Before - applies only to the Start field, for consistency use only for non-overlapping ranges
+func (r *Range) Before(other *Range) bool {
+	if other == nil {
+		return false
+	} else {
+		return before(r.Start, other.Start)
+	}
+}
+
+// After - applies only to the Start field, for consistency use only for non-overlapping ranges
+func (r *Range) After(other *Range) bool {
+	if other == nil {
+		return false
+	} else {
+		return after(r.Start, other.Start)
+	}
+}
+
+// IsDistinct - returns if there is NO overlap between the ranges
+func (r *Range) IsDistinct(other *Range) bool {
+	if other == nil {
+		return false
+	} else {
+		return before(r.End, other.Start) || before(other.End, r.Start)
+	}
+}
+
+// Overlaps - returns if there is ANY overlap between the ranges
+func (r *Range) Overlaps(other *Range) bool {
+	return !r.IsDistinct(other)
+}
+
+// Contains - returns if r contains other
+func (r *Range) Contains(other *Range) bool {
+	if other == nil {
+		return false
+	} else {
+		return (before(r.Start, other.Start) || equal(r.Start, other.Start)) &&
+			(before(other.End, r.End) || equal(other.End, r.End))
+	}
+}
+
+func (r *Range) AdjustRange(other *Range, dev *time.Duration, adjustStart, adjustEnd bool) {
+	if other == nil || dev == nil || *dev <= 0 || !(adjustStart || adjustEnd) {
+		return
+	}
+	nns := other.Start != nil
+	nne := other.End != nil
+	if nns && nne && other.End.Sub(*other.Start) < *dev {
+		return
+	}
+	if adjustStart {
+		if nns && r.Start != nil {
+			rng := &Range{Start: other.Start, End: add(other.Start, *dev)}
+			if rng.In(*r.Start) {
+				r.Start = other.Start
+			}
+		}
+	}
+	if adjustEnd {
+		if nne && r.End != nil {
+			rng := &Range{Start: add(other.End, -*dev), End: other.End}
+			if rng.In(*r.End) {
+				r.End = other.End
+			}
+		}
+	}
+}
+
+func (r *Range) StretchTo(other *Range) {
+	r.stretch(other, self)
+}
+
+func (r *Range) StretchOther(other *Range) {
+	r.stretch(other, another)
+}
+
+func (r *Range) StretchBoth(other *Range) {
+	r.stretch(other, both)
+}
+
+type stretchType int
+
+const (
+	self stretchType = iota
+	another
+	both
+)
+
+func (r *Range) stretch(other *Range, arg stretchType) {
+	if other == nil || other.Start == nil || r.End == nil || !other.Start.After(*r.End) {
+		return
+	}
+	var rEnd, otherStart *time.Time
+	switch arg {
+	case self:
+		rEnd = add(other.Start, -time.Nanosecond)
+	case another:
+		otherStart = add(r.End, time.Nanosecond)
+	case both:
+		if d := (other.Start.Sub(*r.End)) / 2; d > 0 {
+			rEnd = add(r.End, d)
+			otherStart = add(rEnd, time.Nanosecond)
+		}
+	}
+	if rEnd != nil {
+		r.End = rEnd
+	}
+	if otherStart != nil {
+		other.Start = otherStart
+	}
+}
+
+func add(t *time.Time, d time.Duration) *time.Time {
+	var res *time.Time
+	if t != nil {
+		rt := t.Add(d)
+		res = &rt
+	}
+	return res
+}
+
 // String - implement fmt.Stringer
 func (r *Range) String() string {
 	return format(str(r.Start), str(r.End))
@@ -105,6 +227,22 @@ func equal(t1, t2 *time.Time) bool {
 		return t2 == nil
 	} else {
 		return t2 != nil && t1.Equal(*t2)
+	}
+}
+
+func before(t1, t2 *time.Time) bool {
+	if t1 == nil {
+		return t2 != nil
+	} else {
+		return t2 != nil && t1.Before(*t2)
+	}
+}
+
+func after(t1, t2 *time.Time) bool {
+	if t1 == nil {
+		return t2 != nil
+	} else {
+		return t2 != nil && t1.After(*t2)
 	}
 }
 

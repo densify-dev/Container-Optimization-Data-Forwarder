@@ -1,7 +1,15 @@
 package datamodel
 
-type ContainerCluster struct {
-	Name       string                `json:"name,omitempty"`
+import "time"
+
+type Discovery struct {
+	ClusterName       string         `json:"clusterName,omitempty"`
+	Range             *Range         `json:"range,omitempty"`
+	MaxScrapeInterval *time.Duration `json:"maxScrapeInterval,omitempty"`
+}
+
+type ContainerDiscovery struct {
+	Discovery  *Discovery            `json:"discovery,omitempty"`
 	Namespaces map[string]*Namespace `json:"namespaces,omitempty"`
 }
 
@@ -42,9 +50,9 @@ type Container struct {
 	LabelMap   LabelMap `json:"labels,omitempty"`
 }
 
-type NodeCluster struct {
-	Name  string           `json:"name,omitempty"`
-	Nodes map[string]*Node `json:"nodes,omitempty"`
+type NodeDiscovery struct {
+	Discovery *Discovery       `json:"discovery,omitempty"`
+	Nodes     map[string]*Node `json:"nodes,omitempty"`
 }
 
 // Node is used  for storing attributes and config details
@@ -56,8 +64,8 @@ type Node struct {
 	AltWorkloadName  *Labels  `json:"altWorkloadName,omitempty"`
 }
 
-type RQCluster struct {
-	Name       string                               `json:"name,omitempty"`
+type ResourceQuotaDiscovery struct {
+	Discovery  *Discovery                           `json:"discovery,omitempty"`
 	Namespaces map[string]map[string]*ResourceQuota `json:"namespaces,omitempty"`
 }
 
@@ -65,9 +73,9 @@ type ResourceQuota struct {
 	CreationTime *Labels `json:"creationTime,omitempty"`
 }
 
-type CRQCluster struct {
-	Name string                           `json:"name,omitempty"`
-	CRQs map[string]*ClusterResourceQuota `json:"clusterResourceQuotas,omitempty"`
+type ClusterResourceQuotaDiscovery struct {
+	Discovery *Discovery                       `json:"discovery,omitempty"`
+	CRQs      map[string]*ClusterResourceQuota `json:"clusterResourceQuotas,omitempty"`
 }
 
 type ClusterResourceQuota struct {

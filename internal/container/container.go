@@ -14,7 +14,6 @@ import (
 var systems = map[string]*datamodel.Namespace{}
 
 const (
-	entityKind          = "container"
 	ownerKindKey        = "owner_kind"
 	ownerNameKey        = "owner_name"
 	podEntityKey        = "Pods"
@@ -23,6 +22,8 @@ const (
 	replicaSetMetricKey = "replicaset"
 	jobEntityKey        = "Job"
 	jobMetricKey        = "job_name"
+	containerIdKey      = "container_id"
+	imageIdKey          = "image_id"
 )
 
 var ownerKindFilter = []string{ownerKindKey}
@@ -38,19 +39,21 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 	n := mat.Len()
 	for i := 0; i < n; i++ {
 		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
-		namespaceValue, ok := mat[i].Metric[common.NamespaceKey]
+		nsValue, ok := mat[i].Metric[common.NamespaceKey]
 		if !ok {
 			continue
 		}
-		if _, ok = systems[string(namespaceValue)]; !ok {
+		namespaceValue := string(nsValue)
+		if _, ok = systems[namespaceValue]; !ok {
 			continue
 		}
 		//Validate that the data contains the pod label with value and check it exists in our systems structure
-		podValue, ok := mat[i].Metric[pod]
+		pValue, ok := mat[i].Metric[pod]
 		if !ok {
 			continue
 		}
-		if _, ok = systems[string(namespaceValue)].Entities[podEntityKey][string(podValue)]; !ok {
+		podValue := string(pValue)
+		if _, ok = systems[namespaceValue].Entities[podEntityKey][podValue]; !ok {
 			continue
 		}
 		//Validate that the data contains the container label with value and check it exists in our systems structure
@@ -59,7 +62,7 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 			continue
 		}
 		var container *datamodel.Container
-		if container, ok = systems[string(namespaceValue)].Entities[podEntityKey][string(podValue)].Containers[string(containerNameValue)]; !ok {
+		if container, ok = systems[namespaceValue].Entities[podEntityKey][podValue].Containers[string(containerNameValue)]; !ok {
 			continue
 		}
 
@@ -88,7 +91,18 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 		case "memRequest":
 			_ = container.MemRequest.AppendSampleStreamWithValue(mat[i], "", memConvert)
 		case "powerState":
-			_ = container.PowerState.AppendSampleStreamWithValue(mat[i], "", nil)
+			_ = container.PowerState.AppendSampleStreamWithValue(mat[i], "", boolConv)
+		case "kube_pod_container_info":
+			// filter out cases when container_id or image_id are not populated yet (may happen
+			// in the phase of ContainerCreating), as these cause a lot of noise of diffs
+			if _, ok = mat[i].Metric[containerIdKey]; !ok {
+				continue
+			}
+			if _, ok = mat[i].Metric[imageIdKey]; !ok {
+				continue
+			}
+			// if both are there, fallthrough
+			fallthrough
 		default:
 			labels := datamodel.EnsureLabels(container.LabelMap, metric)
 			_ = labels.AppendSampleStream(mat[i])
@@ -106,10 +120,9 @@ func memConv(value float64) float64 {
 }
 
 var cpuConvert = &datamodel.Converter{VCF: cpuConv}
-
 var memConvert = &datamodel.Converter{VCF: memConv}
-
 var timeConv = datamodel.TimeStampConverter()
+var boolConv = datamodel.BoolConverter()
 
 //getmidMetric is used to parse the results from Prometheus related to mid Entities and store them in the systems data structure.
 func getMidMetric(result model.Value, mid model.LabelName, metric, kind, query string) {
@@ -149,7 +162,7 @@ func getMidMetric(result model.Value, mid model.LabelName, metric, kind, query s
 		case "kube_cronjob_next_schedule_time":
 			_ = systems[namespaceValue].Entities[kind][midValue].NextSchedTime.AppendSampleStreamWithValue(mat[i], "", timeConv)
 		case "kube_cronjob_status_active":
-			_ = systems[namespaceValue].Entities[kind][midValue].StatusActive.AppendSampleStreamWithValue(mat[i], "", nil)
+			_ = systems[namespaceValue].Entities[kind][midValue].StatusActive.AppendSampleStreamWithValue(mat[i], "", boolConv)
 		case "kube_cronjob_status_last_schedule_time":
 			_ = systems[namespaceValue].Entities[kind][midValue].LastSchedTime.AppendSampleStreamWithValue(mat[i], "", timeConv)
 		case "kube_deployment_metadata_generation":
@@ -725,8 +738,10 @@ func Metrics(args *common.Parameters) {
 		getMidMetric(result, hpaLabel, "label", "Deployment", query)
 	}
 
-	cluster := &datamodel.ContainerCluster{Namespaces: systems, Name: *args.ClusterName}
-	common.WriteDiscovery(args, cluster, entityKind)
+	if disc, err := args.ToDiscovery(common.ContainerEntityKind); err == nil {
+		discovery := &datamodel.ContainerDiscovery{Discovery: disc, Namespaces: systems}
+		common.WriteDiscovery(args, discovery, common.ContainerEntityKind)
+	}
 
 	//Container workloads
 	if args.Debug {
@@ -738,36 +753,36 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `container_cpu_usage_seconds_total`
-	common.GetWorkload("container_cpu_usage_seconds_total", query, args, entityKind)
+	common.GetWorkload("container_cpu_usage_seconds_total", query, args, common.ContainerEntityKind)
 
 	query = `container_memory_usage_bytes`
-	common.GetWorkload("container_memory_usage_bytes", query, args, entityKind)
+	common.GetWorkload("container_memory_usage_bytes", query, args, common.ContainerEntityKind)
 
 	query = `container_memory_rss`
-	common.GetWorkload("container_memory_rss", query, args, entityKind)
+	common.GetWorkload("container_memory_rss", query, args, common.ContainerEntityKind)
 
 	query = `container_fs_usage_bytes`
-	common.GetWorkload("container_fs_usage_bytes", query, args, entityKind)
+	common.GetWorkload("container_fs_usage_bytes", query, args, common.ContainerEntityKind)
 
 	query = `kube_pod_container_status_restarts_total`
-	common.GetWorkload("kube_pod_container_status_restarts_total", query, args, entityKind)
+	common.GetWorkload("kube_pod_container_status_restarts_total", query, args, common.ContainerEntityKind)
 
 	if labelSuffix == "" {
 		query = `kube_` + hpaName + `_status_condition{status="true",condition="ScalingLimited"}`
 	} else {
 		query = `kube_` + hpaName + `_status_condition{status="ScalingLimited",condition="true"}`
 	}
-	common.GetWorkload(`kube_`+hpaName+`_status_condition`, query, args, entityKind)
+	common.GetWorkload(`kube_`+hpaName+`_status_condition`, query, args, common.ContainerEntityKind)
 
 	//HPA workloads
 	query = `kube_` + hpaName + `_spec_max_replicas`
-	common.GetWorkload(`kube_`+hpaName+`_spec_max_replicas`, query, args, entityKind)
+	common.GetWorkload(`kube_`+hpaName+`_spec_max_replicas`, query, args, common.ContainerEntityKind)
 
 	query = `kube_` + hpaName + `_spec_min_replicas`
-	common.GetWorkload(`kube_`+hpaName+`_spec_min_replicas`, query, args, entityKind)
+	common.GetWorkload(`kube_`+hpaName+`_spec_min_replicas`, query, args, common.ContainerEntityKind)
 
 	query = `kube_` + hpaName + `_status_current_replicas`
-	common.GetWorkload(`kube_`+hpaName+`_status_current_replicas`, query, args, entityKind)
+	common.GetWorkload(`kube_`+hpaName+`_status_current_replicas`, query, args, common.ContainerEntityKind)
 }
 
 func newMidLevel() *datamodel.MidLevel {

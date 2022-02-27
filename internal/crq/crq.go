@@ -11,11 +11,10 @@ import (
 var crqs = make(map[string]*datamodel.ClusterResourceQuota)
 
 const (
-	entityKind = "crq"
-	crqKey     = "name"
-	typeKey    = "type"
-	keyKey     = "key"
-	valueKey   = "value"
+	crqKey   = "name"
+	typeKey  = "type"
+	keyKey   = "key"
+	valueKey = "value"
 )
 
 var typeFilter = []string{typeKey}
@@ -94,15 +93,16 @@ func Metrics(args *common.Parameters) {
 			_ = crq.SelectorValue.AppendSampleStreamWithFilter(mat[i], valueFilter)
 		}
 	}
-
-	cluster := &datamodel.CRQCluster{CRQs: crqs, Name: *args.ClusterName}
-	common.WriteDiscovery(args, cluster, entityKind)
+	if disc, err := args.ToDiscovery(common.CRQEntityKind); err == nil {
+		discovery := &datamodel.ClusterResourceQuotaDiscovery{Discovery: disc, CRQs: crqs}
+		common.WriteDiscovery(args, discovery, common.CRQEntityKind)
+	}
 
 	query = `openshift_clusterresourcequota_usage`
-	common.GetWorkload(query, query, args, entityKind)
+	common.GetWorkload(query, query, args, common.CRQEntityKind)
 
 	query = `openshift_clusterresourcequota_namespace_usage`
-	common.GetWorkload(query, query, args, entityKind)
+	common.GetWorkload(query, query, args, common.CRQEntityKind)
 }
 
 func getCRQ(ss *model.SampleStream) (*datamodel.ClusterResourceQuota, bool) {

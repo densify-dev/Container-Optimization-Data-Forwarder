@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
 	"log"
 	"net/http"
 	"os"
@@ -15,6 +16,14 @@ import (
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
+)
+
+const (
+	// Entity Kinds
+	ContainerEntityKind = "container"
+	NodeEntityKind      = "node"
+	RQEntityKind        = "rq"
+	CRQEntityKind       = "crq"
 )
 
 const (
@@ -33,6 +42,26 @@ type Parameters struct {
 	CaCertPath                                       string
 	Range5Min                                        v1.Range
 	History                                          string
+}
+
+func (args *Parameters) ToDiscovery(entityKind string) (*datamodel.Discovery, error) {
+	var disc *datamodel.Discovery
+	var err error
+	if maxScrapeInterval, ok := entityMaxScrapeIntervals[entityKind]; ok {
+		var d time.Duration
+		if d, err = time.ParseDuration(args.History); err == nil {
+			start := args.CurrentTime.Add(-d)
+			r := &datamodel.Range{Start: &start, End: args.CurrentTime}
+			disc = &datamodel.Discovery{
+				ClusterName:       *args.ClusterName,
+				Range:             r,
+				MaxScrapeInterval: maxScrapeInterval,
+			}
+		}
+	} else {
+		err = fmt.Errorf("unknown entity kind %s", entityKind)
+	}
+	return disc, err
 }
 
 //MetricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
@@ -112,4 +141,57 @@ func WriteDiscovery(args *Parameters, entityInterface interface{}, entityKind st
 		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
 		fmt.Println("[ERROR] entity=" + entityKind + " message=" + err.Error())
 	}
+}
+
+// Prometheus exporters
+const (
+	ne   = "node-exporter"
+	cad  = "cadvisor"
+	ksm  = "kube-state-metrics"
+	ossm = "openshift-state-metrics"
+)
+
+// observed scrape intervals
+// k8s cluster 	ne 	cad 	ksm 	ossm
+// ------------ --- ------- ------- ------
+// bare-metal	15s 25-46s	30s		N/A
+// EKS 			60s 60s		60s		N/A
+// GKE 			5s  12-25s	5s		N/A
+// AKS 			30s 17-40s  30s 	N/A
+// CRC 			15s 30s 	60s 	120s
+// ------------ --- ------- ------- ------
+// max + margin 75s 75s 	75s 	150s
+
+var maxScrapeIntervals = map[string]time.Duration{
+	ne:   time.Second * 75,
+	cad:  time.Second * 75,
+	ksm:  time.Second * 75,
+	ossm: time.Second * 150,
+}
+
+var entityExporterMap = map[string][]string{
+	ContainerEntityKind: {ksm, cad},
+	NodeEntityKind:      {ksm, ne},
+	RQEntityKind:        {ksm},
+	CRQEntityKind:       {ossm},
+}
+
+var entityKinds = []string{ContainerEntityKind, NodeEntityKind, RQEntityKind, CRQEntityKind}
+
+var entityMaxScrapeIntervals = initMaxScrapeIntervalMap()
+
+func initMaxScrapeIntervalMap() map[string]*time.Duration {
+	m := make(map[string]*time.Duration, len(entityKinds))
+	for _, entityKind := range entityKinds {
+		var maxInterval time.Duration
+		exporters := entityExporterMap[entityKind]
+		for _, exporter := range exporters {
+			d := maxScrapeIntervals[exporter]
+			if d > maxInterval {
+				maxInterval = d
+			}
+		}
+		m[entityKind] = &maxInterval
+	}
+	return m
 }

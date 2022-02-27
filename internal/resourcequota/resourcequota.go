@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	entityKind = "rq"
-	rqKey      = "resourcequota"
+	rqKey = "resourcequota"
 )
 
 var resourceQuotas = make(map[string]map[string]*datamodel.ResourceQuota)
@@ -49,9 +48,11 @@ func Metrics(args *common.Parameters) {
 		_ = rq.CreationTime.AppendSampleStreamWithValue(mat[i], "", datamodel.TimeStampConverter())
 	}
 
-	cluster := &datamodel.RQCluster{Namespaces: resourceQuotas, Name: *args.ClusterName}
-	common.WriteDiscovery(args, cluster, entityKind)
+	if disc, err := args.ToDiscovery(common.RQEntityKind); err == nil {
+		discovery := &datamodel.ResourceQuotaDiscovery{Discovery: disc, Namespaces: resourceQuotas}
+		common.WriteDiscovery(args, discovery, common.RQEntityKind)
+	}
 
 	query = `kube_resourcequota`
-	common.GetWorkload(query, query, args, entityKind)
+	common.GetWorkload(query, query, args, common.RQEntityKind)
 }

@@ -4,23 +4,22 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/crq"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/resourcequota"
+	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/spf13/viper"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/crq"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/resourcequota"
-	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
-	"github.com/spf13/viper"
 )
 
 // Global structure used to store Forwarder instance parameters
-var params *common.Parameters
+var params *prometheus.Parameters
 
 // Parameters that allows user to control what levels they want to collect data on (quota, node, container)
 var includeContainer, includeNode, includeQuota bool
@@ -225,7 +224,7 @@ func initParameters() {
 		clusterName = promAddr
 	}
 
-	params = &common.Parameters{
+	params = &prometheus.Parameters{
 
 		ClusterName:    &clusterName,
 		PromURL:        &promURL,

@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+const (
+	TimeFormat = time.RFC3339Nano
+)
+
 type ValueConversionFunction func(float64) float64
 type StringerConversionFunction func(float64) fmt.Stringer
 
@@ -47,9 +51,24 @@ func (bs *BoolStringer) String() string {
 	return fmt.Sprintf("%t", bs.Value)
 }
 
+// TimeStringer is required to format the time using RFC3339Nano (same as MarshalJSON)
+// i.s.o. using time.Time.String()
+type TimeStringer struct {
+	Value *time.Time
+}
+
+func (ts *TimeStringer) String() string {
+	var s string
+	if ts.Value != nil {
+		s = ts.Value.Format(TimeFormat)
+	}
+	return s
+}
+
 func timeConv(value float64) fmt.Stringer {
 	sec, frac := math.Modf(value)
-	return time.Unix(int64(sec), int64(float64(time.Second)*frac))
+	t := time.Unix(int64(sec), int64(float64(time.Second)*frac))
+	return &TimeStringer{Value: &t}
 }
 
 func boolConv(value float64) fmt.Stringer {

@@ -2,6 +2,11 @@ package datamodel
 
 import "time"
 
+const (
+	Unmapped = "unmapped"
+	PodIpKey = "pod_ip"
+)
+
 type Discovery struct {
 	ClusterName       string         `json:"clusterName,omitempty"`
 	Range             *Range         `json:"range,omitempty"`

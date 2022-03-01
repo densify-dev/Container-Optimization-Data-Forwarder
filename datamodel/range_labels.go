@@ -8,21 +8,23 @@ import (
 	"time"
 )
 
-type TimeRangeLabels struct {
+type RangeLabels struct {
 	Map   map[string]string `json:"map,omitempty"`
 	Range *Range            `json:"range,omitempty"`
 }
 
-type TimeRangeLabelsMap struct {
-	Map   map[string]map[string]string `json:"map,omitempty"`
-	Range *Range                       `json:"range,omitempty"`
+type RangeLabelsMap struct {
+	Map   map[string]map[string]map[string]string `json:"map,omitempty"`
+	Range *Range                                  `json:"range,omitempty"`
 }
 
-func ToTimeRangeLabels(l *Labels) ([]*TimeRangeLabels, error) {
+type MapOfRangeLabels map[string]map[string][]*RangeLabels
+
+func ToRangeLabels(l *Labels) ([]*RangeLabels, error) {
 	if l == nil {
 		return nil, fmt.Errorf("nil lables")
 	}
-	var res []*TimeRangeLabels
+	var res []*RangeLabels
 	var err error
 	if l.Origin != nil {
 		res = append(res, l.Origin)
@@ -37,7 +39,7 @@ func ToTimeRangeLabels(l *Labels) ([]*TimeRangeLabels, error) {
 					}
 				}
 				if err == nil {
-					res = append(res, &TimeRangeLabels{Map: m, Range: d.Range})
+					res = append(res, &RangeLabels{Map: m, Range: d.Range})
 					l.setCurrents(m, d.Range)
 				} else {
 					break
@@ -61,47 +63,75 @@ func ToTimeRangeLabels(l *Labels) ([]*TimeRangeLabels, error) {
 	return res, err
 }
 
-func Rearrange(mtrl map[string][]*TimeRangeLabels, d *Discovery) []*TimeRangeLabelsMap {
-	st := make(map[int64]bool)
-	for k, trls := range mtrl {
-		n := len(trls)
-		for i, trl := range trls {
-			r := trl.Range
-			r.AdjustRange(d.Range, d.MaxScrapeInterval, i == 0, i == n-1)
-			// now if trl is not the last one, adjust its end and the start of the next one to the
-			// median of the gap between them
-			if i < n-1 {
-				var nextRange *Range
-				if next := trls[i+1]; next != nil {
-					nextRange = next.Range
-				}
-				r.StretchBoth(nextRange)
-			}
-			// now record the stat time of the range
-			st[r.Start.UnixNano()] = true
+func AppendRangeLabels(mrl MapOfRangeLabels, l *Labels, k string) (MapOfRangeLabels, error) {
+	lm := LabelMap{k: l}
+	return AppendRangeLabelMap(mrl, lm, Unmapped)
+}
+
+func AppendRangeLabelMap(mrl MapOfRangeLabels, lm LabelMap, lmk string) (MapOfRangeLabels, error) {
+	var err error
+	res := mrl
+	if res == nil {
+		res = make(MapOfRangeLabels)
+	}
+	m, f := res[lmk]
+	if !f {
+		m = make(map[string][]*RangeLabels)
+		res[lmk] = m
+	}
+	for k, l := range lm {
+		if rl, e := ToRangeLabels(l); e == nil {
+			m[k] = rl
+		} else {
+			err = multierror.Append(err, e)
 		}
-		// if we are missing ranges to cover the entire discovery range, add additional TimeRangeLabels
-		// with an empty map at the beginning/end of the slice
-		if n > 0 {
-			var modified bool
-			start := trls[0].Range.Start
-			if !start.Equal(*d.Range.Start) {
-				rng := &Range{Start: d.Range.Start, End: add(start, -time.Nanosecond)}
-				newStart := &TimeRangeLabels{Range: rng}
-				trls = append([]*TimeRangeLabels{newStart}, trls...)
-				st[rng.Start.UnixNano()] = true
-				modified = true
+	}
+	return res, err
+}
+
+func Rearrange(mrl MapOfRangeLabels, d *Discovery) []*RangeLabelsMap {
+	st := make(map[int64]bool)
+	for k1, m := range mrl {
+		for k2, rls := range m {
+			n := len(rls)
+			for i, rl := range rls {
+				r := rl.Range
+				r.AdjustRange(d.Range, d.MaxScrapeInterval, i == 0, i == n-1)
+				// now if rl is not the last one, adjust its end and the start of the next one to the
+				// median of the gap between them
+				if i < n-1 {
+					var nextRange *Range
+					if next := rls[i+1]; next != nil {
+						nextRange = next.Range
+					}
+					r.StretchBoth(nextRange)
+				}
+				// now record the stat time of the range
+				st[r.Start.UnixNano()] = true
 			}
-			end := trls[n-1].Range.End
-			if !end.Equal(*d.Range.End) {
-				rng := &Range{Start: add(end, time.Nanosecond), End: d.Range.End}
-				newEnd := &TimeRangeLabels{Range: rng}
-				trls = append(trls, newEnd)
-				st[rng.Start.UnixNano()] = true
-				modified = true
-			}
-			if modified {
-				mtrl[k] = trls
+			// if we are missing ranges to cover the entire discovery range, add additional RangeLabels
+			// with an empty map at the beginning/end of the slice
+			if n > 0 {
+				var modified bool
+				start := rls[0].Range.Start
+				if !start.Equal(*d.Range.Start) {
+					rng := &Range{Start: d.Range.Start, End: add(start, -time.Nanosecond)}
+					newStart := &RangeLabels{Range: rng}
+					rls = append([]*RangeLabels{newStart}, rls...)
+					st[rng.Start.UnixNano()] = true
+					modified = true
+				}
+				end := rls[n-1].Range.End
+				if !end.Equal(*d.Range.End) {
+					rng := &Range{Start: add(end, time.Nanosecond), End: d.Range.End}
+					newEnd := &RangeLabels{Range: rng}
+					rls = append(rls, newEnd)
+					st[rng.Start.UnixNano()] = true
+					modified = true
+				}
+				if modified {
+					mrl[k1][k2] = rls
+				}
 			}
 		}
 	}
@@ -129,18 +159,21 @@ func Rearrange(mtrl map[string][]*TimeRangeLabels, d *Discovery) []*TimeRangeLab
 			ar.StretchTo(actualRanges[i+1])
 		}
 	}
-	res := make([]*TimeRangeLabelsMap, n)
+	res := make([]*RangeLabelsMap, n)
 	for i, ar := range actualRanges {
-		trlm := &TimeRangeLabelsMap{Map: make(map[string]map[string]string), Range: ar}
-		for k, trls := range mtrl {
-			for _, trl := range trls {
-				if trl.Range.Contains(ar) {
-					trlm.Map[k] = trl.Map
+		rlm := &RangeLabelsMap{Map: make(map[string]map[string]map[string]string), Range: ar}
+		for k1, m := range mrl {
+			rlm.Map[k1] = make(map[string]map[string]string)
+			for k2, rls := range m {
+				for _, rl := range rls {
+					if rl.Range.Contains(ar) {
+						rlm.Map[k1][k2] = rl.Map
+					}
+					break
 				}
-				break
 			}
+			res[i] = rlm
 		}
-		res[i] = trlm
 	}
 	return res
 }

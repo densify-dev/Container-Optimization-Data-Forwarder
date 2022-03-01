@@ -3,8 +3,7 @@ package crq
 import (
 	"fmt"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
-
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 )
 
@@ -22,14 +21,14 @@ var keyFilter = []string{keyKey}
 var valueFilter = []string{valueKey}
 
 //Metrics a global func for collecting quota level metrics in prometheus
-func Metrics(args *common.Parameters) {
+func Metrics(args *prometheus.Parameters) {
 	//Setup variables used in the code.
 	var query string
 	var result model.Value
 	var err error
 
 	query = `openshift_clusterresourcequota_created`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.ErrorLogger.Println("metric=clusterResourceQuotas query=" + query + " message=" + err.Error())
 		fmt.Println("[ERROR] metric=clusterResourceQuotas query=" + query + " message=" + err.Error())
@@ -56,7 +55,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `openshift_clusterresourcequota_labels`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=openshift_clusterresourcequota_labels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=openshift_clusterresourcequota_labels query=" + query + " message=" + err.Error())
@@ -76,7 +75,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `openshift_clusterresourcequota_selector`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=openshift_clusterresourcequota_selector query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=openshift_clusterresourcequota_selector query=" + query + " message=" + err.Error())
@@ -93,16 +92,16 @@ func Metrics(args *common.Parameters) {
 			_ = crq.SelectorValue.AppendSampleStreamWithFilter(mat[i], valueFilter)
 		}
 	}
-	if disc, err := args.ToDiscovery(common.CRQEntityKind); err == nil {
+	if disc, err := args.ToDiscovery(prometheus.CRQEntityKind); err == nil {
 		discovery := &datamodel.ClusterResourceQuotaDiscovery{Discovery: disc, CRQs: crqs}
-		common.WriteDiscovery(args, discovery, common.CRQEntityKind)
+		prometheus.WriteDiscovery(args, discovery, prometheus.CRQEntityKind)
 	}
 
 	query = `openshift_clusterresourcequota_usage`
-	common.GetWorkload(query, query, args, common.CRQEntityKind)
+	prometheus.GetWorkload(query, query, args, prometheus.CRQEntityKind)
 
 	query = `openshift_clusterresourcequota_namespace_usage`
-	common.GetWorkload(query, query, args, common.CRQEntityKind)
+	prometheus.GetWorkload(query, query, args, prometheus.CRQEntityKind)
 }
 
 func getCRQ(ss *model.SampleStream) (*datamodel.ClusterResourceQuota, bool) {

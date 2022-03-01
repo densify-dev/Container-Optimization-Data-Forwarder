@@ -1,4 +1,4 @@
-package common
+package prometheus
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/api"
@@ -64,56 +65,28 @@ func (args *Parameters) ToDiscovery(entityKind string) (*datamodel.Discovery, er
 	return disc, err
 }
 
-//MetricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
+var promApi *promAPIv2
+var apiMu sync.Mutex
+
+// MetricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
 func MetricCollect(args *Parameters, query string) (value model.Value, err error) {
-	//setup the context to use for the API calls
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	tlsClientConfig := &tls.Config{}
-	if args.CaCertPath != "" {
-		tmpTLSConfig, err := config.NewTLSConfig(&config.TLSConfig{
-			CAFile: args.CaCertPath,
-		})
-		if err != nil {
-			log.Fatalf("Failed to generate TLS config:%v", err)
-		}
-		tlsClientConfig = tmpTLSConfig
+	if err = ensureApi(args); err != nil {
+		return
 	}
-
-	var roundTripper http.RoundTripper = &http.Transport{
-		TLSClientConfig: tlsClientConfig,
-	}
-
-	if args.OAuthTokenPath != "" {
-		roundTripper = config.NewAuthorizationCredentialsFileRoundTripper("Bearer", args.OAuthTokenPath, roundTripper)
-	}
-	//Setup the API client connection
-	client, err := api.NewClient(api.Config{Address: *args.PromURL, RoundTripper: roundTripper})
-	if err != nil {
-		return value, err
-	}
-
-	//Query prometheus with the values defined above as well as the query that was passed into the function.
-	q := v1.NewAPI(client)
 	// use Query API, not QueryRange for both discovery and workload
 	query = fmt.Sprintf("%s[%s]", query, args.History)
-	value, _, err = q.Query(ctx, query, *args.CurrentTime)
-	if err != nil {
-		return value, err
+	if value, _, err = promApi.Query(ctx, query, *args.CurrentTime); err != nil {
+		return
 	}
-
-	//If the values from the query return no data (length of 0) then give a warning
-	if value == nil {
-		err = errors.New("No resultset returned")
-	} else if value.(model.Matrix) == nil {
-		err = errors.New("No time series data returned")
-	} else if value.(model.Matrix).Len() == 0 {
-		err = errors.New("No data returned, value.(model.Matrix) is empty")
+	// if the values from the query return no data (length of 0) then give a warning
+	if v, ok := value.(model.Matrix); !ok {
+		err = errors.New("value is nil or not a model.Matrix")
+	} else if v.Len() == 0 {
+		err = errors.New("no data returned, matrix is empty")
 	}
-
-	//Return the data that was received from Prometheus.
-	return value, err
+	return
 }
 
 //GetWorkload used to query for the workload data and then calls write workload
@@ -150,6 +123,8 @@ const (
 	ksm  = "kube-state-metrics"
 	ossm = "openshift-state-metrics"
 )
+
+var exporters = []string{ne, cad, ksm, ossm}
 
 // observed scrape intervals
 // k8s cluster 	ne 	cad 	ksm 	ossm
@@ -194,4 +169,35 @@ func initMaxScrapeIntervalMap() map[string]*time.Duration {
 		m[entityKind] = &maxInterval
 	}
 	return m
+}
+
+func ensureApi(args *Parameters) error {
+	apiMu.Lock()
+	defer apiMu.Unlock()
+	if promApi != nil {
+		return nil
+	}
+	tlsClientConfig := &tls.Config{}
+	if args.CaCertPath != "" {
+		tmpTLSConfig, err := config.NewTLSConfig(&config.TLSConfig{
+			CAFile: args.CaCertPath,
+		})
+		if err != nil {
+			log.Fatalf("Failed to generate TLS config:%v", err)
+		}
+		tlsClientConfig = tmpTLSConfig
+	}
+	var roundTripper http.RoundTripper = &http.Transport{
+		TLSClientConfig: tlsClientConfig,
+	}
+	if args.OAuthTokenPath != "" {
+		roundTripper = config.NewAuthorizationCredentialsFileRoundTripper("Bearer", args.OAuthTokenPath, roundTripper)
+	}
+	client, err := api.NewClient(api.Config{Address: *args.PromURL, RoundTripper: roundTripper})
+	if err != nil {
+		return err
+	}
+	a := v1.NewAPI(client)
+	promApi = &promAPIv2{API: a, c: client}
+	return nil
 }

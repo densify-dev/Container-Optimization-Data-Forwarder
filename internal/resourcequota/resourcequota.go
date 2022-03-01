@@ -4,8 +4,7 @@ package resourcequota
 import (
 	"fmt"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
-
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 )
 
@@ -16,14 +15,14 @@ const (
 var resourceQuotas = make(map[string]map[string]*datamodel.ResourceQuota)
 
 //Metrics a global func for collecting quota level metrics in prometheus
-func Metrics(args *common.Parameters) {
+func Metrics(args *prometheus.Parameters) {
 	//Setup variables used in the code.
 	var query string
 	var result model.Value
 	var err error
 
 	query = `kube_resourcequota_created`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 
 	if err != nil {
 		args.ErrorLogger.Println("metric=resourceQuotas query=" + query + " message=" + err.Error())
@@ -34,7 +33,7 @@ func Metrics(args *common.Parameters) {
 	mat := result.(model.Matrix)
 	n := mat.Len()
 	for i := 0; i < n; i++ {
-		nsName := string(mat[i].Metric[common.NamespaceKey])
+		nsName := string(mat[i].Metric[prometheus.NamespaceKey])
 		rqName := string(mat[i].Metric[rqKey])
 		var ok bool
 		if _, ok = resourceQuotas[nsName]; !ok {
@@ -48,11 +47,11 @@ func Metrics(args *common.Parameters) {
 		_ = rq.CreationTime.AppendSampleStreamWithValue(mat[i], "", datamodel.TimeStampConverter())
 	}
 
-	if disc, err := args.ToDiscovery(common.RQEntityKind); err == nil {
+	if disc, err := args.ToDiscovery(prometheus.RQEntityKind); err == nil {
 		discovery := &datamodel.ResourceQuotaDiscovery{Discovery: disc, Namespaces: resourceQuotas}
-		common.WriteDiscovery(args, discovery, common.RQEntityKind)
+		prometheus.WriteDiscovery(args, discovery, prometheus.RQEntityKind)
 	}
 
 	query = `kube_resourcequota`
-	common.GetWorkload(query, query, args, common.RQEntityKind)
+	prometheus.GetWorkload(query, query, args, prometheus.RQEntityKind)
 }

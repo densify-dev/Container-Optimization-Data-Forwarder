@@ -14,7 +14,7 @@ type Diff struct {
 }
 
 type Labels struct {
-	Origin    *TimeRangeLabels  `json:"origin,omitempty"`
+	Origin    *RangeLabels      `json:"origin,omitempty"`
 	Diffs     []*Diff           `json:"diffs,omitempty"`
 	currMap   map[string]string // unexported, helper field when building or converting
 	currRange *Range            // same
@@ -50,7 +50,7 @@ func (l *Labels) AppendMap(m map[string]string, ts []*time.Time) error {
 	var err error
 	if l.Origin == nil {
 		// uninitialized labels
-		l.Origin = &TimeRangeLabels{Map: m, Range: r}
+		l.Origin = &RangeLabels{Map: m, Range: r}
 		l.setCurrents(m, r)
 	} else {
 		var cl diff.Changelog

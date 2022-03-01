@@ -3,6 +3,7 @@ module github.com/densify-dev/Container-Optimization-Data-Forwarder
 go 1.17
 
 require (
+	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/common v0.32.1

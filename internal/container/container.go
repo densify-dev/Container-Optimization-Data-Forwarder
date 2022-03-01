@@ -4,11 +4,10 @@ package container
 import (
 	"fmt"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
+	"github.com/prometheus/common/model"
 	"runtime"
 	"strings"
-
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
-	"github.com/prometheus/common/model"
 )
 
 var systems = map[string]*datamodel.Namespace{}
@@ -39,7 +38,7 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 	n := mat.Len()
 	for i := 0; i < n; i++ {
 		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
-		nsValue, ok := mat[i].Metric[common.NamespaceKey]
+		nsValue, ok := mat[i].Metric[prometheus.NamespaceKey]
 		if !ok {
 			continue
 		}
@@ -134,7 +133,7 @@ func getMidMetric(result model.Value, mid model.LabelName, metric, kind, query s
 	n := mat.Len()
 	for i := 0; i < n; i++ {
 		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
-		nsVal, ok := mat[i].Metric[common.NamespaceKey]
+		nsVal, ok := mat[i].Metric[prometheus.NamespaceKey]
 		if !ok {
 			continue
 		}
@@ -191,7 +190,7 @@ func getNamespaceMetric(result model.Value, query string) {
 	n := mat.Len()
 	for i := 0; i < n; i++ {
 		//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
-		nsValue, ok := mat[i].Metric[common.NamespaceKey]
+		nsValue, ok := mat[i].Metric[prometheus.NamespaceKey]
 		if !ok {
 			continue
 		}
@@ -206,7 +205,7 @@ func getNamespaceMetric(result model.Value, query string) {
 }
 
 //Metrics function to collect data related to containers.
-func Metrics(args *common.Parameters) {
+func Metrics(args *prometheus.Parameters) {
 	//Setup variables used in the code.
 	var query, labelSuffix string
 	var result model.Value
@@ -221,7 +220,7 @@ func Metrics(args *common.Parameters) {
 
 	//query to get info about what containers exist. Using this query that is part of kube-state-metrics means very likely will miss collecting anything related to the k8s_pause container side cars as don't tend to show up in KSM.
 	query = `kube_pod_container_info`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.ErrorLogger.Println("metric=containers query=" + query + " message=" + err.Error())
 		fmt.Println("[ERROR] metric=containers query=" + query + " message=" + err.Error())
@@ -234,7 +233,7 @@ func Metrics(args *common.Parameters) {
 			// Get the container, pod and namespace names.
 			containerName := string(mat[i].Metric["container"])
 			podName := string(mat[i].Metric[podMetricKey])
-			namespaceName := string(mat[i].Metric[common.NamespaceKey])
+			namespaceName := string(mat[i].Metric[prometheus.NamespaceKey])
 			//check if already have setup namespace, pod in system structure and if not add them.
 			if _, ok := systems[namespaceName]; !ok {
 				systems[namespaceName] = &datamodel.Namespace{LabelMap: make(datamodel.LabelMap), Entities: make(map[string]map[string]*datamodel.MidLevel)}
@@ -273,12 +272,12 @@ func Metrics(args *common.Parameters) {
 
 	//query for the Container resource limits (cpu and memory) if we get no results for the newer combined metric then will fall back to older metrics which get just CPU and Memory.
 	query = `kube_pod_container_resource_limits`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	mat := result.(model.Matrix)
 	n := mat.Len()
 	if n == 0 {
 		query = `kube_pod_container_resource_limits_cpu_cores`
-		result, err = common.MetricCollect(args, query)
+		result, err = prometheus.MetricCollect(args, query)
 		if err != nil {
 			args.WarnLogger.Println("metric=cpuLimit query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=cpuLimit query=" + query + " message=" + err.Error())
@@ -287,7 +286,7 @@ func Metrics(args *common.Parameters) {
 		}
 
 		query = `kube_pod_container_resource_limits_memory_bytes`
-		result, err = common.MetricCollect(args, query)
+		result, err = prometheus.MetricCollect(args, query)
 		if err != nil {
 			args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=memLimit query=" + query + " message=" + err.Error())
@@ -300,12 +299,12 @@ func Metrics(args *common.Parameters) {
 
 	//Query for the Container resource requests (cpu and memory) if we get no results for the newer combined metric then will fall back to older metrics which get just CPU and Memory.
 	query = `kube_pod_container_resource_requests`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	mat = result.(model.Matrix)
 	n = mat.Len()
 	if n == 0 {
 		query = `kube_pod_container_resource_requests_cpu_cores`
-		result, err = common.MetricCollect(args, query)
+		result, err = prometheus.MetricCollect(args, query)
 		if err != nil {
 			args.WarnLogger.Println("metric=cpuRequest query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=cpuRequest query=" + query + " message=" + err.Error())
@@ -314,7 +313,7 @@ func Metrics(args *common.Parameters) {
 		}
 
 		query = `kube_pod_container_resource_requests_memory_bytes`
-		result, err = common.MetricCollect(args, query)
+		result, err = prometheus.MetricCollect(args, query)
 		if err != nil {
 			args.WarnLogger.Println("metric=memRequest query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=memRequest query=" + query + " message=" + err.Error())
@@ -327,7 +326,7 @@ func Metrics(args *common.Parameters) {
 
 	// Getting info from cAdvisor metric that will be stored as labels.
 	query = `container_spec_cpu_shares`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=conLabel query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=conLabel query=" + query + " message=" + err.Error())
@@ -349,7 +348,7 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_pod_info`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=podInfo query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=podInfo query=" + query + " message=" + err.Error())
@@ -358,7 +357,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_pod_labels`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=podLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=podLabels query=" + query + " message=" + err.Error())
@@ -368,12 +367,12 @@ func Metrics(args *common.Parameters) {
 
 	//Depending on version of KSM will determine what metric need to use to see if containers are terminated or not for there state.
 	query = `kube_pod_container_status_terminated`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	mat = result.(model.Matrix)
 	n = mat.Len()
 	if n == 0 {
 		query = `kube_pod_container_status_terminated_reason`
-		result, err = common.MetricCollect(args, query)
+		result, err = prometheus.MetricCollect(args, query)
 		if err != nil {
 			args.WarnLogger.Println("metric=powerState query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=powerState query=" + query + " message=" + err.Error())
@@ -390,7 +389,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_pod_created`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=podCreationTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=podCreationTime query=" + query + " message=" + err.Error())
@@ -407,7 +406,7 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_namespace_labels`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=namespaceLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=namespaceLabels query=" + query + " message=" + err.Error())
@@ -416,7 +415,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_namespace_annotations`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=namespaceAnnotations query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=namespaceAnnotations query=" + query + " message=" + err.Error())
@@ -433,7 +432,7 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_deployment_labels`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=labels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=labels query=" + query + " message=" + err.Error())
@@ -442,7 +441,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_deployment_spec_strategy_rollingupdate_max_surge`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=maxSurge query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=maxSurge query=" + query + " message=" + err.Error())
@@ -451,7 +450,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_deployment_spec_strategy_rollingupdate_max_unavailable`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=maxUnavailable query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=maxUnavailable query=" + query + " message=" + err.Error())
@@ -460,7 +459,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_deployment_metadata_generation`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=metadataGeneration query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=metadataGeneration query=" + query + " message=" + err.Error())
@@ -469,7 +468,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_deployment_created`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=deploymentCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=deploymentCreated query=" + query + " message=" + err.Error())
@@ -486,7 +485,7 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_replicaset_labels`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=replicaSetLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=replicaSetLabels query=" + query + " message=" + err.Error())
@@ -495,7 +494,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_replicaset_created`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=replicaSetCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=replicaSetCreated query=" + query + " message=" + err.Error())
@@ -512,7 +511,7 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_replicationcontroller_created`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=replicationControllerCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=replicationControllerCreated query=" + query + " message=" + err.Error())
@@ -529,7 +528,7 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_daemonset_labels`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=daemonSetLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=daemonSetLabels query=" + query + " message=" + err.Error())
@@ -538,7 +537,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_daemonset_created`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=daemonSetCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=daemonSetCreated query=" + query + " message=" + err.Error())
@@ -555,7 +554,7 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_statefulset_labels`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=statefulSetLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=statefulSetLabels query=" + query + " message=" + err.Error())
@@ -564,7 +563,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_statefulset_created`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=statefulSetCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=statefulSetCreated query=" + query + " message=" + err.Error())
@@ -581,7 +580,7 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_job_info`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=jobInfo query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobInfo query=" + query + " message=" + err.Error())
@@ -590,7 +589,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_job_labels`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=jobLabel query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobLabel query=" + query + " message=" + err.Error())
@@ -599,7 +598,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_job_spec_completions`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=jobSpecCompletions query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobSpecCompletions query=" + query + " message=" + err.Error())
@@ -608,7 +607,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_job_spec_parallelism`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=jobSpecParallelism query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobSpecParallelism query=" + query + " message=" + err.Error())
@@ -617,7 +616,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_job_status_completion_time`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=jobStatusCompletionTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobStatusCompletionTime query=" + query + " message=" + err.Error())
@@ -626,7 +625,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_job_status_start_time`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=jobStatusStartTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobStatusStartTime query=" + query + " message=" + err.Error())
@@ -635,7 +634,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_job_created`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=jobCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobCreated query=" + query + " message=" + err.Error())
@@ -652,7 +651,7 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = `kube_cronjob_labels`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=cronJobLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobLabels query=" + query + " message=" + err.Error())
@@ -661,7 +660,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_cronjob_info`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=cronJobInfo query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobInfo query=" + query + " message=" + err.Error())
@@ -670,7 +669,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_cronjob_next_schedule_time`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=cronJobNextScheduleTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobNextScheduleTime query=" + query + " message=" + err.Error())
@@ -679,7 +678,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_cronjob_status_last_schedule_time`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=cronJobStatusLastScheduleTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobStatusLastScheduleTime query=" + query + " message=" + err.Error())
@@ -688,7 +687,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_cronjob_status_active`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=cronJobStatusActive query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobStatusActive query=" + query + " message=" + err.Error())
@@ -697,7 +696,7 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `kube_cronjob_created`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=cronJobCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobCreated query=" + query + " message=" + err.Error())
@@ -716,7 +715,7 @@ func Metrics(args *common.Parameters) {
 
 	//Query to see what hpa labels may be there and if need to use newer or older versions of the query based on what we see for results. Note if you don't have any then will default to using newer version.
 	query = `kube_hpa_labels`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	var hpaName string
 	var hpaLabel model.LabelName
 	mat = result.(model.Matrix)
@@ -728,7 +727,7 @@ func Metrics(args *common.Parameters) {
 		hpaName = "horizontalpodautoscaler"
 		hpaLabel = "horizontalpodautoscaler"
 		query = `kube_` + hpaName + `_labels`
-		result, err = common.MetricCollect(args, query)
+		result, err = prometheus.MetricCollect(args, query)
 	}
 
 	if err != nil {
@@ -738,9 +737,9 @@ func Metrics(args *common.Parameters) {
 		getMidMetric(result, hpaLabel, "label", "Deployment", query)
 	}
 
-	if disc, err := args.ToDiscovery(common.ContainerEntityKind); err == nil {
+	if disc, err := args.ToDiscovery(prometheus.ContainerEntityKind); err == nil {
 		discovery := &datamodel.ContainerDiscovery{Discovery: disc, Namespaces: systems}
-		common.WriteDiscovery(args, discovery, common.ContainerEntityKind)
+		prometheus.WriteDiscovery(args, discovery, prometheus.ContainerEntityKind)
 	}
 
 	//Container workloads
@@ -753,36 +752,36 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `container_cpu_usage_seconds_total`
-	common.GetWorkload("container_cpu_usage_seconds_total", query, args, common.ContainerEntityKind)
+	prometheus.GetWorkload("container_cpu_usage_seconds_total", query, args, prometheus.ContainerEntityKind)
 
 	query = `container_memory_usage_bytes`
-	common.GetWorkload("container_memory_usage_bytes", query, args, common.ContainerEntityKind)
+	prometheus.GetWorkload("container_memory_usage_bytes", query, args, prometheus.ContainerEntityKind)
 
 	query = `container_memory_rss`
-	common.GetWorkload("container_memory_rss", query, args, common.ContainerEntityKind)
+	prometheus.GetWorkload("container_memory_rss", query, args, prometheus.ContainerEntityKind)
 
 	query = `container_fs_usage_bytes`
-	common.GetWorkload("container_fs_usage_bytes", query, args, common.ContainerEntityKind)
+	prometheus.GetWorkload("container_fs_usage_bytes", query, args, prometheus.ContainerEntityKind)
 
 	query = `kube_pod_container_status_restarts_total`
-	common.GetWorkload("kube_pod_container_status_restarts_total", query, args, common.ContainerEntityKind)
+	prometheus.GetWorkload("kube_pod_container_status_restarts_total", query, args, prometheus.ContainerEntityKind)
 
 	if labelSuffix == "" {
 		query = `kube_` + hpaName + `_status_condition{status="true",condition="ScalingLimited"}`
 	} else {
 		query = `kube_` + hpaName + `_status_condition{status="ScalingLimited",condition="true"}`
 	}
-	common.GetWorkload(`kube_`+hpaName+`_status_condition`, query, args, common.ContainerEntityKind)
+	prometheus.GetWorkload(`kube_`+hpaName+`_status_condition`, query, args, prometheus.ContainerEntityKind)
 
 	//HPA workloads
 	query = `kube_` + hpaName + `_spec_max_replicas`
-	common.GetWorkload(`kube_`+hpaName+`_spec_max_replicas`, query, args, common.ContainerEntityKind)
+	prometheus.GetWorkload(`kube_`+hpaName+`_spec_max_replicas`, query, args, prometheus.ContainerEntityKind)
 
 	query = `kube_` + hpaName + `_spec_min_replicas`
-	common.GetWorkload(`kube_`+hpaName+`_spec_min_replicas`, query, args, common.ContainerEntityKind)
+	prometheus.GetWorkload(`kube_`+hpaName+`_spec_min_replicas`, query, args, prometheus.ContainerEntityKind)
 
 	query = `kube_` + hpaName + `_status_current_replicas`
-	common.GetWorkload(`kube_`+hpaName+`_status_current_replicas`, query, args, common.ContainerEntityKind)
+	prometheus.GetWorkload(`kube_`+hpaName+`_status_current_replicas`, query, args, prometheus.ContainerEntityKind)
 }
 
 func newMidLevel() *datamodel.MidLevel {
@@ -815,11 +814,11 @@ func newContainer() *datamodel.Container {
 	}
 }
 
-func getMidLevelOwner(args *common.Parameters, query, entityKey, metricKey string) error {
+func getMidLevelOwner(args *prometheus.Parameters, query, entityKey, metricKey string) error {
 	var result model.Value
 	var err error
 	query += `{owner_name!="<none>"}`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		errMsg := fmt.Sprintf("metric=%s query=%s message=%v", strings.ToLower(entityKey), query, err)
 		args.ErrorLogger.Println(errMsg)
@@ -831,7 +830,7 @@ func getMidLevelOwner(args *common.Parameters, query, entityKey, metricKey strin
 	for i := 0; i < n; i++ {
 		// Get the entity, namespace owner kind and owner kind
 		entityName := string(mat[i].Metric[model.LabelName(metricKey)])
-		namespaceName := string(mat[i].Metric[common.NamespaceKey])
+		namespaceName := string(mat[i].Metric[prometheus.NamespaceKey])
 		ownerKind := string(mat[i].Metric[ownerKindKey])
 		ownerName := string(mat[i].Metric[ownerNameKey])
 		if entityName == "" || namespaceName == "" || ownerKind == "" || ownerName == "" {

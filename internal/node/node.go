@@ -3,12 +3,10 @@ package node
 
 import (
 	"fmt"
-	"net"
-
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
-
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
+	"net"
 )
 
 // Map of labels and values
@@ -18,13 +16,12 @@ var nodesByAltName = make(map[string]*datamodel.Node)
 var nodeNameKeys = map[string]string{"netSpeedBytes": "instance"}
 
 const (
-	nodeKey   = common.NodeEntityKind
-	podIpKey  = "pod_ip"
+	nodeKey   = prometheus.NodeEntityKind
 	roleKey   = "role"
 	deviceKey = "device"
 )
 
-var podIpFilter = []string{podIpKey}
+var podIpFilter = []string{datamodel.PodIpKey}
 
 //getNodeMetric takes data from prometheus and adds to nodes structure
 func getNodeMetric(result model.Value, metric string) {
@@ -72,7 +69,7 @@ func getNodeMetric(result model.Value, metric string) {
 			if no, ok = nodes[nodeName]; !ok {
 				continue
 			}
-			podIp := string(mat[i].Metric[podIpKey])
+			podIp := string(mat[i].Metric[datamodel.PodIpKey])
 			// now insert the node to nodesByAltName
 			if _, f := nodesByAltName[podIp]; !f {
 				nodesByAltName[podIp] = no
@@ -89,7 +86,7 @@ func getNodeMetric(result model.Value, metric string) {
 }
 
 //Metrics a global func for collecting node level metrics in prometheus
-func Metrics(args *common.Parameters) {
+func Metrics(args *prometheus.Parameters) {
 	//Setup variables used in the code.
 	var query string
 	var result model.Value
@@ -97,7 +94,7 @@ func Metrics(args *common.Parameters) {
 
 	//Query and store kubernetes node labels
 	query = `kube_node_labels`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.ErrorLogger.Println("metric=nodes query=" + query + " message=" + err.Error())
 		fmt.Println("[ERROR] metric=nodes query=" + query + " message=" + err.Error())
@@ -121,7 +118,7 @@ func Metrics(args *common.Parameters) {
 
 	//query for node annotations
 	query = `kube_node_annotations`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=nodeAnnotations query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=nodeAnnotations query=" + query + " message=" + err.Error())
@@ -131,7 +128,7 @@ func Metrics(args *common.Parameters) {
 
 	//query for node info and store into labels structure
 	query = `kube_node_info`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=nodeInfo query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=nodeInfo query=" + query + " message=" + err.Error())
@@ -141,7 +138,7 @@ func Metrics(args *common.Parameters) {
 
 	//query to get what roles may have been assigned to this node.
 	query = `kube_node_role`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=nodeRole query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=nodeRole query=" + query + " message=" + err.Error())
@@ -152,7 +149,7 @@ func Metrics(args *common.Parameters) {
 	// Gets the alternative node name (pod_ip of node exporter)
 	// This needs to be done before node_network_speed_bytes
 	query = `kube_pod_info{pod=~".*node-exporter.*"}`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=altWorkloadName query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=altWorkloadName query=" + query + " message=" + err.Error())
@@ -162,7 +159,7 @@ func Metrics(args *common.Parameters) {
 
 	//Gets the network speed in bytes as an attribute/config value for each node
 	query = `node_network_speed_bytes{device!~"veth.*"}`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=networkSpeedBytes query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=networkSpeedBytes query=" + query + " message=" + err.Error())
@@ -170,109 +167,109 @@ func Metrics(args *common.Parameters) {
 		getNodeMetric(result, "netSpeedBytes")
 	}
 
-	if disc, err := args.ToDiscovery(common.NodeEntityKind); err == nil {
+	if disc, err := args.ToDiscovery(prometheus.NodeEntityKind); err == nil {
 		discovery := &datamodel.NodeDiscovery{Discovery: disc, Nodes: nodes}
-		common.WriteDiscovery(args, discovery, common.NodeEntityKind)
+		prometheus.WriteDiscovery(args, discovery, prometheus.NodeEntityKind)
 	}
 
 	//Queries the capacity fields of all nodes if we don't see any data then will try to use the older queries for capacity.
 	query = `kube_node_status_capacity`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if result.(model.Matrix).Len() == 0 {
 
 		//Query and store prometheus total cpu cores
 		query = `kube_node_status_capacity_cpu_cores`
-		common.GetWorkload("node_capacity_cpu_cores", query, args, common.NodeEntityKind)
+		prometheus.GetWorkload("node_capacity_cpu_cores", query, args, prometheus.NodeEntityKind)
 
 		//Query and store prometheus total memory in bytes.
 		query = `kube_node_status_capacity_memory_bytes`
-		common.GetWorkload("node_capacity_mem_bytes", query, args, common.NodeEntityKind)
+		prometheus.GetWorkload("node_capacity_mem_bytes", query, args, prometheus.NodeEntityKind)
 
 		//Query and store prometheus total for pods per node.
 		query = `kube_node_status_capacity_pods`
-		common.GetWorkload("node_capacity_pods", query, args, common.NodeEntityKind)
+		prometheus.GetWorkload("node_capacity_pods", query, args, prometheus.NodeEntityKind)
 	} else {
 		//Query and store prometheus totals for capacity.
 		query = `kube_node_status_capacity`
-		common.GetWorkload("node_capacity", query, args, common.NodeEntityKind)
+		prometheus.GetWorkload("node_capacity", query, args, prometheus.NodeEntityKind)
 	}
 
 	//Queries the allocatable fields of all nodes if we don't see data then will try to query the older metrics for allocations.
 	query = `kube_node_status_allocatable`
-	result, err = common.MetricCollect(args, query)
+	result, err = prometheus.MetricCollect(args, query)
 	if result.(model.Matrix).Len() == 0 {
 
 		//Query and store prometheus total cpu cores.
 		query = `kube_node_status_allocatable_cpu_cores`
-		common.GetWorkload("node_allocatable_cpu_cores", query, args, common.NodeEntityKind)
+		prometheus.GetWorkload("node_allocatable_cpu_cores", query, args, prometheus.NodeEntityKind)
 
 		//Query and store prometheus total memory in bytes
 		query = `kube_node_status_allocatable_memory_bytes`
-		common.GetWorkload("node_allocatable_mem_bytes", query, args, common.NodeEntityKind)
+		prometheus.GetWorkload("node_allocatable_mem_bytes", query, args, prometheus.NodeEntityKind)
 
 		//Query and store prometheus total for pods per node
 		query = `kube_node_status_allocatable_pods`
-		common.GetWorkload("node_allocatable_pods", query, args, common.NodeEntityKind)
+		prometheus.GetWorkload("node_allocatable_pods", query, args, prometheus.NodeEntityKind)
 	} else {
 		//Query and store prometheus allocatable data
 		query = `kube_node_status_allocatable`
-		common.GetWorkload("node_allocatable", query, args, common.NodeEntityKind)
+		prometheus.GetWorkload("node_allocatable", query, args, prometheus.NodeEntityKind)
 	}
 
 	//Query and store prometheus total cpu uptime in seconds
 	query = `node_cpu_seconds_total`
-	common.GetWorkload("cpu_utilization", query, args, common.NodeEntityKind)
+	prometheus.GetWorkload("cpu_utilization", query, args, prometheus.NodeEntityKind)
 
 	//Query and store prometheus node memory total in bytes
 	query = `node_memory_MemTotal_bytes`
-	common.GetWorkload("memory_total_bytes", query, args, common.NodeEntityKind)
+	prometheus.GetWorkload("memory_total_bytes", query, args, prometheus.NodeEntityKind)
 
 	//Query and store prometheus node memory total free in bytes
 	query = `node_memory_MemFree_bytes`
-	common.GetWorkload("memory_free_bytes", query, args, common.NodeEntityKind)
+	prometheus.GetWorkload("memory_free_bytes", query, args, prometheus.NodeEntityKind)
 
 	//Query and store prometheus node memory cache in bytes
 	query = `node_memory_Cached_bytes`
-	common.GetWorkload("memory_cached_bytes", query, args, common.NodeEntityKind)
+	prometheus.GetWorkload("memory_cached_bytes", query, args, prometheus.NodeEntityKind)
 
 	//Query and store prometheus node memory buffers in bytes
 	query = `node_memory_Buffers_bytes`
-	common.GetWorkload("memory_buffers_bytes", query, args, common.NodeEntityKind)
+	prometheus.GetWorkload("memory_buffers_bytes", query, args, prometheus.NodeEntityKind)
 
 	//Query and store prometheus node disk write in bytes
 	query = `node_disk_written_bytes_total{device!~"dm-.*"}`
-	common.GetWorkload("disk_write_bytes", query, args, common.NodeEntityKind)
+	prometheus.GetWorkload("disk_write_bytes", query, args, prometheus.NodeEntityKind)
 
 	//Query and store prometheus node disk read in bytes
 	query = `node_disk_read_bytes_total{device!~"dm-.*"}`
-	common.GetWorkload("disk_read_bytes", query, args, common.NodeEntityKind)
+	prometheus.GetWorkload("disk_read_bytes", query, args, prometheus.NodeEntityKind)
 
 	//Query and store prometheus total disk read uptime as a percentage
 	query = `node_disk_read_time_seconds_total{device!~"dm-.*"}`
-	common.GetWorkload("disk_read_ops", query, args, common.NodeEntityKind)
+	prometheus.GetWorkload("disk_read_ops", query, args, prometheus.NodeEntityKind)
 
 	//Query and store prometheus total disk write uptime as a percentage
 	query = `node_disk_write_time_seconds_total{device!~"dm-.*"}`
-	common.GetWorkload("disk_write_ops", query, args, common.NodeEntityKind)
+	prometheus.GetWorkload("disk_write_ops", query, args, prometheus.NodeEntityKind)
 
 	//Query and store prometheus total disk write uptime as a percentage
 	query = `node_disk_io_time_seconds_total{device!~"dm-.*"}`
-	common.GetWorkload("disk_total_ops", query, args, common.NodeEntityKind)
+	prometheus.GetWorkload("disk_total_ops", query, args, prometheus.NodeEntityKind)
 
 	//Query and store prometheus node recieved network data in bytes
 	query = `node_network_receive_bytes_total{device!~"veth.*"}`
-	common.GetWorkload("net_received_bytes", query, args, common.NodeEntityKind)
+	prometheus.GetWorkload("net_received_bytes", query, args, prometheus.NodeEntityKind)
 
 	//Query and store prometheus recieved network data in packets
 	query = `node_network_receive_packets_total{device!~"veth.*"}`
-	common.GetWorkload("net_received_packets", query, args, common.NodeEntityKind)
+	prometheus.GetWorkload("net_received_packets", query, args, prometheus.NodeEntityKind)
 
 	//Query and store prometheus total transmitted network data in bytes
 	query = `node_network_transmit_bytes_total{device!~"veth.*"}`
-	common.GetWorkload("net_sent_bytes", query, args, common.NodeEntityKind)
+	prometheus.GetWorkload("net_sent_bytes", query, args, prometheus.NodeEntityKind)
 
 	//Query and store prometheus total transmitted network data in packets
 	query = `node_network_transmit_packets_total{device!~"veth.*"}`
-	common.GetWorkload("net_sent_packets", query, args, common.NodeEntityKind)
+	prometheus.GetWorkload("net_sent_packets", query, args, prometheus.NodeEntityKind)
 
 }

@@ -27,11 +27,7 @@ const (
 	CRQEntityKind       = "crq"
 )
 
-const (
-	NamespaceKey = "namespace"
-)
-
-var NamespaceFilter = []string{NamespaceKey}
+var NamespaceFilter = []string{datamodel.NamespaceKey}
 
 // Parameters - Reusable structure that holds common arguments used in the project
 type Parameters struct {

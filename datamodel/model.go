@@ -3,8 +3,10 @@ package datamodel
 import "time"
 
 const (
-	Unmapped = "unmapped"
-	PodIpKey = "pod_ip"
+	NamespaceKey = "namespace"
+	NameKey      = "name"
+	Unmapped     = "unmapped"
+	PodIpKey     = "pod_ip"
 )
 
 type Discovery struct {

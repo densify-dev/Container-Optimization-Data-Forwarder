@@ -91,16 +91,52 @@ func MetricCollect(args *Parameters, query string) (value model.Value, err error
 
 //GetWorkload used to query for the workload data and then calls write workload
 func GetWorkload(fileName, query string, args *Parameters, entityKind string) {
+	GetWorkloadRelabel(fileName, query, args, entityKind, nil)
+}
+
+type ValueConversionFunc func(string) (string, bool)
+
+type RelabelArgs struct {
+	Key string
+	Map map[string]string
+	VCF ValueConversionFunc
+}
+
+func GetWorkloadRelabel(fileName, query string, args *Parameters, entityKind string, ras ...*RelabelArgs) {
 	result, err := MetricCollect(args, query)
 	if err != nil {
 		args.WarnLogger.Println("metric=" + fileName + " query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=" + fileName + " query=" + query + " message=" + err.Error())
 	} else {
+		relabel(result, ras...)
 		file, _ := json.Marshal(result)
 		err = os.WriteFile("./data/"+entityKind+"/"+fileName+".json", file, 0644)
 		if err != nil {
 			args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
 			fmt.Println("[ERROR] entity=" + entityKind + " message=" + err.Error())
+		}
+	}
+}
+
+func relabel(result model.Value, ras ...*RelabelArgs) {
+	if mat, ok := result.(model.Matrix); ok {
+		for _, ra := range ras {
+			if ra != nil {
+				for _, ss := range mat {
+					key := model.LabelName(ra.Key)
+					if val, f := ss.Metric[key]; f {
+						value := string(val)
+						if ra.VCF != nil {
+							if v, converted := ra.VCF(value); converted {
+								value = v
+							}
+						}
+						if replacement, found := ra.Map[value]; found {
+							ss.Metric[key] = model.LabelValue(replacement)
+						}
+					}
+				}
+			}
 		}
 	}
 }

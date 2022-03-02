@@ -66,7 +66,6 @@ type Node struct {
 	LabelMap         LabelMap `json:"labels,omitempty"`
 	Roles            LabelMap `json:"roles,omitempty"`
 	NetSpeedBytesMap LabelMap `json:"netSpeedBytesMap,omitempty"`
-	AltWorkloadName  *Labels  `json:"altWorkloadName,omitempty"`
 }
 
 type ResourceQuotaDiscovery struct {

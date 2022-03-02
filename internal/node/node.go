@@ -9,17 +9,19 @@ import (
 	"net"
 )
 
+const (
+	nodeKey     = prometheus.NodeEntityKind
+	roleKey     = "role"
+	deviceKey   = "device"
+	instanceKey = "instance"
+)
+
 // Map of labels and values
 var nodes = make(map[string]*datamodel.Node)
 var nodesByAltName = make(map[string]*datamodel.Node)
+var altNameMap = make(map[string]string)
 
-var nodeNameKeys = map[string]string{"netSpeedBytes": "instance"}
-
-const (
-	nodeKey   = prometheus.NodeEntityKind
-	roleKey   = "role"
-	deviceKey = "device"
-)
+var nodeNameKeys = map[string]string{"netSpeedBytes": instanceKey}
 
 var podIpFilter = []string{datamodel.PodIpKey}
 
@@ -51,16 +53,8 @@ func getNodeMetric(result model.Value, metric string) {
 			roleLabels := datamodel.EnsureLabels(no.Roles, role)
 			_ = roleLabels.AppendSampleStream(mat[i])
 		case "netSpeedBytes":
-			// strip off port, if part of addr
-			if host, _, err := net.SplitHostPort(nodeName); err == nil {
-				nodeName = host
-			}
-			// first try in nodes
-			if no, ok = nodes[nodeName]; !ok {
-				// then in nodes by alt-name
-				if no, ok = nodesByAltName[nodeName]; !ok {
-					continue
-				}
+			if no, ok = getNode(nodeName); !ok {
+				continue
 			}
 			device := string(mat[i].Metric[deviceKey])
 			deviceLabels := datamodel.EnsureLabels(no.NetSpeedBytesMap, device)
@@ -73,8 +67,9 @@ func getNodeMetric(result model.Value, metric string) {
 			// now insert the node to nodesByAltName
 			if _, f := nodesByAltName[podIp]; !f {
 				nodesByAltName[podIp] = no
+				altNameMap[podIp] = nodeName
 			}
-			_ = no.AltWorkloadName.AppendSampleStreamWithFilter(mat[i], podIpFilter)
+			// no need to update anything, this is just for mapping by altName
 		default:
 			if no, ok = nodes[nodeName]; !ok {
 				continue
@@ -109,7 +104,6 @@ func Metrics(args *prometheus.Parameters) {
 					LabelMap:         make(datamodel.LabelMap),
 					Roles:            make(datamodel.LabelMap),
 					NetSpeedBytesMap: make(datamodel.LabelMap),
-					AltWorkloadName:  &datamodel.Labels{},
 				}
 			}
 		}
@@ -218,58 +212,88 @@ func Metrics(args *prometheus.Parameters) {
 
 	//Query and store prometheus total cpu uptime in seconds
 	query = `node_cpu_seconds_total`
-	prometheus.GetWorkload("cpu_utilization", query, args, prometheus.NodeEntityKind)
+	getNodeExporterWorkload("cpu_utilization", query, args)
 
 	//Query and store prometheus node memory total in bytes
 	query = `node_memory_MemTotal_bytes`
-	prometheus.GetWorkload("memory_total_bytes", query, args, prometheus.NodeEntityKind)
+	getNodeExporterWorkload("memory_total_bytes", query, args)
 
 	//Query and store prometheus node memory total free in bytes
 	query = `node_memory_MemFree_bytes`
-	prometheus.GetWorkload("memory_free_bytes", query, args, prometheus.NodeEntityKind)
+	getNodeExporterWorkload("memory_free_bytes", query, args)
 
 	//Query and store prometheus node memory cache in bytes
 	query = `node_memory_Cached_bytes`
-	prometheus.GetWorkload("memory_cached_bytes", query, args, prometheus.NodeEntityKind)
+	getNodeExporterWorkload("memory_cached_bytes", query, args)
 
 	//Query and store prometheus node memory buffers in bytes
 	query = `node_memory_Buffers_bytes`
-	prometheus.GetWorkload("memory_buffers_bytes", query, args, prometheus.NodeEntityKind)
+	getNodeExporterWorkload("memory_buffers_bytes", query, args)
 
 	//Query and store prometheus node disk write in bytes
 	query = `node_disk_written_bytes_total{device!~"dm-.*"}`
-	prometheus.GetWorkload("disk_write_bytes", query, args, prometheus.NodeEntityKind)
+	getNodeExporterWorkload("disk_write_bytes", query, args)
 
 	//Query and store prometheus node disk read in bytes
 	query = `node_disk_read_bytes_total{device!~"dm-.*"}`
-	prometheus.GetWorkload("disk_read_bytes", query, args, prometheus.NodeEntityKind)
+	getNodeExporterWorkload("disk_read_bytes", query, args)
 
 	//Query and store prometheus total disk read uptime as a percentage
 	query = `node_disk_read_time_seconds_total{device!~"dm-.*"}`
-	prometheus.GetWorkload("disk_read_ops", query, args, prometheus.NodeEntityKind)
+	getNodeExporterWorkload("disk_read_ops", query, args)
 
 	//Query and store prometheus total disk write uptime as a percentage
 	query = `node_disk_write_time_seconds_total{device!~"dm-.*"}`
-	prometheus.GetWorkload("disk_write_ops", query, args, prometheus.NodeEntityKind)
+	getNodeExporterWorkload("disk_write_ops", query, args)
 
 	//Query and store prometheus total disk write uptime as a percentage
 	query = `node_disk_io_time_seconds_total{device!~"dm-.*"}`
-	prometheus.GetWorkload("disk_total_ops", query, args, prometheus.NodeEntityKind)
+	getNodeExporterWorkload("disk_total_ops", query, args)
 
-	//Query and store prometheus node recieved network data in bytes
+	//Query and store prometheus node received network data in bytes
 	query = `node_network_receive_bytes_total{device!~"veth.*"}`
-	prometheus.GetWorkload("net_received_bytes", query, args, prometheus.NodeEntityKind)
+	getNodeExporterWorkload("net_received_bytes", query, args)
 
-	//Query and store prometheus recieved network data in packets
+	//Query and store prometheus received network data in packets
 	query = `node_network_receive_packets_total{device!~"veth.*"}`
-	prometheus.GetWorkload("net_received_packets", query, args, prometheus.NodeEntityKind)
+	getNodeExporterWorkload("net_received_packets", query, args)
 
 	//Query and store prometheus total transmitted network data in bytes
 	query = `node_network_transmit_bytes_total{device!~"veth.*"}`
-	prometheus.GetWorkload("net_sent_bytes", query, args, prometheus.NodeEntityKind)
+	getNodeExporterWorkload("net_sent_bytes", query, args)
 
 	//Query and store prometheus total transmitted network data in packets
 	query = `node_network_transmit_packets_total{device!~"veth.*"}`
-	prometheus.GetWorkload("net_sent_packets", query, args, prometheus.NodeEntityKind)
+	getNodeExporterWorkload("net_sent_packets", query, args)
 
+}
+
+var nera = &prometheus.RelabelArgs{
+	Key: instanceKey,
+	Map: altNameMap,
+	VCF: hostName,
+}
+
+func getNodeExporterWorkload(filename, query string, args *prometheus.Parameters) {
+	prometheus.GetWorkloadRelabel(filename, query, args, prometheus.NodeEntityKind, nera)
+}
+
+func hostName(name string) (string, bool) {
+	// strip off port, if part of addr
+	if host, _, err := net.SplitHostPort(name); err == nil {
+		return host, true
+	} else {
+		return name, false
+	}
+}
+
+func getNode(name string) (*datamodel.Node, bool) {
+	var no *datamodel.Node
+	var ok bool
+	if nodeName, isAlt := hostName(name); isAlt {
+		no, ok = nodesByAltName[nodeName]
+	} else {
+		no, ok = nodes[nodeName]
+	}
+	return no, ok
 }

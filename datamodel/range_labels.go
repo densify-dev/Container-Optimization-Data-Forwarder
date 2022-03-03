@@ -26,9 +26,9 @@ func ToRangeLabels(l *Labels) ([]*RangeLabels, error) {
 	}
 	var res []*RangeLabels
 	var err error
-	if l.Origin != nil {
-		res = append(res, l.Origin)
-		l.setCurrents(l.Origin.Map, l.Origin.Range)
+	if l.Original != nil {
+		res = append(res, l.Original)
+		l.setCurrents(l.Original.Map, l.Original.Range)
 		for _, d := range l.Diffs {
 			if d != nil {
 				m := copyMap(l.currMap)

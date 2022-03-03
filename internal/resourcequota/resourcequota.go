@@ -33,7 +33,7 @@ func Metrics(args *prometheus.Parameters) {
 	mat := result.(model.Matrix)
 	n := mat.Len()
 	for i := 0; i < n; i++ {
-		nsName := string(mat[i].Metric[prometheus.NamespaceKey])
+		nsName := string(mat[i].Metric[datamodel.NamespaceKey])
 		rqName := string(mat[i].Metric[rqKey])
 		var ok bool
 		if _, ok = resourceQuotas[nsName]; !ok {

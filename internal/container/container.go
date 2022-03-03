@@ -38,7 +38,7 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 	n := mat.Len()
 	for i := 0; i < n; i++ {
 		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
-		nsValue, ok := mat[i].Metric[prometheus.NamespaceKey]
+		nsValue, ok := mat[i].Metric[datamodel.NamespaceKey]
 		if !ok {
 			continue
 		}
@@ -133,7 +133,7 @@ func getMidMetric(result model.Value, mid model.LabelName, metric, kind, query s
 	n := mat.Len()
 	for i := 0; i < n; i++ {
 		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
-		nsVal, ok := mat[i].Metric[prometheus.NamespaceKey]
+		nsVal, ok := mat[i].Metric[datamodel.NamespaceKey]
 		if !ok {
 			continue
 		}
@@ -190,7 +190,7 @@ func getNamespaceMetric(result model.Value, query string) {
 	n := mat.Len()
 	for i := 0; i < n; i++ {
 		//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
-		nsValue, ok := mat[i].Metric[prometheus.NamespaceKey]
+		nsValue, ok := mat[i].Metric[datamodel.NamespaceKey]
 		if !ok {
 			continue
 		}
@@ -233,7 +233,7 @@ func Metrics(args *prometheus.Parameters) {
 			// Get the container, pod and namespace names.
 			containerName := string(mat[i].Metric["container"])
 			podName := string(mat[i].Metric[podMetricKey])
-			namespaceName := string(mat[i].Metric[prometheus.NamespaceKey])
+			namespaceName := string(mat[i].Metric[datamodel.NamespaceKey])
 			//check if already have setup namespace, pod in system structure and if not add them.
 			if _, ok := systems[namespaceName]; !ok {
 				systems[namespaceName] = &datamodel.Namespace{LabelMap: make(datamodel.LabelMap), Entities: make(map[string]map[string]*datamodel.MidLevel)}
@@ -830,7 +830,7 @@ func getMidLevelOwner(args *prometheus.Parameters, query, entityKey, metricKey s
 	for i := 0; i < n; i++ {
 		// Get the entity, namespace owner kind and owner kind
 		entityName := string(mat[i].Metric[model.LabelName(metricKey)])
-		namespaceName := string(mat[i].Metric[prometheus.NamespaceKey])
+		namespaceName := string(mat[i].Metric[datamodel.NamespaceKey])
 		ownerKind := string(mat[i].Metric[ownerKindKey])
 		ownerName := string(mat[i].Metric[ownerNameKey])
 		if entityName == "" || namespaceName == "" || ownerKind == "" || ownerName == "" {

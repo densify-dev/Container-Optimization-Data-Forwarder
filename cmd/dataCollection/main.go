@@ -4,6 +4,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/datamodel"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/container"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/crq"
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/node"
@@ -18,6 +19,10 @@ import (
 	"time"
 )
 
+const (
+	logFlag = log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile
+)
+
 // Global structure used to store Forwarder instance parameters
 var params *prometheus.Parameters
 
@@ -26,7 +31,7 @@ var includeContainer, includeNode, includeQuota bool
 
 //initParamters will look for settings defined on the command line or in config.properties file and update accordingly. Also defines the default values for these variables.
 //Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
-func initParameters() {
+func initParameters(version string) {
 	//Set default settings
 	var clusterName string
 	var promProtocol = "http"
@@ -198,10 +203,13 @@ func initParameters() {
 
 	var infoLogger, warnLogger, errorLogger, debugLogger *log.Logger
 
-	infoLogger = log.New(logFile, "[INFO] ", log.Ldate|log.Ltime|log.Lshortfile)
-	warnLogger = log.New(logFile, "[WARN] ", log.Ldate|log.Ltime|log.Lshortfile)
-	errorLogger = log.New(logFile, "[ERROR] ", log.Ldate|log.Ltime|log.Lshortfile)
-	debugLogger = log.New(logFile, "[DEBUG] ", log.Ldate|log.Ltime|log.Lshortfile)
+	infoLogger = log.New(logFile, "[INFO] ", logFlag)
+	warnLogger = log.New(logFile, "[WARN] ", logFlag)
+	errorLogger = log.New(logFile, "[ERROR] ", logFlag)
+	debugLogger = log.New(logFile, "[DEBUG] ", logFlag)
+
+	infoLogger.Printf("Version %s\n", version)
+	fmt.Printf("[INFO] Version %s\n", version)
 
 	// Check if token and certificate are missing
 	if oAuthTokenPath != "" {
@@ -237,6 +245,7 @@ func initParameters() {
 		CaCertPath:     caCertPath,
 	}
 	parseIncludeParam(include)
+	getVersion()
 	timeRange(interval, intervalSize, offset)
 }
 
@@ -253,37 +262,71 @@ func parseIncludeParam(param string) {
 	}
 }
 
+func getVersion() {
+	if ver, err := prometheus.GetVersion(params); err == nil {
+		params.Version = ver
+		fmt.Printf("[INFO] Detected Prometheus version %s\n", ver)
+		params.InfoLogger.Printf("Detected Prometheus version %s\n", ver)
+	}
+}
+
+const (
+	// See: https://github.com/prometheus/prometheus/releases/tag/v2.21.0,
+	// https://github.com/prometheus/prometheus/pull/7713
+	minimumVersionCompositeDuration = "2.21.0"
+	hour                            = "h"
+	minute                          = "m"
+	millisecond                     = "ms"
+)
+
 //timeRange allows you to define the start and end values of the range will pass to the Prometheus for the query.
 func timeRange(interval string, intervalSize, offset int) {
-
-	var start, currentTime, timeUTC time.Time
-
-	timeUTC = time.Now().UTC()
-
+	timeUTC := time.Now().UTC()
+	y := timeUTC.Year()
+	M := timeUTC.Month()
+	d := timeUTC.Day()
+	var h, m int
+	// need to deal with non-composite and non-ms duration (pre minimumVersionCompositeDuration)
+	ival := int64(intervalSize)
+	var ivalUnit string
 	if interval == "days" {
-		currentTime = time.Date(timeUTC.Year(), timeUTC.Month(), timeUTC.Day()-offset, 0, 0, 0, 0, timeUTC.Location())
-		start = currentTime.Add(time.Hour * -24 * time.Duration(intervalSize))
-		params.History = strconv.Itoa(intervalSize) + "d"
+		d -= offset
+		ival *= 24
+		ivalUnit = hour
 	} else if interval == "hours" {
-		currentTime = time.Date(timeUTC.Year(), timeUTC.Month(), timeUTC.Day(), timeUTC.Hour()-offset, 0, 0, 0, timeUTC.Location())
-		start = currentTime.Add(time.Hour * -1 * time.Duration(intervalSize))
-		params.History = strconv.Itoa(intervalSize) + "h"
+		h = timeUTC.Hour() - offset
+		ivalUnit = hour
 	} else {
-		currentTime = time.Date(timeUTC.Year(), timeUTC.Month(), timeUTC.Day(), timeUTC.Hour(), timeUTC.Minute()-offset, 0, 0, timeUTC.Location())
-		start = currentTime.Add(time.Minute * -1 * time.Duration(intervalSize))
-		params.History = strconv.Itoa(intervalSize) + "m"
+		// minutes
+		h = timeUTC.Hour()
+		m = timeUTC.Minute() - offset
+		ivalUnit = minute
 	}
-	//step is 5 minutes in nanoseconds
-	params.Range5Min = v1.Range{Start: start, End: currentTime, Step: 300000000000}
+	currentTime := time.Date(y, M, d, h, m, 0, 0, timeUTC.Location())
 	params.CurrentTime = &currentTime
+	params.History = fmt.Sprintf("%d%s", ival, ivalUnit)
+	var dur time.Duration
+	var err error
+	var adjusted bool
+	if dur, err = time.ParseDuration(params.History); err == nil {
+		if params.Version >= minimumVersionCompositeDuration {
+			dur -= datamodel.PrometheusGranularity
+			ival = dur.Milliseconds()
+			ivalUnit = millisecond
+			params.History = fmt.Sprintf("%d%s", ival, ivalUnit)
+			adjusted = true
+		}
+	}
+	params.StartTimeInclusive = !adjusted
+	start := currentTime.Add(-dur)
+	params.StartTime = &start
+	params.Range5Min = v1.Range{Start: start, End: currentTime, Step: time.Minute * 5}
 }
 
 //main function.
 func main() {
 	//Read in the command line and config file parameters and set the required variables.
-	initParameters()
-	params.InfoLogger.Println("Version 3.0.0-beta")
-	fmt.Println("[INFO] Version 3.0.0-beta")
+	initParameters("3.0.0-beta")
 
 	if includeContainer {
 		container.Metrics(params)

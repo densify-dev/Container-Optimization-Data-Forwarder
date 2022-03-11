@@ -58,9 +58,14 @@ func conditionallyAddActive(intervals map[string]*time.Duration, exporter string
 	addIfExceeds(intervals, exporter, interval, timeout)
 }
 
+const (
+	scrapeIntervalDiscoveredLabelName = "__scrape_interval__"
+	scrapeTimeoutDiscoveredLabelName  = "__scrape_timeout__"
+)
+
 func conditionallyAddDropped(intervals map[string]*time.Duration, exporter string, dt *v1.DroppedTarget) {
-	interval := parseDurationLabel(dt, "__scrape_interval__")
-	timeout := parseDurationLabel(dt, "__scrape_timeout__")
+	interval := parseDurationLabel(dt, scrapeIntervalDiscoveredLabelName)
+	timeout := parseDurationLabel(dt, scrapeTimeoutDiscoveredLabelName)
 	addIfExceeds(intervals, exporter, interval, timeout)
 }
 
@@ -85,73 +90,41 @@ func addIfExceeds(intervals map[string]*time.Duration, exporter string, interval
 }
 
 func isActiveExporter(at *v1.ActiveTarget, exporter string) bool {
-	mtss := make([][]*matcher, 3)
 	if at != nil {
-		switch exporter {
-		case ne:
-			mtss[0] = []*matcher{{f: exact, s1: "service", s2: ne}, {f: contains, s1: "job", s2: ne}, {f: contains, s1: "pod", s2: ne}}
-			mtss[2] = []*matcher{{f: contains, s1: at.ScrapePool, s2: ne}}
-		case cad:
-			mtss[0] = []*matcher{{f: contains, s1: "job", s2: cad}, {f: contains, s1: "metrics_path", s2: cad}}
-			mtss[2] = []*matcher{{f: contains, s1: at.ScrapePool, s2: cad}, {f: contains, s1: at.ScrapeURL, s2: cad}}
-		case ksm:
-			mtss[0] = []*matcher{{f: contains, s1: "service", s2: ksm}, {f: contains, s1: "job", s2: ksm},
-				{f: contains, s1: "app_kubernetes_io_name", s2: ksm}, {f: contains, s1: "kubernetes_name", s2: ksm}}
-
-		case ossm:
+		if mts, f := labelsMatchers[exporter]; f && len(mts) > 0 {
+			if matchLabelSet(at.Labels, exporter, mts...) {
+				return true
+			}
 		}
-		if dlm, f := discoveredLabelsMatchers[exporter]; f {
-			mtss[1] = dlm
+		if mts, f := discoveredLabelsMatchers[exporter]; f && len(mts) > 0 {
+			if matchMap(at.DiscoveredLabels, exporter, mts...) {
+				return true
+			}
+		}
+		for _, mt := range getFieldMatchers(at, exporter) {
+			if mt.match(exporter) {
+				return true
+			}
 		}
 	}
-	return matchActive(mtss, at)
+	return false
 }
 
 func isDroppedExporter(dt *v1.DroppedTarget, exporter string) bool {
-	if mts, f := discoveredLabelsMatchers[exporter]; f {
-		return matchDropped(mts, dt)
-	}
-	return false
-}
-
-func matchActive(mtss [][]*matcher, at *v1.ActiveTarget) bool {
-	if len(mtss) == 3 {
-		if mts := mtss[0]; len(mts) > 0 {
-			if matchLabelSet(at.Labels, mts...) {
-				return true
-			}
-		}
-		if mts := mtss[1]; len(mts) > 0 {
-			if matchMap(at.DiscoveredLabels, mts...) {
-				return true
-			}
-		}
-		if mts := mtss[2]; len(mts) > 0 {
-			for _, mt := range mts {
-				if mt.match() {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
-func matchDropped(mts []*matcher, dt *v1.DroppedTarget) bool {
-	if len(mts) > 0 {
-		if matchMap(dt.DiscoveredLabels, mts...) {
+	if mts, f := discoveredLabelsMatchers[exporter]; f && len(mts) > 0 {
+		if matchMap(dt.DiscoveredLabels, exporter, mts...) {
 			return true
 		}
 	}
 	return false
 }
 
-func matchMap(m map[string]string, mts ...*matcher) bool {
+func matchMap(m map[string]string, s string, mts ...*matcher) bool {
 	for _, mt := range mts {
-		// replace the key - which is s1 in my - by the value from m
-		if v, ok := m[mt.s1]; ok {
-			mt.s1 = v
-			if mt.match() {
+		// replace the key - which is s in mt - by the value from m
+		if v, ok := m[mt.s]; ok {
+			mt1 := &matcher{f: mt.f, s: v}
+			if mt1.match(s) {
 				return true
 			}
 		}
@@ -159,23 +132,23 @@ func matchMap(m map[string]string, mts ...*matcher) bool {
 	return false
 }
 
-func matchLabelSet(ls model.LabelSet, mts ...*matcher) bool {
+func matchLabelSet(ls model.LabelSet, s string, mts ...*matcher) bool {
 	m := make(map[string]string, len(ls))
 	for k, v := range ls {
 		m[string(k)] = string(v)
 	}
-	return matchMap(m, mts...)
+	return matchMap(m, s, mts...)
 }
 
 type matchFunc func(string, string) bool
 
 type matcher struct {
-	f      matchFunc
-	s1, s2 string
+	f matchFunc
+	s string
 }
 
-func (m *matcher) match() bool {
-	return m.f(m.s1, m.s2)
+func (m *matcher) match(s string) bool {
+	return m.f(m.s, s)
 }
 
 func exact(s1, s2 string) bool {
@@ -194,9 +167,63 @@ func endsWith(s1, s2 string) bool {
 	return strings.HasSuffix(s1, s2)
 }
 
+var labelsMatchers = map[string][]*matcher{
+	ne: {
+		{f: exact, s: "service"},
+		{f: contains, s: "job"},
+		{f: contains, s: "pod"},
+		{f: exact, s: "component"},
+		{f: contains, s: "kubernetes_name"},
+		{f: contains, s: "app"},
+		{f: contains, s: "name"},
+	},
+	cad: {
+		{f: contains, s: "job"},
+		{f: contains, s: "metrics_path"},
+	},
+	ksm: {
+		{f: contains, s: "service"},
+		{f: contains, s: "pod"},
+		{f: contains, s: "job"},
+		{f: contains, s: "app_kubernetes_io_name"},
+		{f: contains, s: "kubernetes_name"},
+	},
+	ossm: {},
+}
+
 var discoveredLabelsMatchers = map[string][]*matcher{
-	ne:   {{f: exact, s1: "__meta_kubernetes_pod_label_app", s2: ne}, {f: exact, s1: "__meta_kubernetes_service_label_k8s_app", s2: ne}},
-	cad:  nil,
-	ksm:  nil,
+	ne: {
+		{f: contains, s: "__meta_kubernetes_endpoints_name"},
+		{f: contains, s: "__meta_kubernetes_pod_container_name"},
+		{f: contains, s: "__meta_kubernetes_pod_controller_name"},
+		{f: contains, s: "__meta_kubernetes_pod_label_app"},
+		{f: contains, s: "__meta_kubernetes_pod_name"},
+		{f: exact, s: "__meta_kubernetes_pod_label_component"},
+		{f: contains, s: "__meta_kubernetes_service_name"},
+		{f: contains, s: "job"},
+	},
+	cad: {
+		{f: contains, s: "__metrics_path__"},
+		{f: contains, s: "job"},
+	},
+	ksm: {
+		{f: contains, s: "__meta_kubernetes_endpoints_name"},
+		{f: contains, s: "__meta_kubernetes_pod_container_name"},
+		{f: contains, s: "__meta_kubernetes_pod_controller_name"},
+		{f: contains, s: "__meta_kubernetes_pod_label_app"},
+		{f: contains, s: "__meta_kubernetes_pod_name"},
+		{f: contains, s: "__meta_kubernetes_service_name"},
+		{f: contains, s: "job"},
+	},
 	ossm: nil,
+}
+
+func getFieldMatchers(at *v1.ActiveTarget, exporter string) []*matcher {
+	mts := []*matcher{{f: contains, s: at.ScrapePool}}
+	switch exporter {
+	case cad:
+		mts = append(mts, &matcher{f: contains, s: at.ScrapeURL},
+			&matcher{f: contains, s: at.GlobalURL})
+	}
+	return mts
 }

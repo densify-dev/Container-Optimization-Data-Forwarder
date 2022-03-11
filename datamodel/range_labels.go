@@ -64,8 +64,8 @@ func ToRangeLabels(l *Labels) ([]*RangeLabels, error) {
 }
 
 func AppendRangeLabels(mrl MapOfRangeLabels, l *Labels, k string) (MapOfRangeLabels, error) {
-	lm := LabelMap{k: l}
-	return AppendRangeLabelMap(mrl, lm, Unmapped)
+	lm := LabelMap{Unmapped: l}
+	return AppendRangeLabelMap(mrl, lm, k)
 }
 
 func AppendRangeLabelMap(mrl MapOfRangeLabels, lm LabelMap, lmk string) (MapOfRangeLabels, error) {
@@ -90,7 +90,7 @@ func AppendRangeLabelMap(mrl MapOfRangeLabels, lm LabelMap, lmk string) (MapOfRa
 }
 
 func Rearrange(mrl MapOfRangeLabels, d *Discovery) []*RangeLabelsMap {
-	st := make(map[int64]bool)
+	ranges := make(map[int64]int64)
 	for k1, m := range mrl {
 		for k2, rls := range m {
 			n := len(rls)
@@ -106,27 +106,29 @@ func Rearrange(mrl MapOfRangeLabels, d *Discovery) []*RangeLabelsMap {
 					}
 					r.StretchBoth(nextRange)
 				}
-				// now record the stat time of the range
-				st[r.Start.UnixNano()] = true
+				// now record the start & end time of the range
+				addToMap(ranges, r)
 			}
 			// if we are missing ranges to cover the entire discovery range, add additional RangeLabels
 			// with an empty map at the beginning/end of the slice
 			if n > 0 {
 				var modified bool
+				last := n - 1
 				start := rls[0].Range.Start
 				if !start.Equal(*d.Range.Start) {
-					rng := &Range{Start: d.Range.Start, End: add(start, -time.Nanosecond)}
+					rng := &Range{Start: d.Range.Start, End: add(start, -PrometheusGranularity)}
 					newStart := &RangeLabels{Range: rng}
 					rls = append([]*RangeLabels{newStart}, rls...)
-					st[rng.Start.UnixNano()] = true
+					last++
+					addToMap(ranges, rng)
 					modified = true
 				}
-				end := rls[n-1].Range.End
+				end := rls[last].Range.End
 				if !end.Equal(*d.Range.End) {
-					rng := &Range{Start: add(end, time.Nanosecond), End: d.Range.End}
+					rng := &Range{Start: add(end, PrometheusGranularity), End: d.Range.End}
 					newEnd := &RangeLabels{Range: rng}
 					rls = append(rls, newEnd)
-					st[rng.Start.UnixNano()] = true
+					addToMap(ranges, rng)
 					modified = true
 				}
 				if modified {
@@ -137,10 +139,10 @@ func Rearrange(mrl MapOfRangeLabels, d *Discovery) []*RangeLabelsMap {
 	}
 
 	// now create a slice of start times and sort it
-	n := len(st)
+	n := len(ranges)
 	startTimes := make([]int64, n)
 	i := 0
-	for startTime := range st {
+	for startTime := range ranges {
 		startTimes[i] = startTime
 		i++
 	}
@@ -149,8 +151,14 @@ func Rearrange(mrl MapOfRangeLabels, d *Discovery) []*RangeLabelsMap {
 	})
 	actualRanges := make([]*Range, n)
 	for i, startTime := range startTimes {
-		t := time.Unix(0, startTime)
-		actualRanges[i] = &Range{Start: &t, End: &t}
+		s := time.Unix(0, startTime)
+		var e time.Time
+		if e1, f := ranges[startTime]; f && i == n-1 {
+			e = time.Unix(0, e1)
+		} else {
+			e = s
+		}
+		actualRanges[i] = &Range{Start: &s, End: &e}
 	}
 	for i, ar := range actualRanges {
 		if i == n-1 {
@@ -168,12 +176,20 @@ func Rearrange(mrl MapOfRangeLabels, d *Discovery) []*RangeLabelsMap {
 				for _, rl := range rls {
 					if rl.Range.Contains(ar) {
 						rlm.Map[k1][k2] = rl.Map
+						break
 					}
-					break
 				}
 			}
 			res[i] = rlm
 		}
 	}
 	return res
+}
+
+func addToMap(m map[int64]int64, r *Range) {
+	s := r.Start.UnixNano()
+	newE := r.End.UnixNano()
+	if e, f := m[s]; !f || newE < e {
+		m[s] = newE
+	}
 }

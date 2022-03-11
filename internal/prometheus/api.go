@@ -21,6 +21,18 @@ type promAPIv2 struct {
 	c api.Client
 }
 
+func GetVersion(args *Parameters) (version string, err error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err = ensureApi(args); err != nil {
+		return
+	}
+	var bir v1.BuildinfoResult
+	bir, err = promApi.Buildinfo(ctx)
+	version = bir.Version
+	return
+}
+
 func (pav2 *promAPIv2) TargetsV2(ctx context.Context) (TargetsResult, error) {
 	u := pav2.c.URL(epTargets, nil)
 

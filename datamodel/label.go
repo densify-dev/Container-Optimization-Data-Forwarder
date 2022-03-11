@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/prometheus/common/model"
 	"github.com/r3labs/diff/v2"
-	"sort"
 	"time"
 )
 
@@ -42,7 +41,6 @@ func (l *Labels) AppendMap(m map[string]string, ts []*time.Time) error {
 	if n := len(ts); n == 0 {
 		return fmt.Errorf("append map called with no time series")
 	} else {
-		sort.SliceStable(ts, func(i, j int) bool { return ts[i].Before(*ts[j]) })
 		start = ts[0]
 		end = ts[n-1]
 	}

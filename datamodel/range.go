@@ -8,9 +8,10 @@ import (
 )
 
 const (
-	empty       = "<nil>"
-	delimiter   = "-"
-	validFormat = "nanotimestamp/" + empty
+	empty                 = "<nil>"
+	delimiter             = "-"
+	validFormat           = "nanotimestamp/" + empty
+	PrometheusGranularity = time.Millisecond
 )
 
 // Range represents a time range. We don't use Prometheus client's Range as
@@ -127,19 +128,19 @@ const (
 )
 
 func (r *Range) stretch(other *Range, arg stretchType) {
-	if other == nil || other.Start == nil || r.End == nil || !other.Start.After(*r.End) {
+	if other == nil || other.Start == nil || r.End == nil || !other.Start.After((*r.End).Add(PrometheusGranularity)) {
 		return
 	}
 	var rEnd, otherStart *time.Time
 	switch arg {
 	case self:
-		rEnd = add(other.Start, -time.Nanosecond)
+		rEnd = add(other.Start, -PrometheusGranularity)
 	case another:
-		otherStart = add(r.End, time.Nanosecond)
+		otherStart = add(r.End, PrometheusGranularity)
 	case both:
-		if d := (other.Start.Sub(*r.End)) / 2; d > 0 {
+		if d := (other.Start.Sub(*r.End)) / 2; d >= PrometheusGranularity {
 			rEnd = add(r.End, d)
-			otherStart = add(rEnd, time.Nanosecond)
+			otherStart = add(rEnd, PrometheusGranularity)
 		}
 	}
 	if rEnd != nil {

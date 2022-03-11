@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -33,27 +34,30 @@ var NamespaceFilter = []string{datamodel.NamespaceKey}
 type Parameters struct {
 	ClusterName, PromURL                             *string
 	Debug                                            bool
-	CurrentTime                                      *time.Time
 	InfoLogger, WarnLogger, ErrorLogger, DebugLogger *log.Logger
 	OAuthTokenPath                                   string
 	CaCertPath                                       string
-	Range5Min                                        v1.Range
+	CurrentTime                                      *time.Time
+	StartTime                                        *time.Time
 	History                                          string
+	StartTimeInclusive                               bool
+	Range5Min                                        v1.Range
+	Version                                          string
 }
 
 func (args *Parameters) ToDiscovery(entityKind string) (*datamodel.Discovery, error) {
 	var disc *datamodel.Discovery
 	var err error
 	if maxScrapeInterval, ok := entityMaxScrapeIntervals[entityKind]; ok {
-		var d time.Duration
-		if d, err = time.ParseDuration(args.History); err == nil {
-			start := args.CurrentTime.Add(-d)
-			r := &datamodel.Range{Start: &start, End: args.CurrentTime}
-			disc = &datamodel.Discovery{
-				ClusterName:       *args.ClusterName,
-				Range:             r,
-				MaxScrapeInterval: maxScrapeInterval,
-			}
+		start := *args.StartTime
+		if args.StartTimeInclusive {
+			start = start.Add(datamodel.PrometheusGranularity)
+		}
+		r := &datamodel.Range{Start: &start, End: args.CurrentTime}
+		disc = &datamodel.Discovery{
+			ClusterName:       *args.ClusterName,
+			Range:             r,
+			MaxScrapeInterval: maxScrapeInterval,
 		}
 	} else {
 		err = fmt.Errorf("unknown entity kind %s", entityKind)
@@ -79,8 +83,26 @@ func MetricCollect(args *Parameters, query string) (value model.Value, err error
 	// if the values from the query return no data (length of 0) then give a warning
 	if v, ok := value.(model.Matrix); !ok {
 		err = errors.New("value is nil or not a model.Matrix")
-	} else if v.Len() == 0 {
+	} else if n := v.Len(); n == 0 {
 		err = errors.New("no data returned, matrix is empty")
+	} else {
+		// make sure that values in sample stream are sorted
+		for _, ss := range v {
+			sort.SliceStable(ss.Values, func(i, j int) bool {
+				return ss.Values[i].Timestamp.Before(ss.Values[j].Timestamp)
+			})
+			// filter out the first value iff its time is the start time
+			if args.StartTimeInclusive {
+				if t := ss.Values[0].Timestamp.Time(); t.Equal(*args.StartTime) {
+					// truncate the first element
+					if n == 1 {
+						ss.Values = nil
+					} else {
+						ss.Values = ss.Values[1:]
+					}
+				}
+			}
+		}
 	}
 	return
 }

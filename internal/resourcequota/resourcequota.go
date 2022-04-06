@@ -33,7 +33,7 @@ func Metrics(args *prometheus.Parameters) {
 	mat := result.(model.Matrix)
 	n := mat.Len()
 	for i := 0; i < n; i++ {
-		nsName := string(mat[i].Metric[datamodel.NamespaceKey])
+		nsName := string(mat[i].Metric[datamodel.NamespaceMetricKey])
 		rqName := string(mat[i].Metric[rqKey])
 		var ok bool
 		if _, ok = resourceQuotas[nsName]; !ok {
@@ -41,10 +41,10 @@ func Metrics(args *prometheus.Parameters) {
 		}
 		var rq *datamodel.ResourceQuota
 		if rq, ok = resourceQuotas[nsName][rqName]; !ok {
-			rq = &datamodel.ResourceQuota{CreationTime: &datamodel.Labels{}}
+			rq = datamodel.NewResourceQuota()
 			resourceQuotas[nsName][rqName] = rq
 		}
-		_ = rq.CreationTime.AppendSampleStreamWithValue(mat[i], "", datamodel.TimeStampConverter())
+		_ = rq.CreationTime.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, datamodel.TimeStampConverter())
 	}
 
 	if disc, err := args.ToDiscovery(prometheus.RQEntityKind); err == nil {

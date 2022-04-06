@@ -70,6 +70,28 @@ func (r *Range) Overlaps(other *Range) bool {
 	return !r.IsDistinct(other)
 }
 
+// Intersection - returns if there is ANY overlap between the ranges
+func (r *Range) Intersection(other *Range) *Range {
+	var res *Range
+	if other == nil {
+		res = r
+	} else if r.Overlaps(other) {
+		var start, end *time.Time
+		if otherStart := r.Start == nil || (other.Start != nil && r.Start.Before(*other.Start)); otherStart {
+			start = other.Start
+		} else {
+			start = r.Start
+		}
+		if otherEnd := r.End == nil || (other.End != nil && r.End.After(*other.End)); otherEnd {
+			end = other.End
+		} else {
+			end = r.End
+		}
+		res = &Range{Start: start, End: end}
+	}
+	return res
+}
+
 // Contains - returns if r contains other
 func (r *Range) Contains(other *Range) bool {
 	if other == nil {

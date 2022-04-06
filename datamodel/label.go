@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/prometheus/common/model"
 	"github.com/r3labs/diff/v2"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -20,6 +22,12 @@ type Labels struct {
 }
 
 type LabelMap map[string]*Labels
+
+func SortSampleStream(ss *model.SampleStream) {
+	sort.SliceStable(ss.Values, func(i, j int) bool {
+		return ss.Values[i].Timestamp.Before(ss.Values[j].Timestamp)
+	})
+}
 
 func (l *Labels) HasDiffs() bool {
 	return len(l.Diffs) > 0
@@ -100,7 +108,7 @@ func (l *Labels) AppendSampleWithFilter(s *model.Sample, filter []string) error 
 func (l *Labels) AppendSampleStreamWithValue(ss *model.SampleStream, key string, c *Converter) error {
 	for _, sp := range ss.Values {
 		t := sp.Timestamp.Time()
-		if err := l.appendValue(ss.Metric, key, sp.Value, c, &t); err != nil {
+		if err := l.appendValue(key, sp.Value, c, &t); err != nil {
 			return err
 		}
 	}
@@ -109,7 +117,7 @@ func (l *Labels) AppendSampleStreamWithValue(ss *model.SampleStream, key string,
 
 func (l *Labels) AppendSampleWithValue(s *model.Sample, key string, c *Converter) error {
 	t := s.Timestamp.Time()
-	return l.appendValue(s.Metric, key, s.Value, c, &t)
+	return l.appendValue(key, s.Value, c, &t)
 }
 
 func EnsureLabels(lm LabelMap, key string) *Labels {
@@ -122,6 +130,29 @@ func EnsureLabels(lm LabelMap, key string) *Labels {
 	return labels
 }
 
+func GetActualKey(met model.Metric, keys []string, replaceKeysByValues bool) (string, error) {
+	var actualKey string
+	if n := len(keys); n == 0 {
+		actualKey = SingleValueKey
+	} else {
+		var aks []string
+		if replaceKeysByValues {
+			aks = make([]string, n)
+			for i, key := range keys {
+				if ak, ok := met[model.LabelName(key)]; ok {
+					aks[i] = string(ak)
+				} else {
+					return "", fmt.Errorf("key %s not found in labelset %v", key, met)
+				}
+			}
+		} else {
+			aks = keys
+		}
+		actualKey = strings.Join(aks, CompoundKeyDelimiter)
+	}
+	return actualKey, nil
+}
+
 func (l *Labels) append(met model.Metric, ts []*time.Time) error {
 	m := make(map[string]string, len(met))
 	for ln, lv := range met {
@@ -130,18 +161,12 @@ func (l *Labels) append(met model.Metric, ts []*time.Time) error {
 	return l.AppendMap(m, ts)
 }
 
-func (l *Labels) appendValue(met model.Metric, key string, v model.SampleValue, c *Converter, t *time.Time) error {
-	var actualKey string
-	if key == "" {
-		actualKey = SingleValueKey
-	} else {
-		if ak, ok := met[model.LabelName(key)]; ok {
-			actualKey = string(ak)
-		} else {
-			return fmt.Errorf("key %s not found in labelset %v", key, met)
-		}
-	}
-	return l.AppendMap(map[string]string{actualKey: ToString(c, v)}, []*time.Time{t})
+func (l *Labels) appendValue(key string, v model.SampleValue, c *Converter, t *time.Time) error {
+	return l.appendLiteralValue(key, ToString(c, v), t)
+}
+
+func (l *Labels) appendLiteralValue(key, value string, t *time.Time) error {
+	return l.AppendMap(map[string]string{key: value}, []*time.Time{t})
 }
 
 func filterMetric(met model.Metric, f []string) (model.Metric, error) {

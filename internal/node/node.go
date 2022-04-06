@@ -7,13 +7,23 @@ import (
 	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/prometheus"
 	"github.com/prometheus/common/model"
 	"net"
+	"strings"
 )
 
 const (
-	nodeKey     = prometheus.NodeEntityKind
-	roleKey     = "role"
-	deviceKey   = "device"
-	instanceKey = "instance"
+	nodeKey           = prometheus.NodeEntityKind
+	roleKey           = "role"
+	deviceKey         = "device"
+	instanceKey       = "instance"
+	resourceKey       = "resource"
+	unitKey           = "unit"
+	underscore        = "_"
+	integer           = "integer"
+	capacityMetric    = `kube_node_status_capacity`
+	allocatableMetric = `kube_node_status_allocatable`
+	cpuCores          = "cpu_cores"
+	memBytes          = "memory_bytes"
+	pods              = "pods"
 )
 
 // Map of labels and values
@@ -24,6 +34,10 @@ var altNameMap = make(map[string]string)
 var nodeNameKeys = map[string]string{"netSpeedBytes": instanceKey}
 
 var podIpFilter = []string{datamodel.PodIpKey}
+var deviceKeys = []string{deviceKey}
+var resourceKeys = []string{resourceKey, unitKey}
+var resourceSubQueries = []string{cpuCores, memBytes, pods}
+var conditionKeys = []string{datamodel.ConditionKey}
 
 //getNodeMetric takes data from prometheus and adds to nodes structure
 func getNodeMetric(result model.Value, metric string) {
@@ -52,13 +66,18 @@ func getNodeMetric(result model.Value, metric string) {
 			role := string(mat[i].Metric[roleKey])
 			roleLabels := datamodel.EnsureLabels(no.Roles, role)
 			_ = roleLabels.AppendSampleStream(mat[i])
+			//		case "kube_node_status_condition":
+			// TODO deal with different conditions!
 		case "netSpeedBytes":
 			if no, ok = getNode(nodeName); !ok {
 				continue
 			}
-			device := string(mat[i].Metric[deviceKey])
+			device, err := datamodel.GetActualKey(mat[i].Metric, deviceKeys, true)
+			if err != nil {
+				continue
+			}
 			deviceLabels := datamodel.EnsureLabels(no.NetSpeedBytesMap, device)
-			_ = deviceLabels.AppendSampleStreamWithValue(mat[i], deviceKey, nil)
+			_ = deviceLabels.AppendSampleStreamWithValue(mat[i], device, nil)
 		case "altWorkloadName":
 			if no, ok = nodes[nodeName]; !ok {
 				continue
@@ -70,14 +89,130 @@ func getNodeMetric(result model.Value, metric string) {
 				altNameMap[podIp] = nodeName
 			}
 			// no need to update anything, this is just for mapping by altName
+		case "nodeStatusCondition":
+			if no, ok = getNode(nodeName); !ok {
+				continue
+			}
+			var cond string
+			var err error
+			if cond, err = datamodel.GetActualKey(mat[i].Metric, conditionKeys, true); err != nil {
+				continue
+			}
+			var condition *datamodel.Condition
+			var f bool
+			if condition, f = no.RawConditions[cond]; !f {
+				condition = &datamodel.Condition{}
+				no.RawConditions[cond] = condition
+			}
+			if err = condition.Append(mat[i]); err != nil {
+				continue
+			}
+			if condition.IsComplete() {
+				var ss *model.SampleStream
+				if ss, err = condition.Consolidate(); err != nil {
+					continue
+				}
+				conditionLabels := datamodel.EnsureLabels(no.Conditions, cond)
+				_ = conditionLabels.AppendSampleStreamWithValue(ss, cond, nil)
+			}
 		default:
 			if no, ok = nodes[nodeName]; !ok {
 				continue
 			}
-			labels := datamodel.EnsureLabels(no.LabelMap, metric)
-			_ = labels.AppendSampleStream(mat[i])
+			var capacityOrAllocatable bool
+			if capacityOrAllocatable = getCapacityAllocatableMetric(no.Capacity, mat[i], metric, capacityMetric); !capacityOrAllocatable {
+				capacityOrAllocatable = getCapacityAllocatableMetric(no.Allocatable, mat[i], metric, allocatableMetric)
+			}
+			if !capacityOrAllocatable {
+				// labels
+				labels := datamodel.EnsureLabels(no.LabelMap, metric)
+				_ = labels.AppendSampleStream(mat[i])
+			}
 		}
 	}
+}
+
+func getCapacityAllocatableMetrics(queryGroup string, args *prometheus.Parameters) {
+	query := queryGroup
+	result, err := prometheus.MetricCollect(args, query)
+	var trySubQueries bool
+	if err != nil {
+		args.ErrorLogger.Println("metric=nodes query=" + query + " message=" + err.Error())
+		fmt.Println("[ERROR] metric=nodes query=" + query + " message=" + err.Error())
+		trySubQueries = true
+	} else if result == nil || result.(model.Matrix).Len() == 0 {
+		trySubQueries = true
+	}
+	if trySubQueries {
+		for _, subQuery := range resourceSubQueries {
+			query = strings.Join([]string{queryGroup, subQuery}, underscore)
+			if result, err = prometheus.MetricCollect(args, query); err == nil {
+				getNodeMetric(result, query)
+			} else {
+				args.ErrorLogger.Println("metric=nodes query=" + query + " message=" + err.Error())
+				fmt.Println("[ERROR] metric=nodes query=" + query + " message=" + err.Error())
+			}
+		}
+	} else {
+		getNodeMetric(result, query)
+	}
+}
+
+func getCapacityAllocatableMetric(lm datamodel.LabelMap, ss *model.SampleStream, metric, metricGroup string) bool {
+	var ok bool
+	if sc, f := getSuffixComponents(metric, metricGroup); f {
+		var keys []string
+		var replaceKeysByValues bool
+		if n := len(sc); n == 0 {
+			// new API, kube_node_status_capacity or kube_node_status_allocatable
+			keys = resourceKeys
+			replaceKeysByValues = true
+		} else {
+			keys = sc
+			if n == 1 {
+				// pods
+				keys = append(keys, integer)
+			} else {
+				sc[1] = strings.TrimSuffix(sc[1], "s")
+			}
+		}
+		var ak string
+		var err error
+		if ak, err = datamodel.GetActualKey(ss.Metric, keys[:1], replaceKeysByValues); err == nil {
+			l := datamodel.EnsureLabels(lm, ak)
+			if ak, err = datamodel.GetActualKey(ss.Metric, keys[1:], replaceKeysByValues); err == nil {
+				err = l.AppendSampleStreamWithValue(ss, ak, nil)
+			}
+		}
+		ok = err == nil
+	}
+	return ok
+}
+
+func getSuffixComponents(metric, metricGroup string) (s []string, f bool) {
+	suffix := strings.TrimPrefix(metric, metricGroup)
+	n := len(suffix)
+	switch n {
+	case 0:
+		// exact match
+		f = true
+	case len(metric):
+		// no match, f is false already
+	default:
+		// metricGroup is a prefix of metric
+		sc := strings.SplitN(suffix, underscore, 2)
+		if k := len(sc); k > 0 {
+			f = true
+			if sc[0] == "" {
+				if k > 1 {
+					s = sc[1:]
+				}
+			} else {
+				s = sc
+			}
+		}
+	}
+	return
 }
 
 //Metrics a global func for collecting node level metrics in prometheus
@@ -100,11 +235,7 @@ func Metrics(args *prometheus.Parameters) {
 	for i := 0; i < n; i++ {
 		if nodeName := string(mat[i].Metric[nodeKey]); nodeName != "" {
 			if _, ok := nodes[nodeName]; !ok {
-				nodes[nodeName] = &datamodel.Node{
-					LabelMap:         make(datamodel.LabelMap),
-					Roles:            make(datamodel.LabelMap),
-					NetSpeedBytesMap: make(datamodel.LabelMap),
-				}
+				nodes[nodeName] = datamodel.NewNode()
 			}
 		}
 	}
@@ -161,53 +292,22 @@ func Metrics(args *prometheus.Parameters) {
 		getNodeMetric(result, "netSpeedBytes")
 	}
 
+	getCapacityAllocatableMetrics(capacityMetric, args)
+	getCapacityAllocatableMetrics(allocatableMetric, args)
+
+	// Query and store the node status condition
+	query = `kube_node_status_condition`
+	result, err = prometheus.MetricCollect(args, query)
+	if err != nil {
+		args.WarnLogger.Println("metric=kube_node_status_condition query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=kube_node_status_condition query=" + query + " message=" + err.Error())
+	} else {
+		getNodeMetric(result, "nodeStatusCondition")
+	}
+
 	if disc, err := args.ToDiscovery(prometheus.NodeEntityKind); err == nil {
 		discovery := &datamodel.NodeDiscovery{Discovery: disc, Nodes: nodes}
 		prometheus.WriteDiscovery(args, discovery, prometheus.NodeEntityKind)
-	}
-
-	//Queries the capacity fields of all nodes if we don't see any data then will try to use the older queries for capacity.
-	query = `kube_node_status_capacity`
-	result, err = prometheus.MetricCollect(args, query)
-	if result.(model.Matrix).Len() == 0 {
-
-		//Query and store prometheus total cpu cores
-		query = `kube_node_status_capacity_cpu_cores`
-		prometheus.GetWorkload("node_capacity_cpu_cores", query, args, prometheus.NodeEntityKind)
-
-		//Query and store prometheus total memory in bytes.
-		query = `kube_node_status_capacity_memory_bytes`
-		prometheus.GetWorkload("node_capacity_mem_bytes", query, args, prometheus.NodeEntityKind)
-
-		//Query and store prometheus total for pods per node.
-		query = `kube_node_status_capacity_pods`
-		prometheus.GetWorkload("node_capacity_pods", query, args, prometheus.NodeEntityKind)
-	} else {
-		//Query and store prometheus totals for capacity.
-		query = `kube_node_status_capacity`
-		prometheus.GetWorkload("node_capacity", query, args, prometheus.NodeEntityKind)
-	}
-
-	//Queries the allocatable fields of all nodes if we don't see data then will try to query the older metrics for allocations.
-	query = `kube_node_status_allocatable`
-	result, err = prometheus.MetricCollect(args, query)
-	if result.(model.Matrix).Len() == 0 {
-
-		//Query and store prometheus total cpu cores.
-		query = `kube_node_status_allocatable_cpu_cores`
-		prometheus.GetWorkload("node_allocatable_cpu_cores", query, args, prometheus.NodeEntityKind)
-
-		//Query and store prometheus total memory in bytes
-		query = `kube_node_status_allocatable_memory_bytes`
-		prometheus.GetWorkload("node_allocatable_mem_bytes", query, args, prometheus.NodeEntityKind)
-
-		//Query and store prometheus total for pods per node
-		query = `kube_node_status_allocatable_pods`
-		prometheus.GetWorkload("node_allocatable_pods", query, args, prometheus.NodeEntityKind)
-	} else {
-		//Query and store prometheus allocatable data
-		query = `kube_node_status_allocatable`
-		prometheus.GetWorkload("node_allocatable", query, args, prometheus.NodeEntityKind)
 	}
 
 	//Query and store prometheus total cpu uptime in seconds
@@ -275,7 +375,7 @@ var nera = &prometheus.RelabelArgs{
 }
 
 func getNodeExporterWorkload(filename, query string, args *prometheus.Parameters) {
-	prometheus.GetWorkloadRelabel(filename, query, args, prometheus.NodeEntityKind, nera)
+	prometheus.GetFilteredRelabeledWorkload(filename, query, args, prometheus.NodeEntityKind, nil, nera)
 }
 
 func hostName(name string) (string, bool) {

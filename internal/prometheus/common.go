@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sort"
 	"sync"
 	"time"
 
@@ -28,7 +27,7 @@ const (
 	CRQEntityKind       = "crq"
 )
 
-var NamespaceFilter = []string{datamodel.NamespaceKey}
+var NamespaceFilter = []string{datamodel.NamespaceMetricKey}
 
 // Parameters - Reusable structure that holds common arguments used in the project
 type Parameters struct {
@@ -88,9 +87,7 @@ func MetricCollect(args *Parameters, query string) (value model.Value, err error
 	} else {
 		// make sure that values in sample stream are sorted
 		for _, ss := range v {
-			sort.SliceStable(ss.Values, func(i, j int) bool {
-				return ss.Values[i].Timestamp.Before(ss.Values[j].Timestamp)
-			})
+			datamodel.SortSampleStream(ss)
 			// filter out the first value iff its time is the start time
 			if args.StartTimeInclusive {
 				if t := ss.Values[0].Timestamp.Time(); t.Equal(*args.StartTime) {
@@ -107,10 +104,22 @@ func MetricCollect(args *Parameters, query string) (value model.Value, err error
 	return
 }
 
-//GetWorkload used to query for the workload data and then calls write workload
-func GetWorkload(fileName, query string, args *Parameters, entityKind string) {
-	GetWorkloadRelabel(fileName, query, args, entityKind, nil)
+func FilteredMetricCollect(args *Parameters, query string, mfc MatrixFilterFunc) (value model.Value, err error) {
+	value, err = MetricCollect(args, query)
+	if err == nil && mfc != nil {
+		if m, ok := value.(model.Matrix); ok {
+			value = mfc(m)
+		}
+	}
+	return
 }
+
+// GetWorkload used to query for the workload data and then calls write workload
+func GetWorkload(fileName, query string, args *Parameters, entityKind string) {
+	GetFilteredRelabeledWorkload(fileName, query, args, entityKind, nil, nil)
+}
+
+type MatrixFilterFunc func(model.Matrix) model.Matrix
 
 type ValueConversionFunc func(string) (string, bool)
 
@@ -120,38 +129,50 @@ type RelabelArgs struct {
 	VCF ValueConversionFunc
 }
 
-func GetWorkloadRelabel(fileName, query string, args *Parameters, entityKind string, ras ...*RelabelArgs) {
-	result, err := MetricCollect(args, query)
+// GetFilteredRelabeledWorkload is used to query for the workload data, perform relabeling and then write it
+func GetFilteredRelabeledWorkload(fileName, query string, args *Parameters, entityKind string,
+	mfc MatrixFilterFunc, ras ...*RelabelArgs) {
+	msgHeader := "entity=" + entityKind + "metric=" + fileName + " query=" + query
+	var msg string
+	result, err := FilteredMetricCollect(args, query, mfc)
 	if err != nil {
-		args.WarnLogger.Println("metric=" + fileName + " query=" + query + " message=" + err.Error())
-		fmt.Println("[WARNING] metric=" + fileName + " query=" + query + " message=" + err.Error())
+		msg = msgHeader + " message=" + err.Error()
+		args.WarnLogger.Println(msg)
+		fmt.Println("[WARNING] " + msg)
 	} else {
-		relabel(result, ras...)
-		file, _ := json.Marshal(result)
-		err = os.WriteFile("./data/"+entityKind+"/"+fileName+".json", file, 0644)
-		if err != nil {
-			args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
-			fmt.Println("[ERROR] entity=" + entityKind + " message=" + err.Error())
+		if mat, ok := result.(model.Matrix); ok {
+			if len(mat) == 0 {
+				msg = msgHeader + " (filtered) matrix is of length zero"
+				args.WarnLogger.Println(msg)
+				fmt.Println("[WARNING] " + msg)
+			} else {
+				relabel(mat, ras...)
+				file, _ := json.Marshal(mat)
+				err = os.WriteFile("./data/"+entityKind+"/"+fileName+".json", file, 0644)
+				if err != nil {
+					msg = msgHeader + " message=" + err.Error()
+					args.ErrorLogger.Println(msg)
+					fmt.Println("[ERROR] " + msg)
+				}
+			}
 		}
 	}
 }
 
-func relabel(result model.Value, ras ...*RelabelArgs) {
-	if mat, ok := result.(model.Matrix); ok {
-		for _, ra := range ras {
-			if ra != nil {
-				for _, ss := range mat {
-					key := model.LabelName(ra.Key)
-					if val, f := ss.Metric[key]; f {
-						value := string(val)
-						if ra.VCF != nil {
-							if v, converted := ra.VCF(value); converted {
-								value = v
-							}
+func relabel(mat model.Matrix, ras ...*RelabelArgs) {
+	for _, ra := range ras {
+		if ra != nil {
+			for _, ss := range mat {
+				key := model.LabelName(ra.Key)
+				if val, f := ss.Metric[key]; f {
+					value := string(val)
+					if ra.VCF != nil {
+						if v, converted := ra.VCF(value); converted {
+							value = v
 						}
-						if replacement, found := ra.Map[value]; found {
-							ss.Metric[key] = model.LabelValue(replacement)
-						}
+					}
+					if replacement, found := ra.Map[value]; found {
+						ss.Metric[key] = model.LabelValue(replacement)
 					}
 				}
 			}

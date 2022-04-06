@@ -13,6 +13,7 @@ const (
 
 type ValueConversionFunction func(float64) float64
 type StringerConversionFunction func(float64) fmt.Stringer
+type FilterFunc func(v float64) bool
 
 type Converter struct {
 	VCF ValueConversionFunction
@@ -65,6 +66,10 @@ func (ts *TimeStringer) String() string {
 	return s
 }
 
+func ToBool(value float64) bool {
+	return value != 0.0
+}
+
 func timeConv(value float64) fmt.Stringer {
 	sec, frac := math.Modf(value)
 	t := time.Unix(int64(sec), int64(float64(time.Second)*frac))
@@ -72,6 +77,5 @@ func timeConv(value float64) fmt.Stringer {
 }
 
 func boolConv(value float64) fmt.Stringer {
-	b := value != 0.0
-	return &BoolStringer{Value: b}
+	return &BoolStringer{Value: ToBool(value)}
 }

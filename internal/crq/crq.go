@@ -42,16 +42,10 @@ func Metrics(args *prometheus.Parameters) {
 		var ok bool
 		var crq *datamodel.ClusterResourceQuota
 		if crq, ok = crqs[crqName]; !ok {
-			crq = &datamodel.ClusterResourceQuota{
-				LabelMap:      make(datamodel.LabelMap),
-				SelectorType:  &datamodel.Labels{},
-				SelectorKey:   &datamodel.Labels{},
-				SelectorValue: &datamodel.Labels{},
-				CreationTime:  &datamodel.Labels{},
-			}
+			crq = datamodel.NewClusterResourceQuota()
 			crqs[crqName] = crq
 		}
-		_ = crq.CreationTime.AppendSampleStreamWithValue(mat[i], "", datamodel.TimeStampConverter())
+		_ = crq.CreationTime.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, datamodel.TimeStampConverter())
 	}
 
 	query = `openshift_clusterresourcequota_labels`

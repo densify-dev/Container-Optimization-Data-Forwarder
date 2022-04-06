@@ -15,11 +15,8 @@ var systems = map[string]*datamodel.Namespace{}
 const (
 	ownerKindKey        = "owner_kind"
 	ownerNameKey        = "owner_name"
-	podEntityKey        = "Pods"
 	podMetricKey        = "pod"
-	replicaSetEntityKey = "ReplicaSet"
 	replicaSetMetricKey = "replicaset"
-	jobEntityKey        = "Job"
 	jobMetricKey        = "job_name"
 	containerIdKey      = "container_id"
 	imageIdKey          = "image_id"
@@ -38,30 +35,32 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 	n := mat.Len()
 	for i := 0; i < n; i++ {
 		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
-		nsValue, ok := mat[i].Metric[datamodel.NamespaceKey]
+		nsValue, ok := mat[i].Metric[datamodel.NamespaceMetricKey]
 		if !ok {
 			continue
 		}
 		namespaceValue := string(nsValue)
-		if _, ok = systems[namespaceValue]; !ok {
-			continue
-		}
 		//Validate that the data contains the pod label with value and check it exists in our systems structure
 		pValue, ok := mat[i].Metric[pod]
 		if !ok {
 			continue
 		}
 		podValue := string(pValue)
-		if _, ok = systems[namespaceValue].Entities[podEntityKey][podValue]; !ok {
+		var ei datamodel.EntityInterface
+		if ei, ok = datamodel.GetEntity(systems, namespaceValue, datamodel.PodKey, podValue); !ok || ei == nil {
 			continue
 		}
-		//Validate that the data contains the container label with value and check it exists in our systems structure
-		containerNameValue, ok := mat[i].Metric[container]
+		var p *datamodel.Pod
+		if p, ok = ei.(*datamodel.Pod); !ok {
+			continue
+		}
+		cValue, ok := mat[i].Metric[container]
 		if !ok {
 			continue
 		}
+		contValue := string(cValue)
 		var container *datamodel.Container
-		if container, ok = systems[namespaceValue].Entities[podEntityKey][podValue].Containers[string(containerNameValue)]; !ok {
+		if container, ok = datamodel.GetContainer(p, contValue); !ok {
 			continue
 		}
 
@@ -70,27 +69,27 @@ func getContainerMetric(result model.Value, pod, container model.LabelName, metr
 		case "limits":
 			switch mat[i].Metric["resource"] {
 			case "memory":
-				_ = container.MemLimit.AppendSampleStreamWithValue(mat[i], "", memConvert)
+				_ = container.MemLimit.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, memConvert)
 			case "cpu":
-				_ = container.CpuLimit.AppendSampleStreamWithValue(mat[i], "", cpuConvert)
+				_ = container.CpuLimit.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, cpuConvert)
 			}
 		case "requests":
 			switch mat[i].Metric["resource"] {
 			case "memory":
-				_ = container.MemRequest.AppendSampleStreamWithValue(mat[i], "", memConvert)
+				_ = container.MemRequest.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, memConvert)
 			case "cpu":
-				_ = container.CpuRequest.AppendSampleStreamWithValue(mat[i], "", cpuConvert)
+				_ = container.CpuRequest.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, cpuConvert)
 			}
 		case "cpuLimit":
-			_ = container.CpuLimit.AppendSampleStreamWithValue(mat[i], "", cpuConvert)
+			_ = container.CpuLimit.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, cpuConvert)
 		case "cpuRequest":
-			_ = container.CpuRequest.AppendSampleStreamWithValue(mat[i], "", cpuConvert)
+			_ = container.CpuRequest.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, cpuConvert)
 		case "memLimit":
-			_ = container.MemLimit.AppendSampleStreamWithValue(mat[i], "", memConvert)
+			_ = container.MemLimit.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, memConvert)
 		case "memRequest":
-			_ = container.MemRequest.AppendSampleStreamWithValue(mat[i], "", memConvert)
+			_ = container.MemRequest.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, memConvert)
 		case "powerState":
-			_ = container.PowerState.AppendSampleStreamWithValue(mat[i], "", boolConv)
+			_ = container.PowerState.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, boolConv)
 		case "kube_pod_container_info":
 			// filter out cases when container_id or image_id are not populated yet (may happen
 			// in the phase of ContainerCreating), as these cause a lot of noise of diffs
@@ -123,8 +122,7 @@ var memConvert = &datamodel.Converter{VCF: memConv}
 var timeConv = datamodel.TimeStampConverter()
 var boolConv = datamodel.BoolConverter()
 
-//getmidMetric is used to parse the results from Prometheus related to mid Entities and store them in the systems data structure.
-func getMidMetric(result model.Value, mid model.LabelName, metric, kind, query string) {
+func getEntityMetric(result model.Value, mid model.LabelName, metric, kind, query string) {
 	mat, ok := result.(model.Matrix)
 	if !ok {
 		return
@@ -133,7 +131,7 @@ func getMidMetric(result model.Value, mid model.LabelName, metric, kind, query s
 	n := mat.Len()
 	for i := 0; i < n; i++ {
 		//Validate that the data contains the namespace label with value and check it exists in our systems structure.
-		nsVal, ok := mat[i].Metric[datamodel.NamespaceKey]
+		nsVal, ok := mat[i].Metric[datamodel.NamespaceMetricKey]
 		if !ok {
 			continue
 		}
@@ -147,35 +145,50 @@ func getMidMetric(result model.Value, mid model.LabelName, metric, kind, query s
 			continue
 		}
 		midValue := string(midVal)
-		if _, ok := systems[namespaceValue].Entities[kind][midValue]; !ok {
+		var ei datamodel.EntityInterface
+		if ei, ok = datamodel.GetEntity(systems, namespaceValue, kind, midValue); !ok || ei == nil {
 			continue
 		}
-
-		//Check which metric this is for and update the corresponding variable for this mid in the system data structure
 		switch metric {
 		case "label":
-			labels := datamodel.EnsureLabels(systems[namespaceValue].Entities[kind][midValue].LabelMap, query)
+			labels := datamodel.EnsureLabels(ei.Get().LabelMap, query)
 			_ = labels.AppendSampleStream(mat[i])
 		case "creationTime":
-			_ = systems[namespaceValue].Entities[kind][midValue].CreationTime.AppendSampleStreamWithValue(mat[i], "", timeConv)
+			_ = ei.Get().CreationTime.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, timeConv)
 		case "kube_cronjob_next_schedule_time":
-			_ = systems[namespaceValue].Entities[kind][midValue].NextSchedTime.AppendSampleStreamWithValue(mat[i], "", timeConv)
+			if cj, ok := ei.(*datamodel.CronJob); ok {
+				_ = cj.NextScheduledTime.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, timeConv)
+			}
 		case "kube_cronjob_status_active":
-			_ = systems[namespaceValue].Entities[kind][midValue].StatusActive.AppendSampleStreamWithValue(mat[i], "", boolConv)
+			if cj, ok := ei.(*datamodel.CronJob); ok {
+				_ = cj.Active.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, boolConv)
+			}
 		case "kube_cronjob_status_last_schedule_time":
-			_ = systems[namespaceValue].Entities[kind][midValue].LastSchedTime.AppendSampleStreamWithValue(mat[i], "", timeConv)
+			if cj, ok := ei.(*datamodel.CronJob); ok {
+				_ = cj.LastScheduledTime.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, timeConv)
+			}
 		case "kube_deployment_metadata_generation":
-			_ = systems[namespaceValue].Entities[kind][midValue].MetadataGeneration.AppendSampleStreamWithValue(mat[i], "", nil)
+			_ = ei.Get().Generation.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, nil)
 		case "kube_deployment_spec_strategy_rollingupdate_max_surge":
-			_ = systems[namespaceValue].Entities[kind][midValue].MaxSurge.AppendSampleStreamWithValue(mat[i], "", nil)
+			if d, ok := ei.(*datamodel.Deployment); ok {
+				_ = d.MaxSurge.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, nil)
+			}
 		case "kube_deployment_spec_strategy_rollingupdate_max_unavailable":
-			_ = systems[namespaceValue].Entities[kind][midValue].MaxUnavailable.AppendSampleStreamWithValue(mat[i], "", nil)
+			if d, ok := ei.(*datamodel.Deployment); ok {
+				_ = d.MaxUnavailable.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, nil)
+			}
 		case "kube_job_status_completion_time":
-			_ = systems[namespaceValue].Entities[kind][midValue].CompletionTime.AppendSampleStreamWithValue(mat[i], "", timeConv)
+			if j, ok := ei.(*datamodel.Job); ok {
+				_ = j.CompletionTime.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, timeConv)
+			}
 		case "kube_job_spec_completions":
-			_ = systems[namespaceValue].Entities[kind][midValue].Completions.AppendSampleStreamWithValue(mat[i], "", nil)
+			if j, ok := ei.(*datamodel.Job); ok {
+				_ = j.Completions.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, nil)
+			}
 		case "kube_job_spec_parallelism":
-			_ = systems[namespaceValue].Entities[kind][midValue].Parallelism.AppendSampleStreamWithValue(mat[i], "", nil)
+			if j, ok := ei.(*datamodel.Job); ok {
+				_ = j.Parallelism.AppendSampleStreamWithValue(mat[i], datamodel.SingleValueKey, nil)
+			}
 		}
 	}
 }
@@ -190,7 +203,7 @@ func getNamespaceMetric(result model.Value, query string) {
 	n := mat.Len()
 	for i := 0; i < n; i++ {
 		//Validate that the data contains the namespace label with value and check it exists in our temp structure if not it will be added.
-		nsValue, ok := mat[i].Metric[datamodel.NamespaceKey]
+		nsValue, ok := mat[i].Metric[datamodel.NamespaceMetricKey]
 		if !ok {
 			continue
 		}
@@ -233,34 +246,26 @@ func Metrics(args *prometheus.Parameters) {
 			// Get the container, pod and namespace names.
 			containerName := string(mat[i].Metric["container"])
 			podName := string(mat[i].Metric[podMetricKey])
-			namespaceName := string(mat[i].Metric[datamodel.NamespaceKey])
-			//check if already have setup namespace, pod in system structure and if not add them.
-			if _, ok := systems[namespaceName]; !ok {
-				systems[namespaceName] = &datamodel.Namespace{LabelMap: make(datamodel.LabelMap), Entities: make(map[string]map[string]*datamodel.MidLevel)}
-				systems[namespaceName].Entities[podEntityKey] = make(map[string]*datamodel.MidLevel)
-			}
-			if _, ok := systems[namespaceName].Entities[podEntityKey][podName]; !ok {
-				systems[namespaceName].Entities[podEntityKey][podName] = newMidLevel()
-			}
-			//If the container doesn't exist then look to add and call getContainerMetric to set labels.
-			if _, ok := systems[namespaceName].Entities[podEntityKey][podName].Containers[containerName]; !ok {
-				systems[namespaceName].Entities[podEntityKey][podName].Containers[containerName] = newContainer()
-				getContainerMetric(result, "pod", "container", query)
-			}
+			namespaceName := string(mat[i].Metric[datamodel.NamespaceMetricKey])
+			// ensure the namespace and pods are already there
+			_, _ = datamodel.EnsureEntity(systems, namespaceName, datamodel.NamespaceKey, "")
+			ei, _ := datamodel.EnsureEntity(systems, namespaceName, datamodel.PodKey, podName)
+			_, _ = datamodel.EnsureContainer(ei.(*datamodel.Pod), containerName)
+			getContainerMetric(result, "pod", "container", query)
 		}
 	}
 
 	// Create any entities based on pods that are owned by them.
 	// This will create replicasets, jobs, daemonsets, etc.
-	if err = getMidLevelOwner(args, "kube_pod_owner", podEntityKey, podMetricKey); err != nil {
+	if err = getEntityOwner(args, "kube_pod_owner", datamodel.PodKey, podMetricKey); err != nil {
 		return
 	}
 
 	// Check for any replicaset that are owned by deployments.
-	_ = getMidLevelOwner(args, "kube_replicaset_owner", replicaSetEntityKey, replicaSetMetricKey)
+	_ = getEntityOwner(args, "kube_replicaset_owner", datamodel.ReplicaSetKey, replicaSetMetricKey)
 
 	//Check for any jobs that are owned by Cronjobs
-	_ = getMidLevelOwner(args, "kube_job_owner", jobEntityKey, jobMetricKey)
+	_ = getEntityOwner(args, "kube_job_owner", datamodel.JobKey, jobMetricKey)
 
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting Container Metrics")
@@ -353,7 +358,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=podInfo query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=podInfo query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "pod", "label", podEntityKey, query)
+		getEntityMetric(result, "pod", "label", datamodel.PodKey, query)
 	}
 
 	query = `kube_pod_labels`
@@ -362,7 +367,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=podLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=podLabels query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "pod", "label", podEntityKey, query)
+		getEntityMetric(result, "pod", "label", datamodel.PodKey, query)
 	}
 
 	//Depending on version of KSM will determine what metric need to use to see if containers are terminated or not for there state.
@@ -394,7 +399,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=podCreationTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=podCreationTime query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "pod", "creationTime", "Pod", query)
+		getEntityMetric(result, "pod", "creationTime", "Pod", query)
 	}
 
 	//Namespace metrics
@@ -437,7 +442,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=labels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=labels query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "deployment", "label", "Deployment", query)
+		getEntityMetric(result, "deployment", "label", "Deployment", query)
 	}
 
 	query = `kube_deployment_spec_strategy_rollingupdate_max_surge`
@@ -446,7 +451,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=maxSurge query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=maxSurge query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "deployment", query, "Deployment", query)
+		getEntityMetric(result, "deployment", query, "Deployment", query)
 	}
 
 	query = `kube_deployment_spec_strategy_rollingupdate_max_unavailable`
@@ -455,7 +460,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=maxUnavailable query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=maxUnavailable query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "deployment", query, "Deployment", query)
+		getEntityMetric(result, "deployment", query, "Deployment", query)
 	}
 
 	query = `kube_deployment_metadata_generation`
@@ -464,7 +469,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=metadataGeneration query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=metadataGeneration query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "deployment", query, "Deployment", query)
+		getEntityMetric(result, "deployment", query, "Deployment", query)
 	}
 
 	query = `kube_deployment_created`
@@ -473,7 +478,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=deploymentCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=deploymentCreated query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "deployment", "creationTime", "Deployment", query)
+		getEntityMetric(result, "deployment", "creationTime", "Deployment", query)
 	}
 
 	//ReplicaSet metrics
@@ -490,7 +495,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=replicaSetLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=replicaSetLabels query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "replicaset", "label", "ReplicaSet", query)
+		getEntityMetric(result, "replicaset", "label", "ReplicaSet", query)
 	}
 
 	query = `kube_replicaset_created`
@@ -499,7 +504,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=replicaSetCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=replicaSetCreated query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "replicaset", "creationTime", "ReplicaSet", query)
+		getEntityMetric(result, "replicaset", "creationTime", "ReplicaSet", query)
 	}
 
 	//ReplicationController metrics
@@ -516,7 +521,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=replicationControllerCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=replicationControllerCreated query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "replicationcontroller", "creationTime", "ReplicationController", query)
+		getEntityMetric(result, "replicationcontroller", "creationTime", "ReplicationController", query)
 	}
 
 	//DaemonSet metrics
@@ -533,7 +538,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=daemonSetLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=daemonSetLabels query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "daemonset", "label", "DaemonSet", query)
+		getEntityMetric(result, "daemonset", "label", "DaemonSet", query)
 	}
 
 	query = `kube_daemonset_created`
@@ -542,7 +547,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=daemonSetCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=daemonSetCreated query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "daemonset", "creationTime", "DaemonSet", query)
+		getEntityMetric(result, "daemonset", "creationTime", "DaemonSet", query)
 	}
 
 	//StatefulSet metrics
@@ -559,7 +564,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=statefulSetLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=statefulSetLabels query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "statefulset", "label", "StatefulSet", query)
+		getEntityMetric(result, "statefulset", "label", "StatefulSet", query)
 	}
 
 	query = `kube_statefulset_created`
@@ -568,7 +573,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=statefulSetCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=statefulSetCreated query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "statefulset", "creationTime", "StatefulSet", query)
+		getEntityMetric(result, "statefulset", "creationTime", "StatefulSet", query)
 	}
 
 	//Job metrics
@@ -585,7 +590,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=jobInfo query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobInfo query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "job_name", "label", "Job", query)
+		getEntityMetric(result, "job_name", "label", "Job", query)
 	}
 
 	query = `kube_job_labels`
@@ -594,7 +599,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=jobLabel query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobLabel query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "job_name", "label", "Job", query)
+		getEntityMetric(result, "job_name", "label", "Job", query)
 	}
 
 	query = `kube_job_spec_completions`
@@ -603,7 +608,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=jobSpecCompletions query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobSpecCompletions query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "job_name", query, "Job", query)
+		getEntityMetric(result, "job_name", query, "Job", query)
 	}
 
 	query = `kube_job_spec_parallelism`
@@ -612,7 +617,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=jobSpecParallelism query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobSpecParallelism query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "job_name", query, "Job", query)
+		getEntityMetric(result, "job_name", query, "Job", query)
 	}
 
 	query = `kube_job_status_completion_time`
@@ -621,7 +626,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=jobStatusCompletionTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobStatusCompletionTime query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "job_name", query, "Job", query)
+		getEntityMetric(result, "job_name", query, "Job", query)
 	}
 
 	query = `kube_job_status_start_time`
@@ -630,7 +635,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=jobStatusStartTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobStatusStartTime query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "job_name", "creationTime", "Job", query)
+		getEntityMetric(result, "job_name", "creationTime", "Job", query)
 	}
 
 	query = `kube_job_created`
@@ -639,7 +644,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=jobCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=jobCreated query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "job", "creationTime", "Job", query)
+		getEntityMetric(result, "job", "creationTime", "Job", query)
 	}
 
 	//CronJob metrics
@@ -656,7 +661,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=cronJobLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobLabels query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "cronjob", "label", "CronJob", query)
+		getEntityMetric(result, "cronjob", "label", "CronJob", query)
 	}
 
 	query = `kube_cronjob_info`
@@ -665,7 +670,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=cronJobInfo query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobInfo query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "cronjob", "label", "CronJob", query)
+		getEntityMetric(result, "cronjob", "label", "CronJob", query)
 	}
 
 	query = `kube_cronjob_next_schedule_time`
@@ -674,7 +679,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=cronJobNextScheduleTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobNextScheduleTime query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "cronjob", query, "CronJob", query)
+		getEntityMetric(result, "cronjob", query, "CronJob", query)
 	}
 
 	query = `kube_cronjob_status_last_schedule_time`
@@ -683,7 +688,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=cronJobStatusLastScheduleTime query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobStatusLastScheduleTime query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "cronjob", query, "CronJob", query)
+		getEntityMetric(result, "cronjob", query, "CronJob", query)
 	}
 
 	query = `kube_cronjob_status_active`
@@ -692,7 +697,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=cronJobStatusActive query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobStatusActive query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "cronjob", query, "CronJob", query)
+		getEntityMetric(result, "cronjob", query, "CronJob", query)
 	}
 
 	query = `kube_cronjob_created`
@@ -701,10 +706,12 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=cronJobCreated query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=cronJobCreated query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, "cronjob", "creationTime", "CronJob", query)
+		getEntityMetric(result, "cronjob", "creationTime", "CronJob", query)
 	}
 
 	//HPA metrics
+
+	// TODO: HPA is not ONLY for deployments - should also implement for RCs, StatefulSets, ... ?
 	if args.Debug {
 		args.DebugLogger.Println("message=Collecting HPA Metrics")
 		fmt.Println("[DEBUG] message=Collecting HPA Metrics")
@@ -734,7 +741,7 @@ func Metrics(args *prometheus.Parameters) {
 		args.WarnLogger.Println("metric=hpaLabels query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=hpaLabels query=" + query + " message=" + err.Error())
 	} else {
-		getMidMetric(result, hpaLabel, "label", "Deployment", query)
+		getEntityMetric(result, hpaLabel, "label", "Deployment", query)
 	}
 
 	if disc, err := args.ToDiscovery(prometheus.ContainerEntityKind); err == nil {
@@ -766,6 +773,8 @@ func Metrics(args *prometheus.Parameters) {
 	query = `kube_pod_container_status_restarts_total`
 	prometheus.GetWorkload("kube_pod_container_status_restarts_total", query, args, prometheus.ContainerEntityKind)
 
+	//HPA
+	// event
 	if labelSuffix == "" {
 		query = `kube_` + hpaName + `_status_condition{status="true",condition="ScalingLimited"}`
 	} else {
@@ -773,48 +782,20 @@ func Metrics(args *prometheus.Parameters) {
 	}
 	prometheus.GetWorkload(`kube_`+hpaName+`_status_condition`, query, args, prometheus.ContainerEntityKind)
 
-	//HPA workloads
+	// discovery
 	query = `kube_` + hpaName + `_spec_max_replicas`
 	prometheus.GetWorkload(`kube_`+hpaName+`_spec_max_replicas`, query, args, prometheus.ContainerEntityKind)
 
+	// discovery
 	query = `kube_` + hpaName + `_spec_min_replicas`
 	prometheus.GetWorkload(`kube_`+hpaName+`_spec_min_replicas`, query, args, prometheus.ContainerEntityKind)
 
+	// event
 	query = `kube_` + hpaName + `_status_current_replicas`
 	prometheus.GetWorkload(`kube_`+hpaName+`_status_current_replicas`, query, args, prometheus.ContainerEntityKind)
 }
 
-func newMidLevel() *datamodel.MidLevel {
-	return &datamodel.MidLevel{
-		OwnerName:          &datamodel.Labels{},
-		OwnerKind:          &datamodel.Labels{},
-		CreationTime:       &datamodel.Labels{},
-		NextSchedTime:      &datamodel.Labels{},
-		StatusActive:       &datamodel.Labels{},
-		LastSchedTime:      &datamodel.Labels{},
-		MetadataGeneration: &datamodel.Labels{},
-		MaxSurge:           &datamodel.Labels{},
-		MaxUnavailable:     &datamodel.Labels{},
-		Completions:        &datamodel.Labels{},
-		Parallelism:        &datamodel.Labels{},
-		CompletionTime:     &datamodel.Labels{},
-		Containers:         make(map[string]*datamodel.Container),
-		LabelMap:           make(datamodel.LabelMap),
-	}
-}
-
-func newContainer() *datamodel.Container {
-	return &datamodel.Container{
-		CpuLimit:   &datamodel.Labels{},
-		CpuRequest: &datamodel.Labels{},
-		MemLimit:   &datamodel.Labels{},
-		MemRequest: &datamodel.Labels{},
-		PowerState: &datamodel.Labels{},
-		LabelMap:   make(datamodel.LabelMap),
-	}
-}
-
-func getMidLevelOwner(args *prometheus.Parameters, query, entityKey, metricKey string) error {
+func getEntityOwner(args *prometheus.Parameters, query, entityKey, metricKey string) error {
 	var result model.Value
 	var err error
 	query += `{owner_name!="<none>"}`
@@ -830,28 +811,24 @@ func getMidLevelOwner(args *prometheus.Parameters, query, entityKey, metricKey s
 	for i := 0; i < n; i++ {
 		// Get the entity, namespace owner kind and owner kind
 		entityName := string(mat[i].Metric[model.LabelName(metricKey)])
-		namespaceName := string(mat[i].Metric[datamodel.NamespaceKey])
+		namespaceName := string(mat[i].Metric[datamodel.NamespaceMetricKey])
 		ownerKind := string(mat[i].Metric[ownerKindKey])
 		ownerName := string(mat[i].Metric[ownerNameKey])
 		if entityName == "" || namespaceName == "" || ownerKind == "" || ownerName == "" {
 			continue
 		}
-		var entity *datamodel.MidLevel
+		var ei datamodel.EntityInterface
 		var ok bool
 		// If we have an owner but haven't seen the entity - skip it
-		if entity, ok = systems[namespaceName].Entities[entityKey][entityName]; !ok {
+		if ei, ok = datamodel.GetEntity(systems, namespaceName, entityKey, entityName); !ok {
 			continue
 		}
+		entity := ei.Get()
 
 		_ = entity.OwnerKind.AppendSampleStreamWithFilter(mat[i], ownerKindFilter)
 		_ = entity.OwnerName.AppendSampleStreamWithFilter(mat[i], ownerNameFilter)
-		// Create the entity if doesn't exist.
-		if _, ok := systems[namespaceName].Entities[ownerKind]; !ok {
-			systems[namespaceName].Entities[ownerKind] = make(map[string]*datamodel.MidLevel)
-		}
-		if _, ok := systems[namespaceName].Entities[ownerKind][ownerName]; !ok {
-			systems[namespaceName].Entities[ownerKind][ownerName] = newMidLevel()
-		}
+		// Create the owner entity if it doesn't exist.
+		_, _ = datamodel.EnsureEntity(systems, namespaceName, ownerKind, ownerName)
 	}
 	return nil
 }

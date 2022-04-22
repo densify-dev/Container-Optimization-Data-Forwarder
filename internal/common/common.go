@@ -166,12 +166,13 @@ func GetWorkload(fileName, metricName, query string, metricField []model.LabelNa
 		fmt.Println("entity=" + entityKind + " message=" + err.Error())
 		return
 	}
-	if entityKind == "cluster" {
-		fmt.Fprintf(workloadWrite, "cluster,Datetime,%s\n", metricName)
-	} else if entityKind == "rq" {
-		fmt.Fprintf(workloadWrite, "cluster,namespace,%s,Datetime,%s\n", entityKind, metricName)
+	if csvHeaderFormat, f := GetCsvHeaderFormat(entityKind); f {
+		fmt.Fprintf(workloadWrite, csvHeaderFormat, metricName)
 	} else {
-		fmt.Fprintf(workloadWrite, "cluster,%s,Datetime,%s\n", entityKind, metricName)
+		msg := " message=no CSV header format found"
+		args.ErrorLogger.Println("entity=" + entityKind + msg)
+		fmt.Println("entity=" + entityKind + msg)
+		return
 	}
 
 	//If the History parameter is set to anything but default 1 then will loop through the calls starting with the current day\hour\minute interval and work backwards.
@@ -221,7 +222,79 @@ func WriteWorkload(file io.Writer, result model.Value, metricField []model.Label
 			if entityKind == "rq" {
 				fmt.Fprintf(file, "%s,", strings.Replace(string(field2), ";", ".", -1))
 			}
-			fmt.Fprintf(file, "%s,%f\n", time.Unix(0, int64(result.(model.Matrix)[i].Values[j].Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val)
+			fmt.Fprintf(file, "%s,%f\n", FormatTime(result.(model.Matrix)[i].Values[j].Timestamp), val)
 		}
 	}
+}
+
+func FormatTime(mt model.Time) string {
+	t := mt.Time()
+	return Format(&t)
+}
+
+func FormatTimeInSec(i int64) string {
+	t := time.Unix(i, 0)
+	return Format(&t)
+}
+
+func Format(t *time.Time) string {
+	return t.Format(time.RFC3339Nano)
+}
+
+func GetCsvHeaderFormat(entityKind string) (string, bool) {
+	ek := strings.ToLower(entityKind)
+	format, f := csvHeaderFormats[ek]
+	return format, f
+}
+
+type headerBuilder struct {
+	entityKindName     string
+	includeClusterName bool
+	includeNamespace   bool
+}
+
+const (
+	containerEntityKindName    = "EntityName,EntityType,ContainerName"
+	containerHpaEntityKindName = containerEntityKindName + ",HpaName"
+)
+
+var headerBuilders = map[string]*headerBuilder{
+	"cluster":       {entityKindName: "Name"},
+	"node":          {entityKindName: "NodeName", includeClusterName: true},
+	"node_group":    {entityKindName: "NodeGroupName", includeClusterName: true},
+	"rq":            {entityKindName: "RqName", includeClusterName: true, includeNamespace: true},
+	"crq":           {entityKindName: "CrqName", includeClusterName: true},
+	"container":     {entityKindName: containerEntityKindName, includeClusterName: true, includeNamespace: true},
+	"container_hpa": {entityKindName: containerHpaEntityKindName, includeClusterName: true, includeNamespace: true},
+}
+
+func (hb *headerBuilder) generateCsvHeaderFormat() string {
+	l := 3
+	if hb.includeClusterName {
+		l++
+	}
+	if hb.includeNamespace {
+		l++
+	}
+	components := make([]string, l)
+	if hb.includeClusterName {
+		components[0] = "ClusterName"
+	}
+	if hb.includeNamespace {
+		components[1] = "Namespace"
+	}
+	components[l-3] = hb.entityKindName
+	components[l-2] = "MetricTime"
+	components[l-1] = "%s\n"
+	return strings.Join(components, ",")
+}
+
+var csvHeaderFormats = makeCsvHeaderFormats()
+
+func makeCsvHeaderFormats() map[string]string {
+	m := make(map[string]string, len(headerBuilders))
+	for entityKind, hb := range headerBuilders {
+		m[entityKind] = hb.generateCsvHeaderFormat()
+	}
+	return m
 }

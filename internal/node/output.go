@@ -25,7 +25,7 @@ func writeConfig(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "cluster,node,HW Model,OS Name,HW Total CPUs,HW Total Physical CPUs,HW Cores Per CPU,HW Threads Per Core,HW Total Memory,BM Max Network IO Bps")
+	fmt.Fprintln(configWrite, "ClusterName,NodeName,HwModel,OsName,HwTotalCpus,HwTotalPhysicalCpus,HwCoresPerCpu,HwThreadsPerCore,HwTotalMemory,HwMaxNetworkIoBps")
 
 	//Loop through the nodes and write out the config data for each system.
 	for kn := range nodes {
@@ -82,7 +82,7 @@ func writeAttributes(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,node,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,OS Architecture,Network Speed,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Capacity Pods,Capacity CPU,Capacity Memory,Capacity Ephemeral Storage,Capacity Huge Pages,Allocatable Pods,Allocatable CPU,Allocatable Memory,Allocatable Ephemeral Storage,Allocatable Huge Pages,Node Labels")
+	fmt.Fprintln(attributeWrite, "ClusterName,NodeName,VirtualTechnology,VirtualDomain,VirtualDatacenter,VirtualCluster,OsArchitecture,NetworkSpeed,CpuLimit,CpuRequest,MemoryLimit,MemoryRequest,CapacityPods,CapacityCpu,CapacityMemory,CapacityEphemeralStorage,CapacityHugePages,AllocatablePods,AllocatableCpu,AllocatableMemory,AllocatableEphemeralStorage,AllocatableHugePages,NodeLabels")
 
 	//Loop through the nodes and write out the attributes data for each system.
 	for kn := range nodes {

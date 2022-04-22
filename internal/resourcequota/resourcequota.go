@@ -100,7 +100,7 @@ func writeConfig(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "cluster,namespace,rq")
+	fmt.Fprintln(configWrite, "ClusterName,Namespace,RqName")
 	for kn := range resourceQuotas {
 		for krq := range resourceQuotas[kn].rqs {
 			fmt.Fprintf(configWrite, "%s,%s,%s\n", *args.ClusterName, kn, krq)
@@ -121,14 +121,14 @@ func writeAttributes(args *common.Parameters) {
 	defer attributeWrite.Close()
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,namespace,rq,Virtual Technology,Virtual Domain,Virtual Datacenter,Create Time,Resource Metadata,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Current Size,Namespace CPU Limit,Namespace CPU Request,Namespace Memory Limit,Namespace Memory Request,Namespace Pods Limit")
+	fmt.Fprintln(attributeWrite, "ClusterName,Namespace,RqName,VirtualTechnology,VirtualDomain,VirtualDatacenter,CreateTime,ResourceMetadata,CpuLimit,CpuRequest,MemoryLimit,MemoryRequest,CurrentSize,NamespaceCpuLimit,NamespaceCpuRequest,NamespaceMemoryLimit,NamespaceMemoryRequest,NamespacePodsLimit")
 
 	//Loop through the resource quotas and write out the attributes data for each system.
 	for kn := range resourceQuotas {
 		for krq, vrq := range resourceQuotas[kn].rqs {
 
-			//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-			fmt.Fprintf(attributeWrite, "%s,%s,%s,ResourceQuota,%s,%s,%s", *args.ClusterName, kn, krq, *args.ClusterName, kn, vrq.createTime.Format("2006-01-02 15:04:05.000"))
+			//Write out the different fields. For fields that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
+			fmt.Fprintf(attributeWrite, "%s,%s,%s,ResourceQuota,%s,%s,%s", *args.ClusterName, kn, krq, *args.ClusterName, kn, common.Format(&vrq.createTime))
 
 			fmt.Fprintf(attributeWrite, ",%s", vrq.resources)
 
@@ -252,18 +252,18 @@ func Metrics(args *common.Parameters) {
 	metricField = append(metricField, "resourcequota")
 
 	query = `sum(kube_resourcequota{type="used", resource="limits.cpu"}) by (resourcequota,namespace) * 1000`
-	common.GetWorkload("cpu_limits", "CPU Utilization in mCores", query, metricField, args, entityKind)
+	common.GetWorkload("cpu_limits", "CpuLimits", query, metricField, args, entityKind)
 
 	query = `sum(kube_resourcequota{type="used", resource="requests.cpu"}) by (resourcequota,namespace) * 1000`
-	common.GetWorkload("cpu_requests", "Prometheus CPU Utilization in mCores", query, metricField, args, entityKind)
+	common.GetWorkload("cpu_requests", "CpuRequests", query, metricField, args, entityKind)
 
 	query = `sum(kube_resourcequota{type="used", resource="limits.memory"}) by (resourcequota,namespace)`
-	common.GetWorkload("mem_limits", "Raw Mem Utilization", query, metricField, args, entityKind)
+	common.GetWorkload("mem_limits", "MemLimits", query, metricField, args, entityKind)
 
 	query = `sum(kube_resourcequota{type="used", resource="requests.memory"}) by (resourcequota,namespace) / (1024 * 1024)`
-	common.GetWorkload("mem_requests", "Prometheus Raw Mem Utilization", query, metricField, args, entityKind)
+	common.GetWorkload("mem_requests", "MemRequests", query, metricField, args, entityKind)
 
 	query = `sum(kube_resourcequota{type="used", resource="count/pods"}) by (resourcequota,namespace)`
-	common.GetWorkload("pods", "Auto Scaling - In Service Instances", query, metricField, args, entityKind)
+	common.GetWorkload("pods", "PodsLimits", query, metricField, args, entityKind)
 
 }

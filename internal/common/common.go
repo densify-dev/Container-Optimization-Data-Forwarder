@@ -59,7 +59,7 @@ func MetricCollect(args *Parameters, query string, range5m v1.Range) (value mode
 	}
 
 	if args.OAuthTokenPath != "" {
-		roundTripper = config.NewBearerAuthFileRoundTripper(args.OAuthTokenPath, roundTripper)
+		roundTripper = config.NewAuthorizationCredentialsFileRoundTripper("Bearer", args.OAuthTokenPath, roundTripper)
 	}
 	//Setup the API client connection
 	client, err := api.NewClient(api.Config{Address: *args.PromURL, RoundTripper: roundTripper})

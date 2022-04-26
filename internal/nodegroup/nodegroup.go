@@ -297,7 +297,7 @@ func Metrics(args *common.Parameters) {
 			if _, ok := nodeGroups[nodeGroup]; !ok {
 				nodeGroups[nodeGroup] = &nodeGroupStruct{cpuLimit: -1, cpuRequest: -1, cpuCapacity: -1, memLimit: -1, memRequest: -1, memCapacity: -1, labelMap: map[string]string{}}
 			}
-			nodeGroups[nodeGroup].nodes = nodeGroups[nodeGroup].nodes + node + ";"
+			nodeGroups[nodeGroup].nodes = nodeGroups[nodeGroup].nodes + node + "|"
 			nodeGroups[nodeGroup].currentSize++
 		}
 

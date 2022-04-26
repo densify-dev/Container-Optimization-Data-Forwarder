@@ -100,10 +100,10 @@ func writeConfig(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "ClusterName,Namespace,RqName")
+	fmt.Fprintln(configWrite, "AuditTime,ClusterName,Namespace,RqName")
 	for kn := range resourceQuotas {
 		for krq := range resourceQuotas[kn].rqs {
-			fmt.Fprintf(configWrite, "%s,%s,%s\n", *args.ClusterName, kn, krq)
+			fmt.Fprintf(configWrite, "%s,%s,%s,%s\n", common.Format(args.CurrentTime), *args.ClusterName, kn, krq)
 		}
 	}
 	configWrite.Close()

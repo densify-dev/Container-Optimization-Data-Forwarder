@@ -25,7 +25,7 @@ func writeConfig(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "ClusterName,NodeName,HwModel,OsName,HwTotalCpus,HwTotalPhysicalCpus,HwCoresPerCpu,HwThreadsPerCore,HwTotalMemory,HwMaxNetworkIoBps")
+	fmt.Fprintln(configWrite, "AuditTime,ClusterName,NodeName,HwModel,OsName,HwTotalCpus,HwTotalPhysicalCpus,HwCoresPerCpu,HwThreadsPerCore,HwTotalMemory,HwMaxNetworkIoBps")
 
 	//Loop through the nodes and write out the config data for each system.
 	for kn := range nodes {
@@ -44,7 +44,7 @@ func writeConfig(args *common.Parameters) {
 			instance = ""
 		}
 
-		fmt.Fprintf(configWrite, "%s,%s,%s,%s", *args.ClusterName, kn, instance, nodes[kn].labelMap[os])
+		fmt.Fprintf(configWrite, "%s,%s,%s,%s,%s", common.Format(args.CurrentTime), *args.ClusterName, kn, instance, nodes[kn].labelMap[os])
 
 		if nodes[kn].cpuCapacity == -1 {
 			fmt.Fprintf(configWrite, ",,")

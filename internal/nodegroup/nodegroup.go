@@ -97,7 +97,7 @@ func writeConfig(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "ClusterName,NodeGroupName,HwTotalCpus,HwTotalPhysicalCpus,HwCoresPerCpu,HwThreadsPerCore,HwTotalMemory,HwModel,OsName")
+	fmt.Fprintln(configWrite, "AuditTime,ClusterName,NodeGroupName,HwTotalCpus,HwTotalPhysicalCpus,HwCoresPerCpu,HwThreadsPerCore,HwTotalMemory,HwModel,OsName")
 
 	for nodeGroupName, nodeGroup := range nodeGroups {
 		var os, instance string
@@ -115,7 +115,7 @@ func writeConfig(args *common.Parameters) {
 			instance = ""
 		}
 
-		fmt.Fprintf(configWrite, "%s,%s,", *args.ClusterName, nodeGroupName)
+		fmt.Fprintf(configWrite, "%s,%s,%s,", common.Format(args.CurrentTime), *args.ClusterName, nodeGroupName)
 
 		if nodeGroup.cpuCapacity == -1 {
 			fmt.Fprintf(configWrite, ",,1,1,")

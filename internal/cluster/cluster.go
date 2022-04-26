@@ -77,8 +77,8 @@ func writeConfig(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "Name")
-	fmt.Fprintf(configWrite, "%s\n", *args.ClusterName)
+	fmt.Fprintln(configWrite, "AuditTime,Name")
+	fmt.Fprintf(configWrite, "%s,%s\n", common.Format(args.CurrentTime), *args.ClusterName)
 	configWrite.Close()
 }
 

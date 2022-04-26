@@ -136,10 +136,10 @@ func writeConfig(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "ClusterName,CrqName")
+	fmt.Fprintln(configWrite, "AuditTime,ClusterName,CrqName")
 
 	for crqName := range crqs {
-		fmt.Fprintf(configWrite, "%s,%s\n", *args.ClusterName, crqName)
+		fmt.Fprintf(configWrite, "%s,%s,%s\n", common.Format(args.CurrentTime), *args.ClusterName, crqName)
 	}
 	configWrite.Close()
 }

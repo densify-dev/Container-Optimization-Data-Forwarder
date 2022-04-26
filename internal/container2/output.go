@@ -21,7 +21,7 @@ func writeConfig(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "ClusterName,Namespace,EntityName,EntityType,ContainerName,HwTotalMemory,OsName,HwManufacturer")
+	fmt.Fprintln(configWrite, "AuditTime,ClusterName,Namespace,EntityName,EntityType,ContainerName,HwTotalMemory,OsName,HwManufacturer")
 
 	//Loop through the systems and write out the config data for each system.
 	for kn := range systems {
@@ -29,9 +29,9 @@ func writeConfig(args *common.Parameters) {
 			for kc, vc := range systems[kn].midLevels[kt].containers {
 				//If memory is not set then use first write that will leave it blank otherwise use the second that sets the value.
 				if vc.memory == -1 || vc.memory == 0 {
-					fmt.Fprintf(configWrite, "%s,%s,%s,%s,%s,,Linux,CONTAINERS\n", *args.ClusterName, kn, vt.name, vt.kind, strings.Replace(kc, ":", ".", -1))
+					fmt.Fprintf(configWrite, "%s,%s,%s,%s,%s,%s,,Linux,CONTAINERS\n", common.Format(args.CurrentTime), *args.ClusterName, kn, vt.name, vt.kind, strings.Replace(kc, ":", ".", -1))
 				} else {
-					fmt.Fprintf(configWrite, "%s,%s,%s,%s,%s,%d,Linux,CONTAINERS\n", *args.ClusterName, kn, vt.name, vt.kind, strings.Replace(kc, ":", ".", -1), vc.memory)
+					fmt.Fprintf(configWrite, "%s,%s,%s,%s,%s,%s,%d,Linux,CONTAINERS\n", common.Format(args.CurrentTime), *args.ClusterName, kn, vt.name, vt.kind, strings.Replace(kc, ":", ".", -1), vc.memory)
 				}
 			}
 		}
@@ -49,13 +49,12 @@ func writeHPAConfig(args *common.Parameters, systems map[string]map[string]strin
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "ClusterName,Namespace,EntityName,EntityType,ContainerName,HpaName,OsName,HwManufacturer")
+	fmt.Fprintln(configWrite, "AuditTime,ClusterName,Namespace,EntityName,EntityType,ContainerName,HpaName,OsName,HwManufacturer")
 
 	//Loop through the systems and write out the config data for each system.
 	for i := range systems {
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-		fmt.Fprintf(configWrite, "%s,%s,,,,%s,Linux,HPA", *args.ClusterName, systems[i]["namespace"], i)
-		fmt.Fprintf(configWrite, "\n")
+		fmt.Fprintf(configWrite, "%s,%s,%s,,,,%s,Linux,HPA\n", common.Format(args.CurrentTime), *args.ClusterName, systems[i]["namespace"], i)
 	}
 }
 

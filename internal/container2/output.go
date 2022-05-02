@@ -3,11 +3,12 @@ package container2
 
 import (
 	"fmt"
-	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
-	"github.com/prometheus/common/model"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/densify-dev/Container-Optimization-Data-Forwarder/internal/common"
+	"github.com/prometheus/common/model"
 )
 
 //writeConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
@@ -282,13 +283,13 @@ func writeWorkloadMid(file io.Writer, result model.Value, namespace, mid model.L
 		if !ok {
 			continue
 		}
-		if _, ok := systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)]; !ok { //NOT PASSING THIS STATMENT
+		if _, ok := systems[string(namespaceValue)].midLevels[prefix+"__"+string(midValue)]; !ok { //NOT PASSING THIS STATMENT
 			continue
 		}
-		for kc := range systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].containers {
+		for kc := range systems[string(namespaceValue)].midLevels[prefix+"__"+string(midValue)].containers {
 			//Loop through the different values over the interval and write out each one to the workload file.
 			for j := 0; j < len(result.(model.Matrix)[i].Values); j++ {
-				fmt.Fprintf(file, "%s,%s,%s,%s,%s,%s,%f\n", *args.ClusterName, namespaceValue, systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].name, systems[string(namespaceValue)].pointers[prefix+"__"+string(midValue)].kind, strings.Replace(string(kc), ":", ".", -1), common.FormatTime(result.(model.Matrix)[i].Values[j].Timestamp), result.(model.Matrix)[i].Values[j].Value)
+				fmt.Fprintf(file, "%s,%s,%s,%s,%s,%s,%f\n", *args.ClusterName, namespaceValue, systems[string(namespaceValue)].midLevels[prefix+"__"+string(midValue)].name, systems[string(namespaceValue)].midLevels[prefix+"__"+string(midValue)].kind, strings.Replace(string(kc), ":", ".", -1), common.FormatTime(result.(model.Matrix)[i].Values[j].Timestamp), result.(model.Matrix)[i].Values[j].Value)
 			}
 		}
 	}

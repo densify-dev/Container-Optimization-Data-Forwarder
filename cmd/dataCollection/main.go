@@ -307,8 +307,8 @@ func main() {
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
-	params.InfoLogger.Println("Version 2.5.0")
-	fmt.Println("[INFO] Version 2.5.0")
+	params.InfoLogger.Println("Version 3.0.0-alpha")
+	fmt.Println("[INFO] Version 3.0.0-alpha")
 
 	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
 	var t time.Time

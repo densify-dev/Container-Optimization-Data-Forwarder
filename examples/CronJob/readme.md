@@ -16,11 +16,12 @@ This example shows you how to setup the Data Forwarder to connect to a Prometheu
 	
 	You should see lines similar to the following, near the end of the log:
 	
-	> 2020-09-17T12:00:38.266347376Z 	zipped file: data
+	> {"level":"info","pkg":"default","time":1651699421230540,"caller":"src/densify.com/forwarderv2/files.go:88","goid":1,"message":"zipping gke_cluster.zip, contents: cluster - 21 files; container - 16 files; node - 17 files; node_group - 22 files; hpa - 4 files; rq - 7 files; crq - 0 files; total - 87 files"}
 	
-	> 2020-09-17T12:00:38.266386035Z 	uploading gke.zip; contents of 66 file(s)...
+	> {"level":"info","pkg":"default","file":"data/gke_cluster.zip","time":1651699421321196,"caller":"src/densify.com/forwarderv2/main.go:47","goid":1,"message":"file uploaded successfully"}
 	
-	If the content has 7 files, then you probably have issues with sending container data to Densify and need to review the rest of the log and contact Densify support. If the content has more than 7 files (usually between 20-70 files), then you can move on to the next step.
+	The exact number of files - under each subfolder and total - depends on the Data Forwarder `include_list` configuration, kube-state-metrics configuration and what is defined/running in the Kubernetes cluster we collect data for. If we use the default `include_list` configuration (empty value means collect all), we should see non-zero number of files at least for cluster, container, node and hpa. The other are cluster-specific.
+	If the numbers are lower than expected, you probably have issues with sending container data to Densify and need to review the rest of the log and contact Densify support. Otherwise, you can move on to the next step.
 	
 	Once the collected container data is sent to Densify, the pod ends.
 		

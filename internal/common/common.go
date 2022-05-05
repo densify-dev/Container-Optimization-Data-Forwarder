@@ -41,7 +41,7 @@ func MetricCollect(args *Parameters, query string, range5m v1.Range) (value mode
 
 	//setup the context to use for the API calls
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	_ = time.AfterFunc(2*time.Minute, func() { cancel() })
 
 	tlsClientConfig := &tls.Config{}
 	if args.CaCertPath != "" {

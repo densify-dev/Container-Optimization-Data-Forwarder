@@ -26,40 +26,42 @@ var entityKind = "cluster"
 //Gets cluster metrics from prometheus (and checks to see if they are valid)
 func getClusterMetric(result model.Value, metric string) {
 
-	for i := 0; i < result.(model.Matrix).Len(); i++ {
-		//validates that the value of the entity is set and if not will default to 0
-		var value float64
-		if len(result.(model.Matrix)[i].Values) == 0 {
-			value = 0
-		} else {
-			value = float64(result.(model.Matrix)[i].Values[len(result.(model.Matrix)[i].Values)-1].Value)
-		}
-
-		//Check which metric this is for and update the corresponding variable for this container in the system data structure
-
-		switch metric {
-		case "limits":
-			switch result.(model.Matrix)[i].Metric["resource"] {
-			case "memory":
-				clusterEntity.memLimit = int(value / 1024 / 1024)
-			case "cpu":
-				clusterEntity.cpuLimit = int(value * 1000)
+	if mat, ok := result.(model.Matrix); ok {
+		for i := 0; i < mat.Len(); i++ {
+			//validates that the value of the entity is set and if not will default to 0
+			var value float64
+			if len(mat[i].Values) == 0 {
+				value = 0
+			} else {
+				value = float64(mat[i].Values[len(mat[i].Values)-1].Value)
 			}
-		case "requests":
-			switch result.(model.Matrix)[i].Metric["resource"] {
-			case "memory":
-				clusterEntity.memRequest = int(value / 1024 / 1024)
-			case "cpu":
-				clusterEntity.cpuRequest = int(value * 1000)
+
+			//Check which metric this is for and update the corresponding variable for this container in the system data structure
+
+			switch metric {
+			case "limits":
+				switch mat[i].Metric["resource"] {
+				case "memory":
+					clusterEntity.memLimit = int(value / 1024 / 1024)
+				case "cpu":
+					clusterEntity.cpuLimit = int(value * 1000)
+				}
+			case "requests":
+				switch mat[i].Metric["resource"] {
+				case "memory":
+					clusterEntity.memRequest = int(value / 1024 / 1024)
+				case "cpu":
+					clusterEntity.cpuRequest = int(value * 1000)
+				}
+			case "cpuLimit":
+				clusterEntity.cpuLimit = int(value)
+			case "cpuRequest":
+				clusterEntity.cpuRequest = int(value)
+			case "memLimit":
+				clusterEntity.memLimit = int(value)
+			case "memRequest":
+				clusterEntity.memRequest = int(value)
 			}
-		case "cpuLimit":
-			clusterEntity.cpuLimit = int(value)
-		case "cpuRequest":
-			clusterEntity.cpuRequest = int(value)
-		case "memLimit":
-			clusterEntity.memLimit = int(value)
-		case "memRequest":
-			clusterEntity.memRequest = int(value)
 		}
 	}
 
@@ -140,13 +142,17 @@ func Metrics(args *common.Parameters) {
 
 	query = `sum(kube_pod_container_resource_limits) by (resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if result.(model.Matrix).Len() == 0 {
+	var found bool
+	var successfulQueries int
+	var msg string
+	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		query = `sum(kube_pod_container_resource_limits_cpu_cores*1000)`
 		result, err = common.MetricCollect(args, query, range5Min)
 		if err != nil {
 			args.WarnLogger.Println("metric=cpuLimit query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=cpuLimit query=" + query + " message=" + err.Error())
 		} else {
+			successfulQueries++
 			getClusterMetric(result, "cpuLimit")
 		}
 
@@ -156,15 +162,29 @@ func Metrics(args *common.Parameters) {
 			args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=memLimit query=" + query + " message=" + err.Error())
 		} else {
+			successfulQueries++
 			getClusterMetric(result, "memLimit")
 		}
+		found = successfulQueries == 2
 	} else {
 		getClusterMetric(result, "limits")
+		found = true
+	}
+
+	if found {
+		// reset found, successfulQueries for requests queries
+		found = false
+		successfulQueries = 0
+	} else {
+		msg = "failed to collect limits for cluster"
+		args.ErrorLogger.Println(msg)
+		fmt.Println("[ERROR] " + msg)
+		return
 	}
 
 	query = `sum(kube_pod_container_resource_requests) by (resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if result.(model.Matrix).Len() == 0 {
+	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		query = `sum(kube_pod_container_resource_requests_cpu_cores*1000)`
 		result, err = common.MetricCollect(args, query, range5Min)
 		if err != nil {
@@ -172,6 +192,7 @@ func Metrics(args *common.Parameters) {
 			fmt.Println("[WARNING] metric=cpuRequest query=" + query + " message=" + err.Error())
 		} else {
 			getClusterMetric(result, "cpuRequest")
+			successfulQueries++
 		}
 
 		query = `sum(kube_pod_container_resource_requests_memory_bytes/1024/1024)`
@@ -181,10 +202,20 @@ func Metrics(args *common.Parameters) {
 			fmt.Println("[WARNING] metric=memRequest query=" + query + " message=" + err.Error())
 		} else {
 			getClusterMetric(result, "memRequest")
+			successfulQueries++
 		}
+		found = successfulQueries == 2
 	} else {
 		getClusterMetric(result, "requests")
 		requestsLabel = "unified"
+		found = true
+	}
+
+	if !found {
+		msg = "failed to collect requests for cluster"
+		args.ErrorLogger.Println(msg)
+		fmt.Println("[ERROR] " + msg)
+		return
 	}
 
 	writeAttributes(args)

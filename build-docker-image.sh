@@ -8,6 +8,7 @@ usage() {
     echo "" >&2
     echo "  b - alpine, ubi8, debian [ default is alpine ] " >&2
     echo "  t - required image tag [ mandatory ] " >&2
+    echo "  o - official release image (implied tagging) " >&2
     echo "  p - tag & push image to quay.io and Docker hub " >&2
     echo "  h - print help and exit " >&2
     echo "" >&2
@@ -42,12 +43,14 @@ gitCommitHash() {
 baseImageArg="alpine"
 tag=""
 push=0
+official=0
 
-while getopts 'b:t:ph' opt; do
+while getopts 'b:t:oph' opt; do
     case $opt in
     # general options
     b) baseImageArg=$OPTARG ;;
     t) tag=$OPTARG ;;
+    o) official=1 ;;
     p) push=1 ;;
     # user asked for help, only case usage is called with 0
     h) usage 0 ;;
@@ -83,7 +86,7 @@ if [ ${push} -eq 1 ]; then
     if [ "${baseImageArg}" == "alpine" ]; then
         tagAndPush ${quayImage}:${baseImageArg}-${tag} ${dockerHubRepo}${dockerHubImage}:${baseImageArg}-${tag}
     fi
-    if [ "${release}" == "1" ]; then
+    if [ ${official} -eq 1 ]; then
         tagAndPush ${quayImage}:${baseImageArg}-${tag} ${quayRepo}${quayImage}:${baseImageArg}
         if [ "${baseImageArg}" == "alpine" ]; then
             tagAndPush ${quayImage}:${baseImageArg}-${tag} ${quayRepo}${quayImage}:latest

@@ -9,7 +9,6 @@ usage() {
     echo "  b - alpine, ubi8, debian [ default is alpine ] " >&2
     echo "  t - required image tag [ mandatory ] " >&2
     echo "  p - tag & push image to quay.io and Docker hub " >&2
-    echo "  r - release label " >&2
     echo "  h - print help and exit " >&2
     echo "" >&2
 
@@ -31,18 +30,25 @@ tagAndPush() {
     fi
 }
 
+gitCommitHash() {
+    git rev-parse --verify HEAD
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        echo "failed to get git commit hash, exiting"
+        exit $rc
+    fi
+}
+
 baseImageArg="alpine"
 tag=""
-release="0"
 push=0
 
-while getopts 'b:t:prh' opt; do
+while getopts 'b:t:ph' opt; do
     case $opt in
     # general options
     b) baseImageArg=$OPTARG ;;
     t) tag=$OPTARG ;;
     p) push=1 ;;
-    r) release="1" ;;
     # user asked for help, only case usage is called with 0
     h) usage 0 ;;
     # wrong option - usage error
@@ -65,6 +71,8 @@ quayImage="container-data-collection-forwarder"
 quayRepo="quay.io/densify/"
 dockerHubImage="container-optimization-data-forwarder"
 dockerHubRepo="densify/"
+
+release=$(gitCommitHash)
 
 # build the image
 docker build --progress=plain -t ${quayImage}:${baseImageArg}-${tag} -f Dockerfile --build-arg BASE_IMAGE=${baseImage} --build-arg VERSION=${tag} --build-arg RELEASE=${release} .

@@ -262,6 +262,9 @@ func initParameters() {
 		clusterName = promAddr
 	}
 
+	// trim and lowercase clusterName
+	clusterName = strings.ToLower(strings.TrimSpace(clusterName))
+
 	params = &common.Parameters{
 
 		ClusterName:      &clusterName,

@@ -49,7 +49,7 @@ COPY --chown=densify:densify --chmod=644 ./LICENSE /licenses/LICENSE
 COPY --chown=densify:densify --chmod=644 ./config /config
 
 WORKDIR /home/densify
-RUN mkdir -p data/node data/container data/hpa data/cluster data/node_group data/crq data/rq && chown -R densify:densify /home/densify/data && ln -s /config config
+RUN mkdir -p data/node data/container data/hpa data/cluster data/node_group data/crq data/rq && chown -R densify:densify /home/densify/data && chmod -R 777 /home/densify/data && ln -s /config config
 COPY --chown=densify:densify --chmod=755 ./tools bin
 COPY --chown=densify:densify --chmod=755 --from=builder /github.com/densify-dev/Container-Optimization-Data-Forwarder/cmd/dataCollection/dataCollection bin
 USER densify

@@ -259,8 +259,8 @@ func Metrics(args *common.Parameters) {
 	result, err = common.MetricCollect(args, query, range5Min)
 
 	if err != nil {
-		args.ErrorLogger.Println("metric=clusterResourceQuotas query=" + query + " message=" + err.Error())
-		fmt.Println("[ERROR] metric=clusterResourceQuotas query=" + query + " message=" + err.Error())
+		args.WarnLogger.Println("metric=clusterResourceQuotas query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=clusterResourceQuotas query=" + query + " message=" + err.Error())
 		return
 	}
 	var rsltIndex = result.(model.Matrix)

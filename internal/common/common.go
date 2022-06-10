@@ -38,53 +38,61 @@ type Parameters struct {
 
 //MetricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
 func MetricCollect(args *Parameters, query string, range5m v1.Range) (value model.Value, err error) {
-
-	//setup the context to use for the API calls
+	var pa v1.API
 	ctx, cancel := context.WithCancel(context.Background())
 	_ = time.AfterFunc(2*time.Minute, func() { cancel() })
+	if pa, err = promApi(args); err != nil {
+		return
+	}
+	if value, _, err = pa.QueryRange(ctx, query, range5m); err != nil {
+		return
+	}
+	if value == nil {
+		err = errors.New("no resultset returned")
+	} else if value.(model.Matrix) == nil {
+		err = errors.New("no time series data returned")
+	} else if value.(model.Matrix).Len() == 0 {
+		err = errors.New("no data returned, value.(model.Matrix) is empty")
+	}
+	return
+}
 
+func GetVersion(args *Parameters) (version string, err error) {
+	var pa v1.API
+	ctx, cancel := context.WithCancel(context.Background())
+	_ = time.AfterFunc(30*time.Second, func() { cancel() })
+	if pa, err = promApi(args); err != nil {
+		return
+	}
+	var bir v1.BuildinfoResult
+	if bir, err = pa.Buildinfo(ctx); err == nil {
+		version = bir.Version
+	}
+	return
+}
+
+func promApi(args *Parameters) (v1.API, error) {
 	tlsClientConfig := &tls.Config{}
 	if args.CaCertPath != "" {
-		tmpTLSConfig, err := config.NewTLSConfig(&config.TLSConfig{
+		if c, err := config.NewTLSConfig(&config.TLSConfig{
 			CAFile: args.CaCertPath,
-		})
-		if err != nil {
+		}); err == nil {
+			tlsClientConfig = c
+		} else {
 			log.Fatalf("Failed to generate TLS config:%v", err)
 		}
-		tlsClientConfig = tmpTLSConfig
 	}
-
 	var roundTripper http.RoundTripper = &http.Transport{
 		TLSClientConfig: tlsClientConfig,
 	}
-
 	if args.OAuthTokenPath != "" {
 		roundTripper = config.NewAuthorizationCredentialsFileRoundTripper("Bearer", args.OAuthTokenPath, roundTripper)
 	}
-	//Setup the API client connection
-	client, err := api.NewClient(api.Config{Address: *args.PromURL, RoundTripper: roundTripper})
-	if err != nil {
-		return value, err
+	if client, err := api.NewClient(api.Config{Address: *args.PromURL, RoundTripper: roundTripper}); err == nil {
+		return v1.NewAPI(client), nil
+	} else {
+		return nil, err
 	}
-
-	//Query prometheus with the values defined above as well as the query that was passed into the function.
-	q := v1.NewAPI(client)
-	value, _, err = q.QueryRange(ctx, query, range5m)
-	if err != nil {
-		return value, err
-	}
-
-	//If the values from the query return no data (length of 0) then give a warning
-	if value == nil {
-		err = errors.New("No resultset returned")
-	} else if value.(model.Matrix) == nil {
-		err = errors.New("No time series data returned")
-	} else if value.(model.Matrix).Len() == 0 {
-		err = errors.New("No data returned, value.(model.Matrix) is empty")
-	}
-
-	//Return the data that was received from Prometheus.
-	return value, err
 }
 
 //TimeRange allows you to define the start and end values of the range will pass to the Prometheus for the query.

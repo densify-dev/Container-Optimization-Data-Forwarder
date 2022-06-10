@@ -263,8 +263,8 @@ func Metrics(args *common.Parameters) {
 	query = `avg(kube_node_labels) by (` + args.NodeGroupList + `)`
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
-		args.ErrorLogger.Println("metric=nodeGroup query=" + query + " message=" + err.Error())
-		fmt.Println("[ERROR] metric=nodeGroup query=" + query + " message=" + err.Error())
+		args.WarnLogger.Println("metric=nodeGroup query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=nodeGroup query=" + query + " message=" + err.Error())
 		return
 	}
 

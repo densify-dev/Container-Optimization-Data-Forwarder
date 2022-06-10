@@ -142,9 +142,6 @@ func Metrics(args *common.Parameters) {
 
 	query = `sum(kube_pod_container_resource_limits) by (resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	var found bool
-	var successfulQueries int
-	var msg string
 	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		query = `sum(kube_pod_container_resource_limits_cpu_cores*1000)`
 		result, err = common.MetricCollect(args, query, range5Min)
@@ -152,7 +149,6 @@ func Metrics(args *common.Parameters) {
 			args.WarnLogger.Println("metric=cpuLimit query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=cpuLimit query=" + query + " message=" + err.Error())
 		} else {
-			successfulQueries++
 			getClusterMetric(result, "cpuLimit")
 		}
 
@@ -162,24 +158,10 @@ func Metrics(args *common.Parameters) {
 			args.WarnLogger.Println("metric=memLimit query=" + query + " message=" + err.Error())
 			fmt.Println("[WARNING] metric=memLimit query=" + query + " message=" + err.Error())
 		} else {
-			successfulQueries++
 			getClusterMetric(result, "memLimit")
 		}
-		found = successfulQueries == 2
 	} else {
 		getClusterMetric(result, "limits")
-		found = true
-	}
-
-	if found {
-		// reset found, successfulQueries for requests queries
-		found = false
-		successfulQueries = 0
-	} else {
-		msg = "failed to collect limits for cluster"
-		args.ErrorLogger.Println(msg)
-		fmt.Println("[ERROR] " + msg)
-		return
 	}
 
 	query = `sum(kube_pod_container_resource_requests) by (resource)`
@@ -192,7 +174,6 @@ func Metrics(args *common.Parameters) {
 			fmt.Println("[WARNING] metric=cpuRequest query=" + query + " message=" + err.Error())
 		} else {
 			getClusterMetric(result, "cpuRequest")
-			successfulQueries++
 		}
 
 		query = `sum(kube_pod_container_resource_requests_memory_bytes/1024/1024)`
@@ -202,20 +183,10 @@ func Metrics(args *common.Parameters) {
 			fmt.Println("[WARNING] metric=memRequest query=" + query + " message=" + err.Error())
 		} else {
 			getClusterMetric(result, "memRequest")
-			successfulQueries++
 		}
-		found = successfulQueries == 2
 	} else {
 		getClusterMetric(result, "requests")
 		requestsLabel = "unified"
-		found = true
-	}
-
-	if !found {
-		msg = "failed to collect requests for cluster"
-		args.ErrorLogger.Println(msg)
-		fmt.Println("[ERROR] " + msg)
-		return
 	}
 
 	writeAttributes(args)

@@ -326,6 +326,14 @@ func main() {
 	}
 	params.CurrentTime = &currentTime
 
+	if ver, err := common.GetVersion(params); err == nil {
+		fmt.Printf("[INFO] Detected Prometheus version %s\n", ver)
+		params.InfoLogger.Printf("Detected Prometheus version %s\n", ver)
+	} else {
+		params.ErrorLogger.Printf("Failed to connect to Prometheus\n")
+		log.Fatalf("[ERROR] Failed to connect to Prometheus\n")
+	}
+
 	if includeContainer {
 		container2.Metrics(params)
 	} else {

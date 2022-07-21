@@ -330,8 +330,9 @@ func main() {
 		fmt.Printf("[INFO] Detected Prometheus version %s\n", ver)
 		params.InfoLogger.Printf("Detected Prometheus version %s\n", ver)
 	} else {
-		params.ErrorLogger.Printf("Failed to connect to Prometheus\n")
-		log.Fatalf("[ERROR] Failed to connect to Prometheus\n")
+		msg := fmt.Sprintf("Failed to connect to Prometheus: %s\n", err.Error())
+		params.ErrorLogger.Printf(msg)
+		log.Fatalf("%s %s", "[ERROR]", msg)
 	}
 
 	if includeContainer {

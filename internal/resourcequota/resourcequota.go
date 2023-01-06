@@ -88,7 +88,7 @@ func getExistingQuotas(result model.Value) {
 	}
 }
 
-//writeNodeGroupConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
+// writeNodeGroupConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
 func writeConfig(args *common.Parameters) {
 
 	//Create the config file and open it for writing.
@@ -195,7 +195,7 @@ func writeAttributes(args *common.Parameters) {
 	}
 }
 
-//Metrics a global func for collecting quota level metrics in prometheus
+// Metrics a global func for collecting quota level metrics in prometheus
 func Metrics(args *common.Parameters) {
 	//Setup variables used in the code.
 	var historyInterval time.Duration
@@ -254,16 +254,16 @@ func Metrics(args *common.Parameters) {
 	query = `sum(kube_resourcequota{type="used", resource="limits.cpu"}) by (resourcequota,namespace) * 1000`
 	common.GetWorkload("cpu_limits", "CpuLimits", query, metricField, args, entityKind)
 
-	query = `sum(kube_resourcequota{type="used", resource="requests.cpu"}) by (resourcequota,namespace) * 1000`
+	query = `sum(kube_resourcequota{type="used", resource=~"cpu|requests\\.cpu"}) by (resourcequota,namespace) * 1000`
 	common.GetWorkload("cpu_requests", "CpuRequests", query, metricField, args, entityKind)
 
 	query = `sum(kube_resourcequota{type="used", resource="limits.memory"}) by (resourcequota,namespace)`
 	common.GetWorkload("mem_limits", "MemLimits", query, metricField, args, entityKind)
 
-	query = `sum(kube_resourcequota{type="used", resource="requests.memory"}) by (resourcequota,namespace) / (1024 * 1024)`
+	query = `sum(kube_resourcequota{type="used", resource=~"memory|requests\\.memory"}) by (resourcequota,namespace) / (1024 * 1024)`
 	common.GetWorkload("mem_requests", "MemRequests", query, metricField, args, entityKind)
 
-	query = `sum(kube_resourcequota{type="used", resource="count/pods"}) by (resourcequota,namespace)`
+	query = `sum(kube_resourcequota{type="used", resource=~"pods|count\\/pods"}) by (resourcequota,namespace)`
 	common.GetWorkload("pods", "PodsLimits", query, metricField, args, entityKind)
 
 }

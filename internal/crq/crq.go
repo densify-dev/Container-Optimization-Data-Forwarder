@@ -107,7 +107,7 @@ func getExistingQuotas(result model.Value) {
 	}
 }
 
-//populateLabelMap is used to parse the label based results from Prometheus related to CRQ Entities and store them in the system's data structure.
+// populateLabelMap is used to parse the label based results from Prometheus related to CRQ Entities and store them in the system's data structure.
 func populateLabelMap(result model.Value, nameLabel model.LabelName) {
 	//Loop through the different entities in the results.
 	for i := 0; i < result.(model.Matrix).Len(); i++ {
@@ -124,7 +124,7 @@ func populateLabelMap(result model.Value, nameLabel model.LabelName) {
 	}
 }
 
-//writeNodeGroupConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
+// writeNodeGroupConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
 func writeConfig(args *common.Parameters) {
 
 	//Create the config file and open it for writing.
@@ -243,7 +243,7 @@ func writeAttributes(args *common.Parameters) {
 	}
 }
 
-//Metrics a global func for collecting quota level metrics in prometheus
+// Metrics a global func for collecting quota level metrics in prometheus
 func Metrics(args *common.Parameters) {
 	//Setup variables used in the code.
 	var historyInterval time.Duration
@@ -324,13 +324,13 @@ func Metrics(args *common.Parameters) {
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="limits.cpu"}) by (name) * 1000`
 	common.GetWorkload("cpu_limits", "CpuLimits", query, metricField, args, entityKind)
 
-	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="requests.cpu"}) by (name) * 1000`
+	query = `sum(openshift_clusterresourcequota_usage{type="used", resource=~"cpu|requests\\.cpu"}) by (name) * 1000`
 	common.GetWorkload("cpu_requests", "CpuRequests", query, metricField, args, entityKind)
 
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="limits.memory"}) by (name)`
 	common.GetWorkload("mem_limits", "MemLimits", query, metricField, args, entityKind)
 
-	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="requests.memory"}) by (name) / (1024 * 1024)`
+	query = `sum(openshift_clusterresourcequota_usage{type="used", resource=~"memory|requests\\.memory"}) by (name) / (1024 * 1024)`
 	common.GetWorkload("mem_requests", "MemRequests", query, metricField, args, entityKind)
 
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="pods"}) by (name)`

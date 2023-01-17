@@ -6,7 +6,7 @@ usage() {
     echo "" >&2
     echo "usage: ${exec} [ -b baseImage ] [ -t imageTag ] [ -p ] [ -r ] [ -h ]" >&2
     echo "" >&2
-    echo "  b - alpine, ubi9, debian [ default is alpine ] " >&2
+    echo "  b - alpine, ubi8, debian [ default is alpine ] " >&2
     echo "  t - required image tag [ mandatory ] " >&2
     echo "  o - official release image (implied tagging) " >&2
     echo "  p - tag & push image to quay.io and Docker hub " >&2
@@ -64,8 +64,8 @@ if [ -z "${tag}" ]; then
 fi
 
 # full name of ubi8 image
-if [ "${baseImageArg}" == "ubi9" ]; then
-    baseImage="registry.access.redhat.com/ubi9/ubi-minimal"
+if [ "${baseImageArg}" == "ubi8" ]; then
+    baseImage="registry.access.redhat.com/ubi8/ubi-minimal"
 else
     baseImage="${baseImageArg}"
 fi

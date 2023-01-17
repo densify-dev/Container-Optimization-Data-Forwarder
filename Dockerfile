@@ -43,6 +43,8 @@ RUN case ${BASE_IMG} in \
         exit 1 ;; \
     esac
 
+### make sure /home/densify is accessible
+RUN chmod 755 /home/densify
 ### add licenses to this directory
 COPY --chown=densify:densify --chmod=644 ./LICENSE /licenses/LICENSE
 ### keep /config as this is how it is mounted in versions < 3.0
@@ -52,5 +54,5 @@ WORKDIR /home/densify
 RUN mkdir -p data/node data/container data/hpa data/cluster data/node_group data/crq data/rq && chown -R densify:densify /home/densify/data && chmod -R 777 /home/densify/data && ln -s /config config
 COPY --chown=densify:densify --chmod=755 ./tools bin
 COPY --chown=densify:densify --chmod=755 --from=builder /github.com/densify-dev/Container-Optimization-Data-Forwarder/cmd/dataCollection/dataCollection bin
-USER densify
+USER 3000
 CMD ["/home/densify/bin/entry.sh"]

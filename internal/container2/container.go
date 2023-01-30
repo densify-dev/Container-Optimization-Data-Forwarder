@@ -810,7 +810,7 @@ func Metrics(args *common.Parameters) {
 		queryPrefix = `label_replace(`
 		querySuffix = `, "container_name", "$1", "container", "(.*)")`
 	}
-	query = queryPrefix + `max(irate(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}[` + args.SampleRateString + `m])) by (instance,pod,namespace,container)` + querySuffix
+	query = queryPrefix + `max(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}) by (instance,pod,namespace,container)` + querySuffix
 	getWorkload("restarts", "MaxRestarts", query, "max", args)
 
 	if args.LabelSuffix == "" {

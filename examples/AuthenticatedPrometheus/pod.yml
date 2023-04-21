@@ -9,7 +9,7 @@ spec:
       type: RuntimeDefault
   serviceAccountName: densify                           
   containers:
-  - image: densify/container-optimization-data-forwarder
+  - image: densify/container-optimization-data-forwarder:3
     imagePullPolicy: Always
     name: data-forwarder
     securityContext:

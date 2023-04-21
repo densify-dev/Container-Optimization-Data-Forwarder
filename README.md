@@ -20,7 +20,7 @@ The Densify Container Optimization Data Forwarder is the container that collects
 
 ## Docker images
 
-The Docker image is available on [Docker Hub](https://hub.docker.com/r/densify/container-optimization-data-forwarder).
+The Docker image is available on [Docker hub](https://hub.docker.com/r/densify/container-optimization-data-forwarder/tags). Pull it using `docker pull densify/container-optimization-data-forwarder:3`.
 
 ## Examples 
 * [Kubernetes with Prometheus using Cron Job and Config Map](examples/CronJob)

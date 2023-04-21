@@ -4,7 +4,7 @@ To run the container using Docker you will need to pass the config.properties to
 3. Run the container using the following command:
 ```bash
 docker run -v "<local folder>/config.properties":"/home/densify/config/config.properties":ro \
-  densify/container-optimization-data-forwarder
+  densify/container-optimization-data-forwarder:3
 ```
 4. Densify then loads the collected data.
 

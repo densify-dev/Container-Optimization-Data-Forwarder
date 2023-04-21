@@ -4,7 +4,7 @@ metadata:
   name: densify
 spec:
   containers:
-  - image: densify/container-optimization-data-forwarder
+  - image: densify/container-optimization-data-forwarder:3
     imagePullPolicy: Always
     name: data-forwarder
     volumeMounts:

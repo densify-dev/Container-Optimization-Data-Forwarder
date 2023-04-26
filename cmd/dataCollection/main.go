@@ -1,4 +1,4 @@
-//Package main collects data from Prometheus and formats the data into CSVs that will be sent to Densify through the Forwarder.
+// Package main collects data from Prometheus and formats the data into CSVs that will be sent to Densify through the Forwarder.
 package main
 
 import (
@@ -26,8 +26,8 @@ var params *common.Parameters
 // Parameters that allows user to control what levels they want to collect data on (cluster, node, container)
 var includeContainer, includeNode, includeNodeGroup, includeCluster, includeQuota bool
 
-//initParamters will look for settings defined on the command line or in config.properties file and update accordingly. Also defines the default values for these variables.
-//Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
+// initParamters will look for settings defined on the command line or in config.properties file and update accordingly. Also defines the default values for these variables.
+// Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
 func initParameters() {
 	//Set default settings
 	var clusterName string
@@ -305,13 +305,13 @@ func parseIncludeParam(param string) {
 	}
 }
 
-//main function.
+// main function.
 func main() {
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
-	params.InfoLogger.Println("Version 3.0.0-beta")
-	fmt.Println("[INFO] Version 3.0.0-beta")
+	params.InfoLogger.Println("Version 3.0.0")
+	fmt.Println("[INFO] Version 3.0.0")
 
 	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
 	var t time.Time

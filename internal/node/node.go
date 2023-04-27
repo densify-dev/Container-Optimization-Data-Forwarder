@@ -1,4 +1,4 @@
-//Package node collects data related to containers and formats into csv files to send to Densify.
+// Package node collects data related to containers and formats into csv files to send to Densify.
 package node
 
 import (
@@ -9,7 +9,7 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-//A node structure. Used for storing attributes and config details.
+// A node structure. Used for storing attributes and config details.
 type node struct {
 
 	//Labels & general information about each node
@@ -21,20 +21,20 @@ type node struct {
 	cpuLimit, cpuRequest, memLimit, memRequest                                                            int
 }
 
-//Map that labels and values will be stored in
+// Map that labels and values will be stored in
 var nodes = map[string]*node{}
 
-//Hard-coded string for log file warnings
+// Hard-coded string for log file warnings
 var entityKind = "node"
 
-//Metrics a global func for collecting node level metrics in prometheus
+// Metrics a global func for collecting node level metrics in prometheus
 func Metrics(args *common.Parameters) {
 	//Setup variables used in the code.
 	var historyInterval time.Duration
 	historyInterval = 0
 	var query string
 	var result model.Value
-	var haveNodeExport = true
+	var hasNodeExporter bool
 	var err error
 
 	//Start and end time + the prometheus address used for querying
@@ -100,11 +100,10 @@ func Metrics(args *common.Parameters) {
 		args.WarnLogger.Println("metric=networkSpeedBytes query=" + query + " message=" + err.Error())
 		fmt.Println("[WARNING] metric=networkSpeedBytes query=" + query + " message=" + err.Error())
 	} else {
-		getNodeMetric(result, "node", "netSpeedBytes")
-	}
-
-	if result.(model.Matrix).Len() == 0 {
-		haveNodeExport = false
+		if mat, ok := result.(model.Matrix); ok && mat.Len() != 0 {
+			hasNodeExporter = true
+			getNodeMetric(result, "node", "netSpeedBytes")
+		}
 	}
 
 	//Queries the capacity fields of all nodes
@@ -120,7 +119,7 @@ func Metrics(args *common.Parameters) {
 	  individual queries. If you see missing fields in the config/attribute files,
 	  that is why.
 	*/
-	if result.(model.Matrix).Len() == 0 {
+	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		//capacity_cpu_cores query
 		query = `kube_node_status_capacity_cpu_cores`
 		result, err = common.MetricCollect(args, query, range5Min)
@@ -152,12 +151,7 @@ func Metrics(args *common.Parameters) {
 		}
 
 	} else {
-		if err != nil {
-			args.WarnLogger.Println("metric=statusCapacity query=" + query + " message=" + err.Error())
-			fmt.Println("[WARNING] metric=statusCapacity query=" + query + " message=" + err.Error())
-		} else {
-			getNodeMetric(result, "node", "capacity")
-		}
+		getNodeMetric(result, "node", "capacity")
 	}
 
 	//Queries the allocatable metric fields of all the nodes
@@ -173,7 +167,7 @@ func Metrics(args *common.Parameters) {
 	  individual queries. If you see missing fields in the config/attribute files,
 	  that is why.
 	*/
-	if result.(model.Matrix).Len() == 0 {
+	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		query = `kube_node_status_allocatable_cpu_cores`
 		result, err = common.MetricCollect(args, query, range5Min)
 		if err != nil {
@@ -202,17 +196,12 @@ func Metrics(args *common.Parameters) {
 		}
 
 	} else {
-		if err != nil {
-			args.WarnLogger.Println("metric=statusAllocatable query=" + query + " message=" + err.Error())
-			fmt.Println("[WARNING] metric=statusAllocatable query=" + query + " message=" + err.Error())
-		} else {
-			getNodeMetric(result, "node", "allocatable")
-		}
+		getNodeMetric(result, "node", "allocatable")
 	}
 
 	query = `sum(kube_pod_container_resource_limits) by (node, resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if result.(model.Matrix).Len() == 0 {
+	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		query = `sum(kube_pod_container_resource_limits_cpu_cores) by (node)*1000`
 		result, err = common.MetricCollect(args, query, range5Min)
 		if err != nil {
@@ -235,7 +224,7 @@ func Metrics(args *common.Parameters) {
 
 	query = `sum(kube_pod_container_resource_requests) by (node,resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if result.(model.Matrix).Len() == 0 {
+	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		query = `sum(kube_pod_container_resource_requests_cpu_cores) by (node)*1000`
 		result, err = common.MetricCollect(args, query, range5Min)
 		if err != nil {
@@ -262,7 +251,7 @@ func Metrics(args *common.Parameters) {
 	writeAttributes(args)
 
 	//Checks to see if Node Exporter is installed. Based off if anything is returned from network speed bytes
-	if haveNodeExport == false {
+	if !hasNodeExporter {
 		args.ErrorLogger.Println("entity=" + entityKind + " message=It appears you do not have Node Exporter installed.")
 		fmt.Println("[ERROR] entity=" + entityKind + " message=It appears you do not have Node Exporter installed.")
 		return
@@ -279,7 +268,7 @@ func Metrics(args *common.Parameters) {
 	query = `max(max(label_replace(sum(irate(node_cpu_seconds_total{mode!="idle"}[` + args.SampleRateString + `m])) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`
 	result, err = common.MetricCollect(args, query, range5Min)
 
-	if result.(model.Matrix).Len() != 0 {
+	if mat, ok := result.(model.Matrix); err == nil && ok && mat.Len() != 0 {
 		queryPrefix = `max(max(label_replace(`
 		queryPrefixSum = `max(sum(label_replace(`
 		querySuffix = `, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}) by (node)`

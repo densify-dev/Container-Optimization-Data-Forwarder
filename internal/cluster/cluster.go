@@ -1,4 +1,4 @@
-//Package cluster collects data related to containers and formats into csv files to send to Densify.
+// Package cluster collects data related to containers and formats into csv files to send to Densify.
 package cluster
 
 import (
@@ -10,21 +10,25 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-//A node structure. Used for storing attributes and config details.
+// A node structure. Used for storing attributes and config details.
 type clusterStruct struct {
 
 	//Value fields
 	cpuLimit, cpuRequest, memLimit, memRequest int
 }
 
-//Map that labels and values will be stored in
+// Map that labels and values will be stored in
 var clusterEntity = clusterStruct{}
 
-//Hard-coded string for log file warnings
+// Hard-coded string for log file warnings
 var entityKind = "cluster"
 
-//Gets cluster metrics from prometheus (and checks to see if they are valid)
+// Gets cluster metrics from prometheus (and checks to see if they are valid)
 func getClusterMetric(result model.Value, metric string) {
+	//Validate there is data in the results.
+	if result == nil {
+		return
+	}
 
 	if mat, ok := result.(model.Matrix); ok {
 		for i := 0; i < mat.Len(); i++ {
@@ -67,7 +71,7 @@ func getClusterMetric(result model.Value, metric string) {
 
 }
 
-//writeConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
+// writeConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
 func writeConfig(args *common.Parameters) {
 
 	//Create the config file and open it for writing.
@@ -84,7 +88,7 @@ func writeConfig(args *common.Parameters) {
 	configWrite.Close()
 }
 
-//writeAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
+// writeAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
 func writeAttributes(args *common.Parameters) {
 
 	//Create the attributes file and open it for writing
@@ -128,7 +132,7 @@ func writeAttributes(args *common.Parameters) {
 	attributeWrite.Close()
 }
 
-//Metrics a global func for collecting node level metrics in prometheus
+// Metrics a global func for collecting node level metrics in prometheus
 func Metrics(args *common.Parameters) {
 	//Setup variables used in the code.
 	var historyInterval time.Duration

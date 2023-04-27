@@ -1,4 +1,4 @@
-//Package container2 collects data related to containers and formats into csv files to send to Densify.
+// Package container2 collects data related to containers and formats into csv files to send to Densify.
 package container2
 
 import (
@@ -21,7 +21,7 @@ type namespace struct {
 	labelMap                                              map[string]string
 }
 
-//midLevel is used to hold information related to the highest owner of any containers
+// midLevel is used to hold information related to the highest owner of any containers
 type midLevel struct {
 	name, kind            string
 	containers            map[string]*container
@@ -30,14 +30,14 @@ type midLevel struct {
 	labelMap              map[string]string
 }
 
-//container is used to hold information related to containers
+// container is used to hold information related to containers
 type container struct {
 	memory, cpuLimit, cpuRequest, memLimit, memRequest, restarts, powerState int
 	name                                                                     string
 	labelMap                                                                 map[string]string
 }
 
-//Metrics function to collect data related to containers.
+// Metrics function to collect data related to containers.
 func Metrics(args *common.Parameters) {
 	//Setup variables used in the code.
 	var historyInterval time.Duration
@@ -206,7 +206,7 @@ func Metrics(args *common.Parameters) {
 
 	query = `sum(kube_pod_container_resource_limits) by (pod,namespace,container,resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if result.(model.Matrix).Len() == 0 {
+	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		query = `sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000`
 		result, err = common.MetricCollect(args, query, range5Min)
 		if err != nil {
@@ -230,7 +230,7 @@ func Metrics(args *common.Parameters) {
 
 	query = `sum(kube_pod_container_resource_requests) by (pod,namespace,container,resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if result.(model.Matrix).Len() == 0 {
+	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		query = `sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000`
 		result, err = common.MetricCollect(args, query, range5Min)
 		if err != nil {
@@ -307,7 +307,7 @@ func Metrics(args *common.Parameters) {
 
 	query = `sum(kube_pod_container_status_terminated) by (pod,namespace,container)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if result.(model.Matrix).Len() == 0 {
+	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		query = `sum(kube_pod_container_status_terminated_reason) by (pod,namespace,container)`
 		result, err = common.MetricCollect(args, query, range5Min)
 		if err != nil {
@@ -317,12 +317,7 @@ func Metrics(args *common.Parameters) {
 			getContainerMetric(result, "namespace", "pod", "container", "powerState")
 		}
 	} else {
-		if err != nil {
-			args.WarnLogger.Println("metric=powerState query=" + query + " message=" + err.Error())
-			fmt.Println("[WARNING] metric=powerState query=" + query + " message=" + err.Error())
-		} else {
-			getContainerMetric(result, "namespace", "pod", "container", "powerState")
-		}
+		getContainerMetric(result, "namespace", "pod", "container", "powerState")
 	}
 
 	query = `kube_pod_created`
@@ -664,14 +659,14 @@ func Metrics(args *common.Parameters) {
 
 	var hpaName string
 	var hpaLabel model.LabelName
-	if result.(model.Matrix).Len() != 0 {
-		hpaName = "hpa"
-		hpaLabel = "hpa"
-	} else {
+	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		hpaName = "horizontalpodautoscaler"
 		hpaLabel = "horizontalpodautoscaler"
 		query = `kube_` + hpaName + `_labels`
 		result, err = common.MetricCollect(args, query, range5Min)
+	} else {
+		hpaName = "hpa"
+		hpaLabel = "hpa"
 	}
 
 	if err != nil {

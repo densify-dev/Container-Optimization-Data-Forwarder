@@ -1,4 +1,4 @@
-//Package nodegroup collects data related to containers and formats into csv files to send to Densify.
+// Package nodegroup collects data related to containers and formats into csv files to send to Densify.
 package nodegroup
 
 import (
@@ -19,10 +19,10 @@ type nodeGroupStruct struct {
 
 var nodeGroups = map[string]*nodeGroupStruct{}
 
-//Hard-coded string for log file warnings
+// Hard-coded string for log file warnings
 var entityKind = "node_group"
 
-//getNodeMetricString is used to parse the label based results from Prometheus related to Container Entities and store them in the systems data structure.
+// getNodeMetricString is used to parse the label based results from Prometheus related to Container Entities and store them in the systems data structure.
 func getNodeMetricString(result model.Value, nodeGroup model.LabelName) {
 	//Validate there is data in the results.
 	if result == nil {
@@ -43,9 +43,12 @@ func getNodeMetricString(result model.Value, nodeGroup model.LabelName) {
 	}
 }
 
-//Gets node metrics from prometheus (and checks to see if they are valid)
+// Gets node metrics from prometheus (and checks to see if they are valid)
 func getNodeGroupMetric(result model.Value, nodeGroupLabel model.LabelName, metric string) {
-
+	//Validate there is data in the results.
+	if result == nil {
+		return
+	}
 	//Loop through the different entities in the results.
 	for i := 0; i < result.(model.Matrix).Len(); i++ {
 		nodeGroup, ok := result.(model.Matrix)[i].Metric[nodeGroupLabel]
@@ -85,7 +88,7 @@ func getNodeGroupMetric(result model.Value, nodeGroupLabel model.LabelName, metr
 	}
 }
 
-//writeNodeGroupConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
+// writeNodeGroupConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
 func writeConfig(args *common.Parameters) {
 
 	//Create the config file and open it for writing.
@@ -131,7 +134,7 @@ func writeConfig(args *common.Parameters) {
 	configWrite.Close()
 }
 
-//writeNodeGroupAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
+// writeNodeGroupAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
 func writeAttributes(args *common.Parameters) {
 
 	//Create the attributes file and open it for writing
@@ -189,7 +192,7 @@ func writeAttributes(args *common.Parameters) {
 	attributeWrite.Close()
 }
 
-//checkNodeGroups checks to see if the node group label in the results is already in the nodeGroupsLabels array or not.
+// checkNodeGroups checks to see if the node group label in the results is already in the nodeGroupsLabels array or not.
 func checkNodeGroups(nodeGroupLabels []model.LabelName, labelName model.LabelName) bool {
 	for _, label := range nodeGroupLabels {
 		if label == labelName {
@@ -199,7 +202,7 @@ func checkNodeGroups(nodeGroupLabels []model.LabelName, labelName model.LabelNam
 	return false
 }
 
-//getWorkload used to query for the workload data and then calls write workload
+// getWorkload used to query for the workload data and then calls write workload
 func getWorkload(fileName, metricName, query string, nodeGroupLabels []model.LabelName, args *common.Parameters, entityKind string) {
 	var historyInterval time.Duration
 	historyInterval = 0
@@ -245,7 +248,7 @@ func getWorkload(fileName, metricName, query string, nodeGroupLabels []model.Lab
 	workloadWrite.Close()
 }
 
-//Metrics a global func for collecting node level metrics in prometheus
+// Metrics a global func for collecting node level metrics in prometheus
 func Metrics(args *common.Parameters) {
 	//Setup variables used in the code.
 	var historyInterval time.Duration
@@ -307,7 +310,7 @@ func Metrics(args *common.Parameters) {
 
 		query = `sum(kube_pod_container_resource_limits) by (node, resource)`
 		result, err = common.MetricCollect(args, query, range5Min)
-		if result.(model.Matrix).Len() == 0 {
+		if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 			query = `avg(sum(kube_pod_container_resource_limits_cpu_cores*1000) by (node)` + nodeGroupSuffix
 			result, err = common.MetricCollect(args, query, range5Min)
 			if err != nil {
@@ -349,7 +352,7 @@ func Metrics(args *common.Parameters) {
 
 		query = `sum(kube_pod_container_resource_requests) by (node, resource)`
 		result, err = common.MetricCollect(args, query, range5Min)
-		if result.(model.Matrix).Len() == 0 {
+		if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 			query = `avg(sum(kube_pod_container_resource_requests_cpu_cores*1000) by (node)` + nodeGroupSuffix
 			result, err = common.MetricCollect(args, query, range5Min)
 			if err != nil {
@@ -391,7 +394,7 @@ func Metrics(args *common.Parameters) {
 		query = `avg(kube_node_status_capacity * on (node) group_left (` + string(nodeGroupLabels[ng]) + `) kube_node_labels{` + string(nodeGroupLabels[ng]) + `=~".+"}) by (` + string(nodeGroupLabels[ng]) + `,resource)`
 		result, err = common.MetricCollect(args, query, range5Min)
 
-		if result.(model.Matrix).Len() == 0 {
+		if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 			query = `avg(kube_node_status_capacity_cpu_cores` + nodeGroupSuffix
 			result, err = common.MetricCollect(args, query, range5Min)
 			if err != nil {
@@ -466,7 +469,7 @@ func Metrics(args *common.Parameters) {
 	queryPrefixSum := `avg(label_replace(sum(`
 	querySuffix := `, "node", "$1", "instance", "(.*):*")` + nodeGroupSuffix
 	querySuffixSum := `) by (instance), "node", "$1", "instance", "(.*):*")` + nodeGroupSuffix
-	if result.(model.Matrix).Len() != 0 {
+	if mat, ok := result.(model.Matrix); err == nil && ok && mat.Len() != 0 {
 		queryPrefix = `avg(max(label_replace(`
 		queryPrefixSum = `avg(sum(label_replace(`
 		querySuffix = `, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}` + nodeGroupSuffix

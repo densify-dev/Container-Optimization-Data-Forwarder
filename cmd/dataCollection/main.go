@@ -143,7 +143,7 @@ func initParameters() {
 	flag.IntVar(&offsetTemp, "offset", offset, "Amount of units (based on interval value) to offset the data collection backwards in time")
 	flag.IntVar(&sampleRateTemp, "sampleRate", sampleRate, "Rate of sample points to collect. default is 5 for 1 sample for every 5 minutes.")
 	flag.BoolVar(&debugTemp, "debug", debug, "Enable debug logging")
-	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
+	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extension. Default config")
 	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
 	flag.StringVar(&includeTemp, "includeList", include, "Comma separated list of data to include in collection (cluster, node, container, nodegroup, quota) Ex: \"node,cluster\"")
 	flag.StringVar(&nodeGroupListTemp, "nodeGroupList", nodeGroupList, "Comma separated list of labels to check for building node groups Ex: \"label_cloud_google_com_gke_nodepool,label_eks_amazonaws_com_nodegroup,label_agentpool,label_pool_name\"")

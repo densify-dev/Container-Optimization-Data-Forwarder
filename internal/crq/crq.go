@@ -107,7 +107,7 @@ func getExistingQuotas(result model.Value) {
 	}
 }
 
-//populateLabelMap is used to parse the label based results from Prometheus related to CRQ Entities and store them in the system's data structure.
+// populateLabelMap is used to parse the label based results from Prometheus related to CRQ Entities and store them in the system's data structure.
 func populateLabelMap(result model.Value, nameLabel model.LabelName) {
 	//Loop through the different entities in the results.
 	for i := 0; i < result.(model.Matrix).Len(); i++ {
@@ -124,7 +124,7 @@ func populateLabelMap(result model.Value, nameLabel model.LabelName) {
 	}
 }
 
-//writeNodeGroupConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
+// writeNodeGroupConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
 func writeConfig(args *common.Parameters) {
 
 	//Create the config file and open it for writing.
@@ -136,10 +136,10 @@ func writeConfig(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "cluster,crq")
+	fmt.Fprintln(configWrite, "AuditTime,ClusterName,CrqName")
 
 	for crqName := range crqs {
-		fmt.Fprintf(configWrite, "%s,%s\n", *args.ClusterName, crqName)
+		fmt.Fprintf(configWrite, "%s,%s,%s\n", common.Format(args.CurrentTime), *args.ClusterName, crqName)
 	}
 	configWrite.Close()
 }
@@ -156,13 +156,13 @@ func writeAttributes(args *common.Parameters) {
 	defer attributeWrite.Close()
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,crq,Virtual Technology,Virtual Domain,Virtual Datacenter,Virtual Cluster,Selector Type,Selector Key,Selector Value,Create Time,Namespace Labels,Resource Metadata,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Current Size,Namespace CPU Limit,Namespace CPU Request,Namespace Memory Limit,Namespace Memory Request,Namespace Pods Limit,Namespaces")
+	fmt.Fprintln(attributeWrite, "ClusterName,CrqName,VirtualTechnology,VirtualDomain,VirtualDatacenter,VirtualCluster,SelectorType,SelectorKey,SelectorValue,CreateTime,NamespaceLabels,ResourceMetadata,CpuLimit,CpuRequest,MemoryLimit,MemoryRequest,CurrentSize,NamespaceCpuLimit,NamespaceCpuRequest,NamespaceMemoryLimit,NamespaceMemoryRequest,NamespacePodsLimit,Namespaces")
 
 	//Loop through the CRQs and write out the attributes data for each system.
 	for crqName, crq := range crqs {
 
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
-		fmt.Fprintf(attributeWrite, "%s,%s,ClusterResourceQuota,%s,%s,%s,%s,%s,%s,%s,", *args.ClusterName, crqName, *args.ClusterName, crq.selectorType, crq.selectorKey, crq.selectorType, crq.selectorKey, crq.selectorValue, crq.createTime.Format("2006-01-02 15:04:05.000"))
+		fmt.Fprintf(attributeWrite, "%s,%s,ClusterResourceQuota,%s,%s,%s,%s,%s,%s,%s,", *args.ClusterName, crqName, *args.ClusterName, crq.selectorType, crq.selectorKey, crq.selectorType, crq.selectorKey, crq.selectorValue, common.Format(&crq.createTime))
 
 		for key, value := range crq.labelMap {
 			if len(key) >= 250 {
@@ -243,7 +243,7 @@ func writeAttributes(args *common.Parameters) {
 	}
 }
 
-//Metrics a global func for collecting quota level metrics in prometheus
+// Metrics a global func for collecting quota level metrics in prometheus
 func Metrics(args *common.Parameters) {
 	//Setup variables used in the code.
 	var historyInterval time.Duration
@@ -259,8 +259,8 @@ func Metrics(args *common.Parameters) {
 	result, err = common.MetricCollect(args, query, range5Min)
 
 	if err != nil {
-		args.ErrorLogger.Println("metric=clusterResourceQuotas query=" + query + " message=" + err.Error())
-		fmt.Println("[ERROR] metric=clusterResourceQuotas query=" + query + " message=" + err.Error())
+		args.WarnLogger.Println("metric=clusterResourceQuotas query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=clusterResourceQuotas query=" + query + " message=" + err.Error())
 		return
 	}
 	var rsltIndex = result.(model.Matrix)
@@ -322,18 +322,18 @@ func Metrics(args *common.Parameters) {
 	var metricField []model.LabelName
 	metricField = append(metricField, "name")
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="limits.cpu"}) by (name) * 1000`
-	common.GetWorkload("cpu_limits", "CPU Utilization in mCores", query, metricField, args, entityKind)
+	common.GetWorkload("cpu_limits", "CpuLimits", query, metricField, args, entityKind)
 
-	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="requests.cpu"}) by (name) * 1000`
-	common.GetWorkload("cpu_requests", "Prometheus CPU Utilization in mCores", query, metricField, args, entityKind)
+	query = `sum(openshift_clusterresourcequota_usage{type="used", resource=~"cpu|requests\\.cpu"}) by (name) * 1000`
+	common.GetWorkload("cpu_requests", "CpuRequests", query, metricField, args, entityKind)
 
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="limits.memory"}) by (name)`
-	common.GetWorkload("mem_limits", "Raw Mem Utilization", query, metricField, args, entityKind)
+	common.GetWorkload("mem_limits", "MemLimits", query, metricField, args, entityKind)
 
-	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="requests.memory"}) by (name) / (1024 * 1024)`
-	common.GetWorkload("mem_requests", "Prometheus Raw Mem Utilization", query, metricField, args, entityKind)
+	query = `sum(openshift_clusterresourcequota_usage{type="used", resource=~"memory|requests\\.memory"}) by (name) / (1024 * 1024)`
+	common.GetWorkload("mem_requests", "MemRequests", query, metricField, args, entityKind)
 
 	query = `sum(openshift_clusterresourcequota_usage{type="used", resource="pods"}) by (name)`
-	common.GetWorkload("pods", "Auto Scaling - In Service Instances", query, metricField, args, entityKind)
+	common.GetWorkload("pods", "PodsLimits", query, metricField, args, entityKind)
 
 }

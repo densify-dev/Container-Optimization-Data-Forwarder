@@ -1,4 +1,4 @@
-//Package main collects data from Prometheus and formats the data into CSVs that will be sent to Densify through the Forwarder.
+// Package main collects data from Prometheus and formats the data into CSVs that will be sent to Densify through the Forwarder.
 package main
 
 import (
@@ -26,8 +26,8 @@ var params *common.Parameters
 // Parameters that allows user to control what levels they want to collect data on (cluster, node, container)
 var includeContainer, includeNode, includeNodeGroup, includeCluster, includeQuota bool
 
-//initParamters will look for settings defined on the command line or in config.properties file and update accordingly. Also defines the default values for these variables.
-//Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
+// initParamters will look for settings defined on the command line or in config.properties file and update accordingly. Also defines the default values for these variables.
+// Note if the value is defined both on the command line and in the config.properties the value in the config.properties will be used.
 func initParameters() {
 	//Set default settings
 	var clusterName string
@@ -143,7 +143,7 @@ func initParameters() {
 	flag.IntVar(&offsetTemp, "offset", offset, "Amount of units (based on interval value) to offset the data collection backwards in time")
 	flag.IntVar(&sampleRateTemp, "sampleRate", sampleRate, "Rate of sample points to collect. default is 5 for 1 sample for every 5 minutes.")
 	flag.BoolVar(&debugTemp, "debug", debug, "Enable debug logging")
-	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extention. Default config")
+	flag.StringVar(&configFile, "file", configFile, "Name of the config file without extension. Default config")
 	flag.StringVar(&configPath, "path", configPath, "Path to where the config file is stored")
 	flag.StringVar(&includeTemp, "includeList", include, "Comma separated list of data to include in collection (cluster, node, container, nodegroup, quota) Ex: \"node,cluster\"")
 	flag.StringVar(&nodeGroupListTemp, "nodeGroupList", nodeGroupList, "Comma separated list of labels to check for building node groups Ex: \"label_cloud_google_com_gke_nodepool,label_eks_amazonaws_com_nodegroup,label_agentpool,label_pool_name\"")
@@ -262,6 +262,9 @@ func initParameters() {
 		clusterName = promAddr
 	}
 
+	// trim and lowercase clusterName
+	clusterName = strings.ToLower(strings.TrimSpace(clusterName))
+
 	params = &common.Parameters{
 
 		ClusterName:      &clusterName,
@@ -302,13 +305,13 @@ func parseIncludeParam(param string) {
 	}
 }
 
-//main function.
+// main function.
 func main() {
 
 	//Read in the command line and config file parameters and set the required variables.
 	initParameters()
-	params.InfoLogger.Println("Version 2.4.0")
-	fmt.Println("[INFO] Version 2.4.0")
+	params.InfoLogger.Println("Version 3.0.0")
+	fmt.Println("[INFO] Version 3.0.0")
 
 	//Get the current time in UTC and format it. The script uses this time for all the queries this way if you have a large environment we are collecting the data as a snapshot of a specific time and not potentially getting a misaligned set of data.
 	var t time.Time
@@ -322,6 +325,15 @@ func main() {
 		currentTime = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute()-*params.Offset, 0, 0, t.Location())
 	}
 	params.CurrentTime = &currentTime
+
+	if ver, err := common.GetVersion(params); err == nil {
+		fmt.Printf("[INFO] Detected Prometheus version %s\n", ver)
+		params.InfoLogger.Printf("Detected Prometheus version %s\n", ver)
+	} else {
+		msg := fmt.Sprintf("Failed to connect to Prometheus: %s\n", err.Error())
+		params.ErrorLogger.Printf(msg)
+		log.Fatalf("%s %s", "[ERROR]", msg)
+	}
 
 	if includeContainer {
 		container2.Metrics(params)

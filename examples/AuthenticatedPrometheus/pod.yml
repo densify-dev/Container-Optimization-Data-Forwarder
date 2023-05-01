@@ -3,11 +3,20 @@ kind: Pod
 metadata:
   name: densify
 spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   serviceAccountName: densify                           
   containers:
-  - image: densify/container-optimization-data-forwarder
+  - image: densify/container-optimization-data-forwarder:3
     imagePullPolicy: Always
     name: data-forwarder
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
     volumeMounts:
     - mountPath: /config
       name: config

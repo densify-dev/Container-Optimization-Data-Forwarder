@@ -1,4 +1,4 @@
-//Package nodegroup collects data related to containers and formats into csv files to send to Densify.
+// Package nodegroup collects data related to containers and formats into csv files to send to Densify.
 package nodegroup
 
 import (
@@ -19,10 +19,10 @@ type nodeGroupStruct struct {
 
 var nodeGroups = map[string]*nodeGroupStruct{}
 
-//Hard-coded string for log file warnings
+// Hard-coded string for log file warnings
 var entityKind = "node_group"
 
-//getNodeMetricString is used to parse the label based results from Prometheus related to Container Entities and store them in the systems data structure.
+// getNodeMetricString is used to parse the label based results from Prometheus related to Container Entities and store them in the systems data structure.
 func getNodeMetricString(result model.Value, nodeGroup model.LabelName) {
 	//Validate there is data in the results.
 	if result == nil {
@@ -43,9 +43,12 @@ func getNodeMetricString(result model.Value, nodeGroup model.LabelName) {
 	}
 }
 
-//Gets node metrics from prometheus (and checks to see if they are valid)
+// Gets node metrics from prometheus (and checks to see if they are valid)
 func getNodeGroupMetric(result model.Value, nodeGroupLabel model.LabelName, metric string) {
-
+	//Validate there is data in the results.
+	if result == nil {
+		return
+	}
 	//Loop through the different entities in the results.
 	for i := 0; i < result.(model.Matrix).Len(); i++ {
 		nodeGroup, ok := result.(model.Matrix)[i].Metric[nodeGroupLabel]
@@ -85,7 +88,7 @@ func getNodeGroupMetric(result model.Value, nodeGroupLabel model.LabelName, metr
 	}
 }
 
-//writeNodeGroupConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
+// writeNodeGroupConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
 func writeConfig(args *common.Parameters) {
 
 	//Create the config file and open it for writing.
@@ -97,7 +100,7 @@ func writeConfig(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(configWrite, "cluster,node_group,HW Total CPUs,HW Total Physical CPUs,HW Cores Per CPU,HW Threads Per Core,HW Total Memory,HW Model,OS Name")
+	fmt.Fprintln(configWrite, "AuditTime,ClusterName,NodeGroupName,HwTotalCpus,HwTotalPhysicalCpus,HwCoresPerCpu,HwThreadsPerCore,HwTotalMemory,HwModel,OsName")
 
 	for nodeGroupName, nodeGroup := range nodeGroups {
 		var os, instance string
@@ -115,7 +118,7 @@ func writeConfig(args *common.Parameters) {
 			instance = ""
 		}
 
-		fmt.Fprintf(configWrite, "%s,%s,", *args.ClusterName, nodeGroupName)
+		fmt.Fprintf(configWrite, "%s,%s,%s,", common.Format(args.CurrentTime), *args.ClusterName, nodeGroupName)
 
 		if nodeGroup.cpuCapacity == -1 {
 			fmt.Fprintf(configWrite, ",,1,1,")
@@ -131,7 +134,7 @@ func writeConfig(args *common.Parameters) {
 	configWrite.Close()
 }
 
-//writeNodeGroupAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
+// writeNodeGroupAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
 func writeAttributes(args *common.Parameters) {
 
 	//Create the attributes file and open it for writing
@@ -143,8 +146,7 @@ func writeAttributes(args *common.Parameters) {
 	}
 
 	//Write out the header.
-	fmt.Fprintln(attributeWrite, "cluster,node_group,Virtual Technology,Virtual Domain,Existing CPU Limit,Existing CPU Request,Existing Memory Limit,Existing Memory Request,Current Size,Current Nodes,Node Labels")
-
+	fmt.Fprintln(attributeWrite, "ClusterName,NodeGroupName,VirtualTechnology,VirtualDomain,CpuLimit,CpuRequest,MemoryLimit,MemoryRequest,CurrentSize,CurrentNodes,NodeLabels")
 	for nodeGroupName, nodeGroup := range nodeGroups {
 		//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
 		fmt.Fprintf(attributeWrite, "%s,%s,NodeGroup,%s,", *args.ClusterName, nodeGroupName, *args.ClusterName)
@@ -190,7 +192,7 @@ func writeAttributes(args *common.Parameters) {
 	attributeWrite.Close()
 }
 
-//checkNodeGroups checks to see if the node group label in the results is already in the nodeGroupsLabels array or not.
+// checkNodeGroups checks to see if the node group label in the results is already in the nodeGroupsLabels array or not.
 func checkNodeGroups(nodeGroupLabels []model.LabelName, labelName model.LabelName) bool {
 	for _, label := range nodeGroupLabels {
 		if label == labelName {
@@ -200,7 +202,7 @@ func checkNodeGroups(nodeGroupLabels []model.LabelName, labelName model.LabelNam
 	return false
 }
 
-//getWorkload used to query for the workload data and then calls write workload
+// getWorkload used to query for the workload data and then calls write workload
 func getWorkload(fileName, metricName, query string, nodeGroupLabels []model.LabelName, args *common.Parameters, entityKind string) {
 	var historyInterval time.Duration
 	historyInterval = 0
@@ -212,8 +214,14 @@ func getWorkload(fileName, metricName, query string, nodeGroupLabels []model.Lab
 		fmt.Println("entity=" + entityKind + " message=" + err.Error())
 		return
 	}
-
-	fmt.Fprintf(workloadWrite, "cluster,%s,Datetime,%s\n", entityKind, metricName)
+	if csvHeaderFormat, f := common.GetCsvHeaderFormat(entityKind); f {
+		fmt.Fprintf(workloadWrite, csvHeaderFormat, metricName)
+	} else {
+		msg := " message=no CSV header format found"
+		args.ErrorLogger.Println("entity=" + entityKind + msg)
+		fmt.Println("entity=" + entityKind + msg)
+		return
+	}
 
 	for _, metricField := range nodeGroupLabels {
 
@@ -240,7 +248,7 @@ func getWorkload(fileName, metricName, query string, nodeGroupLabels []model.Lab
 	workloadWrite.Close()
 }
 
-//Metrics a global func for collecting node level metrics in prometheus
+// Metrics a global func for collecting node level metrics in prometheus
 func Metrics(args *common.Parameters) {
 	//Setup variables used in the code.
 	var historyInterval time.Duration
@@ -258,8 +266,8 @@ func Metrics(args *common.Parameters) {
 	query = `avg(kube_node_labels) by (` + args.NodeGroupList + `)`
 	result, err = common.MetricCollect(args, query, range5Min)
 	if err != nil {
-		args.ErrorLogger.Println("metric=nodeGroup query=" + query + " message=" + err.Error())
-		fmt.Println("[ERROR] metric=nodeGroup query=" + query + " message=" + err.Error())
+		args.WarnLogger.Println("metric=nodeGroup query=" + query + " message=" + err.Error())
+		fmt.Println("[WARNING] metric=nodeGroup query=" + query + " message=" + err.Error())
 		return
 	}
 
@@ -292,7 +300,7 @@ func Metrics(args *common.Parameters) {
 			if _, ok := nodeGroups[nodeGroup]; !ok {
 				nodeGroups[nodeGroup] = &nodeGroupStruct{cpuLimit: -1, cpuRequest: -1, cpuCapacity: -1, memLimit: -1, memRequest: -1, memCapacity: -1, labelMap: map[string]string{}}
 			}
-			nodeGroups[nodeGroup].nodes = nodeGroups[nodeGroup].nodes + node + ";"
+			nodeGroups[nodeGroup].nodes = nodeGroups[nodeGroup].nodes + node + "|"
 			nodeGroups[nodeGroup].currentSize++
 		}
 
@@ -302,7 +310,7 @@ func Metrics(args *common.Parameters) {
 
 		query = `sum(kube_pod_container_resource_limits) by (node, resource)`
 		result, err = common.MetricCollect(args, query, range5Min)
-		if result.(model.Matrix).Len() == 0 {
+		if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 			query = `avg(sum(kube_pod_container_resource_limits_cpu_cores*1000) by (node)` + nodeGroupSuffix
 			result, err = common.MetricCollect(args, query, range5Min)
 			if err != nil {
@@ -344,7 +352,7 @@ func Metrics(args *common.Parameters) {
 
 		query = `sum(kube_pod_container_resource_requests) by (node, resource)`
 		result, err = common.MetricCollect(args, query, range5Min)
-		if result.(model.Matrix).Len() == 0 {
+		if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 			query = `avg(sum(kube_pod_container_resource_requests_cpu_cores*1000) by (node)` + nodeGroupSuffix
 			result, err = common.MetricCollect(args, query, range5Min)
 			if err != nil {
@@ -386,7 +394,7 @@ func Metrics(args *common.Parameters) {
 		query = `avg(kube_node_status_capacity * on (node) group_left (` + string(nodeGroupLabels[ng]) + `) kube_node_labels{` + string(nodeGroupLabels[ng]) + `=~".+"}) by (` + string(nodeGroupLabels[ng]) + `,resource)`
 		result, err = common.MetricCollect(args, query, range5Min)
 
-		if result.(model.Matrix).Len() == 0 {
+		if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 			query = `avg(kube_node_status_capacity_cpu_cores` + nodeGroupSuffix
 			result, err = common.MetricCollect(args, query, range5Min)
 			if err != nil {
@@ -422,35 +430,35 @@ func Metrics(args *common.Parameters) {
 	if requestsLabel == "unified" {
 		//Query and store prometheus CPU requests
 		query = `avg(sum(kube_pod_container_resource_requests{resource="cpu"})  by (node)` + nodeGroupSuffix
-		getWorkload("cpu_requests", "CPU Reservation in Cores", query, nodeGroupLabels, args, entityKind)
+		getWorkload("cpu_requests", "CpuRequests", query, nodeGroupLabels, args, entityKind)
 
 		//Query and store prometheus CPU requests
 		query = `avg(sum(kube_pod_container_resource_requests{resource="cpu"}) by (node) / sum(kube_node_status_capacity{resource="cpu"}) by (node)` + nodeGroupSuffix + ` * 100`
-		getWorkload("cpu_reservation_percent", "CPU Reservation Percent", query, nodeGroupLabels, args, entityKind)
+		getWorkload("cpu_reservation_percent", "CpuReservationPercent", query, nodeGroupLabels, args, entityKind)
 
 		//Query and store prometheus Memory requests
 		query = `avg(sum(kube_pod_container_resource_requests{resource="memory"}/1024/1024) by (node)` + nodeGroupSuffix
-		getWorkload("memory_requests", "Memory Reservation in MB", query, nodeGroupLabels, args, entityKind)
+		getWorkload("memory_requests", "MemoryRequests", query, nodeGroupLabels, args, entityKind)
 
 		//Query and store prometheus Memory requests
 		query = `avg(sum(kube_pod_container_resource_requests{resource="memory"}/1024/1024) by (node) / sum(kube_node_status_capacity{resource="memory"}/1024/1024) by (node)` + nodeGroupSuffix + ` * 100`
-		getWorkload("memory_reservation_percent", "Memory Reservation Percent", query, nodeGroupLabels, args, entityKind)
+		getWorkload("memory_reservation_percent", "MemoryReservationPercent", query, nodeGroupLabels, args, entityKind)
 	} else {
 		//Query and store prometheus CPU requests
 		query = `avg(sum(kube_pod_container_resource_requests_cpu_cores)  by (node)` + nodeGroupSuffix
-		getWorkload("cpu_requests", "CPU Reservation in Cores", query, nodeGroupLabels, args, entityKind)
+		getWorkload("cpu_requests", "CpuRequests", query, nodeGroupLabels, args, entityKind)
 
 		//Query and store prometheus CPU requests
 		query = `avg(sum(kube_pod_container_resource_requests_cpu_cores) by (node) / sum(kube_node_status_capacity_cpu_cores) by (node)` + nodeGroupSuffix + ` * 100`
-		getWorkload("cpu_reservation_percent", "CPU Reservation Percent", query, nodeGroupLabels, args, entityKind)
+		getWorkload("cpu_reservation_percent", "CpuReservationPercent", query, nodeGroupLabels, args, entityKind)
 
 		//Query and store prometheus Memory requests
 		query = `avg(sum(kube_pod_container_resource_requests_memory_bytes/1024/1024) by (node)` + nodeGroupSuffix
-		getWorkload("memory_requests", "Memory Reservation in MB", query, nodeGroupLabels, args, entityKind)
+		getWorkload("memory_requests", "MemoryRequests", query, nodeGroupLabels, args, entityKind)
 
 		//Query and store prometheus Memory requests
 		query = `avg(sum(kube_pod_container_resource_requests_memory_bytes/1024/1024) by (node) / sum(kube_node_status_capacity_memory_bytes/1024/1024) by (node)` + nodeGroupSuffix + ` * 100`
-		getWorkload("memory_reservation_percent", "Memory Reservation Percent", query, nodeGroupLabels, args, entityKind)
+		getWorkload("memory_reservation_percent", "MemoryReservationPercent", query, nodeGroupLabels, args, entityKind)
 	}
 
 	//Check to see which disk queries to use if instance is IP address that need to link to pod to get name or if instance = node name.
@@ -461,7 +469,7 @@ func Metrics(args *common.Parameters) {
 	queryPrefixSum := `avg(label_replace(sum(`
 	querySuffix := `, "node", "$1", "instance", "(.*):*")` + nodeGroupSuffix
 	querySuffixSum := `) by (instance), "node", "$1", "instance", "(.*):*")` + nodeGroupSuffix
-	if result.(model.Matrix).Len() != 0 {
+	if mat, ok := result.(model.Matrix); err == nil && ok && mat.Len() != 0 {
 		queryPrefix = `avg(max(label_replace(`
 		queryPrefixSum = `avg(sum(label_replace(`
 		querySuffix = `, "pod_ip", "$1", "instance", "(.*):.*")) by (pod_ip) * on (pod_ip) group_right kube_pod_info{pod=~".*node-exporter.*"}` + nodeGroupSuffix
@@ -469,67 +477,67 @@ func Metrics(args *common.Parameters) {
 	}
 
 	query = `sum(kube_node_labels{stringToBeReplaced=~".+"}) by (stringToBeReplaced)`
-	getWorkload("current_size", "Auto Scaling - In Service Instances", query, nodeGroupLabels, args, entityKind)
+	getWorkload("current_size", "CurrentSize", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus total cpu uptime in seconds
 	query = queryPrefix + `sum(irate(node_cpu_seconds_total{mode!="idle"}[` + args.SampleRateString + `m])) by (instance) / on (instance) group_left count(node_cpu_seconds_total{mode="idle"}) by (instance) *100` + querySuffix
-	getWorkload("cpu_utilization", "CPU Utilization", query, nodeGroupLabels, args, entityKind)
+	getWorkload("cpu_utilization", "CpuUtilization", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus node memory total in bytes
 	query = queryPrefix + `node_memory_MemTotal_bytes - node_memory_MemFree_bytes` + querySuffix
-	getWorkload("memory_raw_bytes", "Raw Mem Utilization", query, nodeGroupLabels, args, entityKind)
+	getWorkload("memory_raw_bytes", "MemoryBytes", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus node memory total free in bytes
 	query = queryPrefix + `node_memory_MemTotal_bytes - (node_memory_MemFree_bytes + node_memory_Cached_bytes + node_memory_Buffers_bytes)` + querySuffix
-	getWorkload("memory_actual_workload", "Actual Memory Utilization", query, nodeGroupLabels, args, entityKind)
+	getWorkload("memory_actual_workload", "MemoryActualWorkload", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus node disk write in bytes
 	query = queryPrefixSum + `irate(node_disk_written_bytes_total{device!~"dm-.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	getWorkload("disk_write_bytes", "Raw Disk Write Utilization", query, nodeGroupLabels, args, entityKind)
+	getWorkload("disk_write_bytes", "DiskWriteBytes", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus node disk read in bytes
 	query = queryPrefixSum + `irate(node_disk_read_bytes_total{device!~"dm-.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	getWorkload("disk_read_bytes", "Raw Disk Read Utilization", query, nodeGroupLabels, args, entityKind)
+	getWorkload("disk_read_bytes", "DiskReadBytes", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus total disk read uptime as a percentage
 	query = queryPrefixSum + `irate(node_disk_read_time_seconds_total{device!~"dm-.*"}[` + args.SampleRateString + `m]) / irate(node_disk_io_time_seconds_total{device!~"dm-.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	getWorkload("disk_read_ops", "Disk Read Operations", query, nodeGroupLabels, args, entityKind)
+	getWorkload("disk_read_ops", "DiskReadOps", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus total disk write uptime as a percentage
 	query = queryPrefixSum + `irate(node_disk_write_time_seconds_total{device!~"dm-.*"}[` + args.SampleRateString + `m]) / irate(node_disk_io_time_seconds_total{device!~"dm-.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	getWorkload("disk_write_ops", "Disk Write Operations", query, nodeGroupLabels, args, entityKind)
+	getWorkload("disk_write_ops", "DiskWriteOps", query, nodeGroupLabels, args, entityKind)
 
 	//Total disk values
 	//Query and store prometheus node disk read in bytes
 	query = queryPrefixSum + `irate(node_disk_read_bytes_total{device!~"dm-.*"}[` + args.SampleRateString + `m]) + irate(node_disk_written_bytes_total{device!~"dm-.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	getWorkload("disk_total_bytes", "Raw Disk Utilization", query, nodeGroupLabels, args, entityKind)
+	getWorkload("disk_total_bytes", "DiskTotalBytes", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus total disk read uptime as a percentage
 	query = queryPrefixSum + `(irate(node_disk_read_time_seconds_total{device!~"dm-.*"}[` + args.SampleRateString + `m]) + irate(node_disk_write_time_seconds_total{device!~"dm-.*"}[` + args.SampleRateString + `m])) / irate(node_disk_io_time_seconds_total{device!~"dm-.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	getWorkload("disk_total_ops", "Disk Operations", query, nodeGroupLabels, args, entityKind)
+	getWorkload("disk_total_ops", "DiskTotalOps", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus node recieved network data in bytes
 	query = queryPrefixSum + `irate(node_network_receive_bytes_total{device!~"veth.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	getWorkload("net_received_bytes", "Raw Net Received Utilization", query, nodeGroupLabels, args, entityKind)
+	getWorkload("net_received_bytes", "NetReceivedBytes", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus recieved network data in packets
 	query = queryPrefixSum + `irate(node_network_receive_packets_total{device!~"veth.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	getWorkload("net_received_packets", "Network Packets Received", query, nodeGroupLabels, args, entityKind)
+	getWorkload("net_received_packets", "NetReceivedPackets", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus total transmitted network data in bytes
 	query = queryPrefixSum + `irate(node_network_transmit_bytes_total{device!~"veth.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	getWorkload("net_sent_bytes", "Raw Net Sent Utilization", query, nodeGroupLabels, args, entityKind)
+	getWorkload("net_sent_bytes", "NetSentBytes", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus total transmitted network data in packets
 	query = queryPrefixSum + `irate(node_network_transmit_packets_total{device!~"veth.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	getWorkload("net_sent_packets", "Network Packets Sent", query, nodeGroupLabels, args, entityKind)
+	getWorkload("net_sent_packets", "NetSentPackets", query, nodeGroupLabels, args, entityKind)
 
 	//Total values network
 	//Query and store prometheus total network data in bytes
 	query = queryPrefixSum + `irate(node_network_transmit_bytes_total{device!~"veth.*"}[` + args.SampleRateString + `m]) + irate(node_network_receive_bytes_total{device!~"veth.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	getWorkload("net_total_bytes", "Raw Net Utilization", query, nodeGroupLabels, args, entityKind)
+	getWorkload("net_total_bytes", "NetTotalBytes", query, nodeGroupLabels, args, entityKind)
 
 	//Query and store prometheus total network data in packets
 	query = queryPrefixSum + `irate(node_network_transmit_packets_total{device!~"veth.*"}[` + args.SampleRateString + `m]) + irate(node_network_receive_packets_total{device!~"veth.*"}[` + args.SampleRateString + `m])` + querySuffixSum
-	getWorkload("net_total_packets", "Network Packets", query, nodeGroupLabels, args, entityKind)
+	getWorkload("net_total_packets", "NetTotalPackets", query, nodeGroupLabels, args, entityKind)
 }

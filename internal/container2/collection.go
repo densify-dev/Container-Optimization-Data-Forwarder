@@ -326,7 +326,7 @@ func getWorkload(fileName, metricName, query, aggregator string, args *common.Pa
 		fmt.Println("[ERROR] entity=" + entityKind + " metric=" + metricName + " query=" + query + " message=" + err.Error())
 		return
 	}
-	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,%s\n", metricName)
+	fmt.Fprintf(workloadWrite, "ClusterName,Namespace,EntityName,EntityType,ContainerName,MetricTime,%s\n", metricName)
 
 	//If the History parameter is set to anything but default 1 then will loop through the calls starting with the current day\hour\minute interval and work backwards.
 	//This is done as the farther you go back in time the slpwer prometheus querying becomes and we have seen cases where will not run from timeouts on Prometheus.
@@ -395,7 +395,8 @@ func getDeploymentWorkload(fileName, metricName, query string, args *common.Para
 		fmt.Println("[ERROR] metric=" + metricName + " query=" + query + " message=File not found")
 		return
 	}
-	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,%s\n", metricName)
+	hf, _ := common.GetCsvHeaderFormat(entityKind)
+	fmt.Fprintf(workloadWrite, hf, metricName)
 
 	tempMap := map[int]map[string]map[string][]model.SamplePair{}
 
@@ -430,7 +431,7 @@ func getDeploymentWorkload(fileName, metricName, query string, args *common.Para
 			for c := range systems[n].midLevels[m].containers {
 				for historyInterval = 0; int(historyInterval) < *args.History; historyInterval++ {
 					for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
-						fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%f\n", *args.ClusterName, n, midVal.name, midVal.kind, c, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+						fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%f\n", *args.ClusterName, n, midVal.name, midVal.kind, c, common.FormatTime(val.Timestamp), val.Value)
 					}
 				}
 			}
@@ -438,6 +439,10 @@ func getDeploymentWorkload(fileName, metricName, query string, args *common.Para
 	}
 	workloadWrite.Close()
 }
+
+const (
+	hpaSuffix = "_hpa"
+)
 
 func getHPAWorkload(fileName, metricName, query string, args *common.Parameters, hpaLabel model.LabelName) {
 	var historyInterval time.Duration
@@ -457,8 +462,9 @@ func getHPAWorkload(fileName, metricName, query string, args *common.Parameters,
 		fmt.Println("[ERROR] metric=" + metricName + " query=" + query + " message=File not found")
 		return
 	}
-	fmt.Fprintf(workloadWrite, "cluster,namespace,entity_name,entity_type,container,HPA Name,Datetime,%s\n", metricName)
-	fmt.Fprintf(workloadWriteExtra, "cluster,namespace,entity_name,entity_type,container,HPA Name,Datetime,%s\n", metricName)
+	hf, _ := common.GetCsvHeaderFormat(entityKind + hpaSuffix)
+	fmt.Fprintf(workloadWrite, hf, metricName)
+	fmt.Fprintf(workloadWriteExtra, hf, metricName)
 
 	tempMap := map[int]map[string]map[string][]model.SamplePair{}
 
@@ -492,19 +498,19 @@ func getHPAWorkload(fileName, metricName, query string, args *common.Parameters,
 				case "Deployment":
 					for c := range systems[n].pointers[m].containers {
 						for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
-							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", *args.ClusterName, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", *args.ClusterName, n, midVal.name, midVal.kind, c, midVal.name, common.FormatTime(val.Timestamp), val.Value)
 						}
 					}
 				case "ReplicaSet":
 					for c := range systems[n].pointers[m].containers {
 						for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
-							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", *args.ClusterName, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", *args.ClusterName, n, midVal.name, midVal.kind, c, midVal.name, common.FormatTime(val.Timestamp), val.Value)
 						}
 					}
 				case "ReplicationController":
 					for c := range systems[n].pointers[m].containers {
 						for _, val := range tempMap[int(historyInterval)][n][midVal.name] {
-							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", *args.ClusterName, n, midVal.name, midVal.kind, c, midVal.name, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+							fmt.Fprintf(workloadWrite, "%s,%s,%s,%s,%s,%s,%s,%f\n", *args.ClusterName, n, midVal.name, midVal.kind, c, midVal.name, common.FormatTime(val.Timestamp), val.Value)
 						}
 					}
 				}
@@ -518,7 +524,7 @@ func getHPAWorkload(fileName, metricName, query string, args *common.Parameters,
 			for n := range tempMap[i] {
 				for m := range tempMap[i][n] {
 					for _, val := range tempMap[int(historyInterval)][n][m] {
-						fmt.Fprintf(workloadWriteExtra, "%s,%s,,,,%s,%s,%f\n", *args.ClusterName, n, m, time.Unix(0, int64(val.Timestamp)*1000000).Format("2006-01-02 15:04:05.000"), val.Value)
+						fmt.Fprintf(workloadWriteExtra, "%s,%s,,,,%s,%s,%f\n", *args.ClusterName, n, m, common.FormatTime(val.Timestamp), val.Value)
 					}
 				}
 			}

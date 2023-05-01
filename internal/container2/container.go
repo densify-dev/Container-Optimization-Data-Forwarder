@@ -1,4 +1,4 @@
-//Package container2 collects data related to containers and formats into csv files to send to Densify.
+// Package container2 collects data related to containers and formats into csv files to send to Densify.
 package container2
 
 import (
@@ -21,7 +21,7 @@ type namespace struct {
 	labelMap                                              map[string]string
 }
 
-//midLevel is used to hold information related to the highest owner of any containers
+// midLevel is used to hold information related to the highest owner of any containers
 type midLevel struct {
 	name, kind            string
 	containers            map[string]*container
@@ -30,14 +30,14 @@ type midLevel struct {
 	labelMap              map[string]string
 }
 
-//container is used to hold information related to containers
+// container is used to hold information related to containers
 type container struct {
 	memory, cpuLimit, cpuRequest, memLimit, memRequest, restarts, powerState int
 	name                                                                     string
 	labelMap                                                                 map[string]string
 }
 
-//Metrics function to collect data related to containers.
+// Metrics function to collect data related to containers.
 func Metrics(args *common.Parameters) {
 	//Setup variables used in the code.
 	var historyInterval time.Duration
@@ -206,7 +206,7 @@ func Metrics(args *common.Parameters) {
 
 	query = `sum(kube_pod_container_resource_limits) by (pod,namespace,container,resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if result.(model.Matrix).Len() == 0 {
+	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		query = `sum(kube_pod_container_resource_limits_cpu_cores) by (pod,namespace,container)*1000`
 		result, err = common.MetricCollect(args, query, range5Min)
 		if err != nil {
@@ -230,7 +230,7 @@ func Metrics(args *common.Parameters) {
 
 	query = `sum(kube_pod_container_resource_requests) by (pod,namespace,container,resource)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if result.(model.Matrix).Len() == 0 {
+	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		query = `sum(kube_pod_container_resource_requests_cpu_cores) by (pod,namespace,container)*1000`
 		result, err = common.MetricCollect(args, query, range5Min)
 		if err != nil {
@@ -307,7 +307,7 @@ func Metrics(args *common.Parameters) {
 
 	query = `sum(kube_pod_container_status_terminated) by (pod,namespace,container)`
 	result, err = common.MetricCollect(args, query, range5Min)
-	if result.(model.Matrix).Len() == 0 {
+	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		query = `sum(kube_pod_container_status_terminated_reason) by (pod,namespace,container)`
 		result, err = common.MetricCollect(args, query, range5Min)
 		if err != nil {
@@ -317,12 +317,7 @@ func Metrics(args *common.Parameters) {
 			getContainerMetric(result, "namespace", "pod", "container", "powerState")
 		}
 	} else {
-		if err != nil {
-			args.WarnLogger.Println("metric=powerState query=" + query + " message=" + err.Error())
-			fmt.Println("[WARNING] metric=powerState query=" + query + " message=" + err.Error())
-		} else {
-			getContainerMetric(result, "namespace", "pod", "container", "powerState")
-		}
+		getContainerMetric(result, "namespace", "pod", "container", "powerState")
 	}
 
 	query = `kube_pod_created`
@@ -664,14 +659,14 @@ func Metrics(args *common.Parameters) {
 
 	var hpaName string
 	var hpaLabel model.LabelName
-	if result.(model.Matrix).Len() != 0 {
-		hpaName = "hpa"
-		hpaLabel = "hpa"
-	} else {
+	if mat, ok := result.(model.Matrix); err != nil || !ok || mat.Len() == 0 {
 		hpaName = "horizontalpodautoscaler"
 		hpaLabel = "horizontalpodautoscaler"
 		query = `kube_` + hpaName + `_labels`
 		result, err = common.MetricCollect(args, query, range5Min)
+	} else {
+		hpaName = "hpa"
+		hpaLabel = "hpa"
 	}
 
 	if err != nil {
@@ -694,7 +689,8 @@ func Metrics(args *common.Parameters) {
 		args.ErrorLogger.Println("entity=" + entityKind + " message=" + err.Error())
 		fmt.Println("[ERROR] entity=" + entityKind + " message=" + err.Error())
 	} else {
-		fmt.Fprintf(currentSizeWrite, "cluster,namespace,entity_name,entity_type,container,Datetime,Auto Scaling - In Service Instances\n")
+		hf, _ := common.GetCsvHeaderFormat(entityKind)
+		fmt.Fprintf(currentSizeWrite, hf, "CurrentSize")
 
 		query = `kube_replicaset_spec_replicas`
 		result, err = common.MetricCollect(args, query, range5Min)
@@ -788,45 +784,45 @@ func Metrics(args *common.Parameters) {
 		fmt.Printf("[DEBUG] Alloc = %v MiB\tTotalAlloc = %v MiB\tSys = %v MiB\tNumGC = %v\n", mem.Alloc/1024/1024, mem.TotalAlloc/1024/1024, mem.Sys/1024/1024, mem.NumGC)
 	}
 	query = queryPrefix + `round(max(irate(container_cpu_usage_seconds_total{name!~"k8s_POD_.*"}[` + args.SampleRateString + `m])) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)*1000,1)` + querySuffix
-	getWorkload("cpu_mCores_workload", "CPU Utilization in mCores", query, "max", args)
-	getWorkload("cpu_mCores_workload", "Prometheus CPU Utilization in mCores", query, "avg", args)
+	getWorkload("cpu_mCores_workload", "MaxCpuMcores", query, "max", args)
+	getWorkload("cpu_mCores_workload", "AvgCpuMcores", query, "avg", args)
 
 	query = queryPrefix + `max(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
-	getWorkload("mem_workload", "Raw Mem Utilization", query, "max", args)
+	getWorkload("mem_workload", "MaxMem", query, "max", args)
 	query = queryPrefix + `max(container_memory_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `) / (1024 * 1024)` + querySuffix
-	getWorkload("mem_workload", "Prometheus Raw Mem Utilization", query, "avg", args)
+	getWorkload("mem_workload", "AvgMem", query, "avg", args)
 
 	query = queryPrefix + `max(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
-	getWorkload("rss_workload", "Actual Memory Utilization", query, "max", args)
+	getWorkload("rss_workload", "MaxRss", query, "max", args)
 	query = queryPrefix + `max(container_memory_rss{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `) / (1024 * 1024)` + querySuffix
-	getWorkload("rss_workload", "Prometheus Actual Memory Utilization", query, "avg", args)
+	getWorkload("rss_workload", "AvgRss", query, "avg", args)
 
 	query = queryPrefix + `max(container_fs_usage_bytes{name!~"k8s_POD_.*"}) by (instance,pod` + args.LabelSuffix + `,namespace,container` + args.LabelSuffix + `)` + querySuffix
-	getWorkload("disk_workload", "Raw Disk Utilization", query, "max", args)
-	getWorkload("disk_workload", "Prometheus Raw Disk Utilization", query, "avg", args)
+	getWorkload("disk_workload", "MaxDisk", query, "max", args)
+	getWorkload("disk_workload", "AvgDisk", query, "avg", args)
 
 	if args.LabelSuffix != "" {
 		queryPrefix = `label_replace(`
 		querySuffix = `, "container_name", "$1", "container", "(.*)")`
 	}
-	query = queryPrefix + `max(irate(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}[` + args.SampleRateString + `m])) by (instance,pod,namespace,container)` + querySuffix
-	getWorkload("restarts", "Restarts", query, "max", args)
+	query = queryPrefix + `max(round(increase(kube_pod_container_status_restarts_total{name!~"k8s_POD_.*"}[` + args.SampleRateString + `m]),1)) by (instance,pod,namespace,container)` + querySuffix
+	getWorkload("restarts", "MaxRestarts", query, "max", args)
 
 	if args.LabelSuffix == "" {
 		query = `kube_` + hpaName + `_status_condition{status="true",condition="ScalingLimited"}`
 	} else {
 		query = `kube_` + hpaName + `_status_condition{status="ScalingLimited",condition="true"}`
 	}
-	getHPAWorkload("condition_scaling_limited", "Scaling Limited", query, args, hpaLabel)
+	getHPAWorkload("condition_scaling_limited", "HpaConditionScalingLimited", query, args, hpaLabel)
 
 	//HPA workloads
 	query = `kube_` + hpaName + `_spec_max_replicas`
-	getHPAWorkload("max_replicas", "Auto Scaling - Maximum Size", query, args, hpaLabel)
+	getHPAWorkload("max_replicas", "HpaMaxReplicas", query, args, hpaLabel)
 
 	query = `kube_` + hpaName + `_spec_min_replicas`
-	getHPAWorkload("min_replicas", "Auto Scaling - Minimum Size", query, args, hpaLabel)
+	getHPAWorkload("min_replicas", "HpaMinReplicas", query, args, hpaLabel)
 
 	query = `kube_` + hpaName + `_status_current_replicas`
-	getHPAWorkload("current_replicas", "Auto Scaling - Total Instances", query, args, hpaLabel)
+	getHPAWorkload("current_replicas", "HpaCurrentReplicas", query, args, hpaLabel)
 
 }

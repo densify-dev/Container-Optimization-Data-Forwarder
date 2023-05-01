@@ -1,3 +1,7 @@
+## 3.0.0
+* Usage of a new endpoint to support TSDB.
+* Corresponds to image tag `densify/container-optimization-data-forwarder:3`.
+
 ## 2.3.0
 * Add support for resource quotas and cluster resource quotas
 * Add support for changing label used for building node groups

@@ -289,17 +289,16 @@ func initParameters() {
 }
 
 func parseIncludeParam(param string) {
-	param = strings.ToLower(param)
+	// cluster should always be included, regardless of the configuration
+	includeCluster = true
 	for _, elem := range strings.Split(param, ",") {
-		if strings.Compare(elem, "cluster") == 0 {
-			includeCluster = true
-		} else if strings.Compare(elem, "node") == 0 {
+		if strings.EqualFold(elem, "node") {
 			includeNode = true
-		} else if strings.Compare(elem, "container") == 0 {
+		} else if strings.EqualFold(elem, "container") {
 			includeContainer = true
-		} else if strings.Compare(elem, "nodegroup") == 0 {
+		} else if strings.EqualFold(elem, "nodegroup") {
 			includeNodeGroup = true
-		} else if strings.Compare(elem, "quota") == 0 {
+		} else if strings.EqualFold(elem, "quota") {
 			includeQuota = true
 		}
 	}

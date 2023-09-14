@@ -91,7 +91,7 @@ if [ ${push} -eq 1 ]; then
         if [ "${baseImageArg}" == "alpine" ]; then
             tagAndPush ${quayImage}:${baseImageArg}-${tag} ${quayRepo}${quayImage}:latest
             tagAndPush ${quayImage}:${baseImageArg}-${tag} ${dockerHubRepo}${dockerHubImage}:${baseImageArg}
-            tagAndPush ${quayImage}:${baseImageArg}-${tag} ${dockerHubRepo}${dockerHubImage}:latest
+            tagAndPush ${quayImage}:${baseImageArg}-${tag} ${dockerHubRepo}${dockerHubImage}:3
         fi
     fi
 fi

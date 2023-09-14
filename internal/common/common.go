@@ -36,9 +36,15 @@ type Parameters struct {
 
 // Prometheus Objects
 
-//MetricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
+// MetricCollect is used to query Prometheus to get data for specific query and return the results to be processed.
 func MetricCollect(args *Parameters, query string, range5m v1.Range) (value model.Value, err error) {
 	var pa v1.API
+	if args.Debug {
+		// range5m is always the same, no point in logging
+		msg := fmt.Sprintf("QueryRange: query = %s", query)
+		args.DebugLogger.Println(msg)
+		fmt.Println("[DEBUG] " + msg)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	_ = time.AfterFunc(2*time.Minute, func() { cancel() })
 	if pa, err = promApi(args); err != nil {
@@ -95,7 +101,7 @@ func promApi(args *Parameters) (v1.API, error) {
 	}
 }
 
-//TimeRange allows you to define the start and end values of the range will pass to the Prometheus for the query.
+// TimeRange allows you to define the start and end values of the range will pass to the Prometheus for the query.
 func TimeRange(args *Parameters, historyInterval time.Duration) (promRange v1.Range) {
 
 	var start, end time.Time
@@ -162,7 +168,7 @@ func AddToLabelMap(key string, value string, labelPath map[string]string) {
 	}
 }
 
-//GetWorkload used to query for the workload data and then calls write workload
+// GetWorkload used to query for the workload data and then calls write workload
 func GetWorkload(fileName, metricName, query string, metricField []model.LabelName, args *Parameters, entityKind string) {
 	var historyInterval time.Duration
 	historyInterval = 0
@@ -201,7 +207,7 @@ func GetWorkload(fileName, metricName, query string, metricField []model.LabelNa
 	workloadWrite.Close()
 }
 
-//WriteWorkload will write out the workload data specific to metric provided to the file that was passed in.
+// WriteWorkload will write out the workload data specific to metric provided to the file that was passed in.
 func WriteWorkload(file io.Writer, result model.Value, metricField []model.LabelName, args *Parameters, entityKind string) {
 	//Loop through the results for the workload and validate that contains the required labels and that the entity exists in the systems data structure once validated will write out the workload for the system.
 	for i := 0; i < result.(model.Matrix).Len(); i++ {

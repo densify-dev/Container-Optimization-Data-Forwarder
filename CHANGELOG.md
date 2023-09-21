@@ -1,3 +1,6 @@
+## 3.0.1
+* Force include cluster for consistency.
+
 ## 3.0.0
 * Usage of a new endpoint to support TSDB.
 * Corresponds to image tag `densify/container-optimization-data-forwarder:3`.

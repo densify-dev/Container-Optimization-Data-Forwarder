@@ -1,4 +1,4 @@
-//Package container2 collects data related to containers and formats into csv files to send to Densify.
+// Package container2 collects data related to containers and formats into csv files to send to Densify.
 package container2
 
 import (
@@ -11,7 +11,9 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-//writeConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
+const kubeLastAppliedConfLabel = "annotation_kubectl_kubernetes_io_last_applied_configuration"
+
+// writeConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
 func writeConfig(args *common.Parameters) {
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/container/config.csv")
@@ -39,7 +41,7 @@ func writeConfig(args *common.Parameters) {
 	}
 }
 
-//writeConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
+// writeConfig will create the config.csv file that is will be sent to Densify by the Forwarder.
 func writeHPAConfig(args *common.Parameters, systems map[string]map[string]string) {
 	//Create the config file and open it for writing.
 	configWrite, err := os.Create("./data/hpa/hpa_extra_config.csv")
@@ -59,7 +61,7 @@ func writeHPAConfig(args *common.Parameters, systems map[string]map[string]strin
 	}
 }
 
-//writeAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
+// writeAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
 func writeAttributes(args *common.Parameters) {
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/container/attributes.csv")
@@ -82,13 +84,17 @@ func writeAttributes(args *common.Parameters) {
 					cstate = "Terminated"
 				}
 				//for wt, vt := range systems[kn].pods
-				//Write out the different fields. For fiels that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
+				//Write out the different fields. For fields that are numeric we don't want to write -1 if it wasn't set so we write a blank if that is the value otherwise we write the number out.
 				fmt.Fprintf(attributeWrite, "%s,%s,%s,%s,%s,Containers,%s,%s,%s,", *args.ClusterName, kn, strings.Replace(vt.name, ";", ".", -1), vt.kind, strings.Replace(kc, ":", ".", -1), *args.ClusterName, kn, vt.name)
 				for key, value := range systems[kn].midLevels[kt].containers[kc].labelMap {
 					if len(key) >= 250 {
 						continue
 					}
+					if key == kubeLastAppliedConfLabel {
+						continue
+					}
 					value = strings.Replace(value, ",", " ", -1)
+					value = strings.Replace(value, "\"", "", -1)
 					if len(value)+3+len(key) < 256 {
 						fmt.Fprintf(attributeWrite, key+" : "+value+"|")
 					} else {
@@ -192,7 +198,7 @@ func writeAttributes(args *common.Parameters) {
 	}
 }
 
-//writeAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
+// writeAttributes will create the attributes.csv file that is will be sent to Densify by the Forwarder.
 func writeHPAAttributes(args *common.Parameters, systems map[string]map[string]string) {
 	//Create the attributes file and open it for writing
 	attributeWrite, err := os.Create("./data/hpa/hpa_extra_attributes.csv")
@@ -221,7 +227,7 @@ func writeHPAAttributes(args *common.Parameters, systems map[string]map[string]s
 	}
 }
 
-//writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
+// writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
 func writeWorkload(file io.Writer, result model.Value, namespace, pod, container model.LabelName, args *common.Parameters, kind string) {
 	var tempKind bool
 	if result == nil {
@@ -264,7 +270,7 @@ func writeWorkload(file io.Writer, result model.Value, namespace, pod, container
 	}
 }
 
-//writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
+// writeWorkload will write out the workload data specific to metric provided to the file that was passed in.
 func writeWorkloadMid(file io.Writer, result model.Value, namespace, mid model.LabelName, args *common.Parameters, prefix string) {
 	if result == nil {
 		return

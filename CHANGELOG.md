@@ -1,3 +1,7 @@
+## 3.0.2
+* Remove nested quotes from label values
+* Skip processing of label annotation_kubectl_kubernetes_io_last_applied_configuration as it's not required 
+
 ## 3.0.1
 * Force include cluster for consistency.
 

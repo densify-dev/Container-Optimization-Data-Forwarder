@@ -109,7 +109,11 @@ func writeAttributes(args *common.Parameters) {
 					if len(key) >= 250 {
 						continue
 					}
+					if key == kubeLastAppliedConfLabel {
+						continue
+					}
 					value = strings.Replace(value, ",", " ", -1)
+					value = strings.Replace(value, "\"", "", -1)
 					if len(value)+3+len(key) < 256 {
 						fmt.Fprintf(attributeWrite, key+" : "+value+"|")
 					} else {
@@ -158,7 +162,11 @@ func writeAttributes(args *common.Parameters) {
 					if len(key) >= 250 {
 						continue
 					}
+					if key == kubeLastAppliedConfLabel {
+						continue
+					}
 					value = strings.Replace(value, ",", " ", -1)
+					value = strings.Replace(value, "\"", "", -1)
 					if len(value)+3+len(key) < 256 {
 						fmt.Fprintf(attributeWrite, key+" : "+value+"|")
 					} else {

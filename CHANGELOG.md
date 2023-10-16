@@ -1,3 +1,6 @@
+## 3.0.4
+Fix missing CSV column for nodegroup memRequest if data is not found.
+
 ## 3.0.3
 Cover cases of pod/namespace labels:
 * Remove nested quotes from label values

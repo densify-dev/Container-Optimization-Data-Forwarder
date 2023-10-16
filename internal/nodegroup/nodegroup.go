@@ -170,7 +170,7 @@ func writeAttributes(args *common.Parameters) {
 		}
 
 		if nodeGroup.memRequest == -1 {
-			fmt.Fprintf(attributeWrite, "%d,%s,", nodeGroup.currentSize, nodeGroup.nodes[:len(nodeGroup.nodes)-1])
+			fmt.Fprintf(attributeWrite, ",%d,%s,", nodeGroup.currentSize, nodeGroup.nodes[:len(nodeGroup.nodes)-1])
 		} else {
 			fmt.Fprintf(attributeWrite, "%d,%d,%s,", nodeGroup.memRequest, nodeGroup.currentSize, nodeGroup.nodes[:len(nodeGroup.nodes)-1])
 		}

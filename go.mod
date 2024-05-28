@@ -1,3 +1,4 @@
+// Deprecated as of 2024-06-30: Please move to use https://github.com/densify-dev/container-data-collection
 module github.com/densify-dev/Container-Optimization-Data-Forwarder
 
 go 1.19
